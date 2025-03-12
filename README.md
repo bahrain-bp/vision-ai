@@ -1,4 +1,4 @@
-# CIC Innovation Center - TestingChallenge PoC
+# CIC Innovation Center - TestingChallengeV2 PoC
 
 ### 📁 **Project Structure**
 
