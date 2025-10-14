@@ -1,10 +1,10 @@
-# CIC Innovation Center - TestingChallenge PoC
+# CIC Innovation Center - VisionAI PoC
 
 ### 📁 **Project Structure**
 
 ```
 
-CIC-[ChallengeName]-PoC/
+CIC-VisionAI-PoC/
 │── frontend/                # React app (S3-hosted website)
 │   ├── public/
 │   ├── src/
@@ -112,6 +112,9 @@ npm install web-vitals
 ```
 ```
 npm audit fix --force
+```
+```
+npm install react-scripts --save-dev
 ```
 ```
 npm run build
