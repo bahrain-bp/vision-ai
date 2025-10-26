@@ -1,28 +1,36 @@
-#!/usr/bin/env python3
 import os
-
 import aws_cdk as cdk
-
-from vision_ai.vision_ai_stack import VisionAiStack
+from vision_ai.cognito_stack import CognitoStack
 
 
 app = cdk.App()
-VisionAiStack(app, "VisionAiStack",
-    # If you don't specify 'env', this stack will be environment-agnostic.
-    # Account/Region-dependent features and context lookups will not work,
-    # but a single synthesized template can be deployed anywhere.
 
-    # Uncomment the next line to specialize this stack for the AWS Account
-    # and Region that are implied by the current CLI configuration.
+# Environment configuration
+env = cdk.Environment(
+    account=os.getenv('CDK_DEFAULT_ACCOUNT'),
+    region=os.getenv('CDK_DEFAULT_REGION', 'us-east-1')
+)
 
-    #env=cdk.Environment(account=os.getenv('CDK_DEFAULT_ACCOUNT'), region=os.getenv('CDK_DEFAULT_REGION')),
+app_name = "vision-ai"
 
-    # Uncomment the next line if you know exactly what Account and Region you
-    # want to deploy the stack to. */
+# Create Cognito Stack for Login/Signup
+cognito_stack = CognitoStack(
+    app,
+    f"{app_name}-cognito-stack",
+    app_name=app_name,
+    callback_urls=[
+        "http://localhost:3000",
+    ],
+    logout_urls=[
+        "http://localhost:3000",
+        
+    ],
+    env=env,
+    description="Cognito User Pool for Login and Signup"
+)
 
-    #env=cdk.Environment(account='123456789012', region='us-east-1'),
-
-    # For more information, see https://docs.aws.amazon.com/cdk/latest/guide/environments.html
-    )
+# Add tags
+cdk.Tags.of(app).add("Project", "VisionAI")
+cdk.Tags.of(app).add("ManagedBy", "CDK")
 
 app.synth()
