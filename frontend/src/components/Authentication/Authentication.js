@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import "../index.css";
+import "../../../src/index.css";
 import {
   LogIn,
   UserPlus,
@@ -11,7 +11,7 @@ import {
   Home,
   Eye,
 } from "lucide-react";
-import authService from "../services/authService";
+import authService from "../../services/authService";
 
 // --- REUSABLE COMPONENTS ---
 const Button = ({ children, onClick, loading, icon: Icon, className = "" }) => (
