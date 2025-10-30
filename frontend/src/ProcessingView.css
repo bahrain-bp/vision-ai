@@ -1,0 +1,201 @@
+/* Processing View Styles */
+.processing-view {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - 140px);
+  height: 100%;
+  background: var(--background-light);
+  padding: 1rem;
+}
+
+/* Tabs container */
+.processing-tabs {
+  display: flex;
+  flex-wrap: wrap; /* allows tabs to wrap on small screens */
+  gap: 1px;
+  background: var(--background-white);
+  padding: 0 1rem;
+  border-bottom: 1px solid var(--border-light);
+}
+
+/* Individual tab buttons */
+.tab-btn {
+  padding: 0.75rem 1rem;
+  border: none;
+  background: none;
+  cursor: pointer;
+  position: relative;
+  color: var(--text-medium);
+  font-weight: 500;
+  transition: all 0.2s;
+  flex: 1; /* stretch evenly across the row */
+  text-align: center;
+  min-width: 100px; /* prevent shrinking too small */
+}
+
+.tab-btn:hover:not(.disabled) {
+  color: var(--text-dark);
+}
+
+.tab-btn.active {
+  color: var(--primary-color);
+}
+
+.tab-btn.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--primary-color);
+}
+
+.tab-btn.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Tab content container */
+.tab-content {
+  display: flex;
+  flex: 1;
+  justify-content: center;
+  align-items: center;
+  padding: 2rem;
+  overflow-y: auto;
+  background: var(--background-white);
+  border-radius: 8px;
+  box-shadow: var(--shadow-light);
+  width: 100%;
+  box-sizing: border-box;
+  margin: 1rem;
+}
+
+/* Processing content inside tab */
+.processing-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 2rem;
+  width: 100%;
+  max-width: 800px;
+  box-sizing: border-box;
+}
+
+/* Continue button */
+.continue-btn {
+  margin-top: 2rem;
+  padding: 0.75rem 1.5rem;
+  background: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  box-shadow: var(--shadow-light);
+}
+
+.continue-btn:hover {
+  background: var(--primary-dark);
+}
+
+/* Spinner */
+.processing-spinner {
+  color: var(--primary-color);
+  margin-bottom: 1.5rem;
+  animation: spin 1s linear infinite;
+}
+
+/* Titles and descriptions */
+.processing-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--text-dark);
+  margin-bottom: 1rem;
+}
+
+.processing-description {
+  color: var(--text-light);
+  margin-bottom: 0.5rem;
+}
+
+.session-reference {
+  color: var(--text-light);
+  font-size: 14px;
+  margin-top: 0.5rem;
+}
+
+/* Processing Tab Content Styles */
+.tab-section {
+  background: var(--background-white);
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-bottom: 0.5rem;
+  box-shadow: var(--shadow-light);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.tab-section-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-dark);
+  margin-bottom: 1rem;
+}
+
+.tab-section-content {
+  color: var(--text-medium);
+  font-size: 14px;
+}
+
+/* Responsive Media Queries */
+@media (max-width: 1024px) {
+  .processing-title {
+    font-size: 22px;
+  }
+  .tab-section-title {
+    font-size: 16px;
+  }
+  .tab-btn {
+    padding: 0.5rem 0.75rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .processing-content {
+    padding: 1.5rem;
+  }
+  .tab-content {
+    padding: 1rem;
+  }
+  .processing-title {
+    font-size: 20px;
+  }
+  .tab-section-title {
+    font-size: 15px;
+  }
+}
+
+@media (max-width: 480px) {
+  .processing-content {
+    padding: 1rem;
+  }
+  .processing-title {
+    font-size: 18px;
+  }
+  .tab-section-title {
+    font-size: 14px;
+  }
+  .tab-btn {
+    padding: 0.5rem 0.5rem;
+    font-size: 14px;
+  }
+  .continue-btn {
+    padding: 0.5rem 1rem;
+    font-size: 14px;
+  }
+}
