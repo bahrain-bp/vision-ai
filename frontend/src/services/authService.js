@@ -1,13 +1,15 @@
 
-import { 
-  signUp, 
-  signIn, 
-  signOut, 
-  confirmSignUp, 
+import {
+  signUp,
+  signIn,
+  signOut,
+  confirmSignUp,
   resendSignUpCode,
   getCurrentUser,
-  fetchAuthSession
-} from 'aws-amplify/auth';
+  fetchAuthSession,
+  resetPassword,
+  confirmResetPassword,
+} from "aws-amplify/auth";
  
 /**
 * Sign up a new user
@@ -155,6 +157,41 @@ export async function getAuthSession() {
     };
   }
 }
+
+
+export async function forgotPasswordUser(username) {
+  try {
+    const output = await resetPassword({ username });
+    return {
+      success: true,
+      nextStep: output.nextStep,
+      message: 'Verification code sent to your email.'
+    };
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    throw handleAuthError(error);
+  }
+}
+
+/**
+* Complete forgot password flow - reset password with verification code
+*/
+export async function forgotPasswordSubmitUser(username, confirmationCode, newPassword) {
+  try {
+    await confirmResetPassword({
+      username,
+      confirmationCode,
+      newPassword
+    });
+    return {
+      success: true,
+      message: 'Password reset successful! Redirecting to login...'
+    };
+  } catch (error) {
+    console.error('Reset password error:', error);
+    throw handleAuthError(error);
+  }
+}
  
 /**
 * Handle and format authentication errors
@@ -188,7 +225,9 @@ const authService = {
   signIn: signInUser,
   signOut: signOutUser,
   getCurrentUser: getCurrentAuthUser,
-  getSession: getAuthSession
+  getSession: getAuthSession,
+  forgotPassword: forgotPasswordUser,
+  forgotPasswordSubmitUser: forgotPasswordSubmitUser,
 };
  
 export default authService;
