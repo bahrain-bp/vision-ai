@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Amplify } from "aws-amplify";
 import Authentication from "./components/Authentication/Authentication";
 import HomePage from "./components/HomePage/HomePage";
-import SessionPage from "./components/Session/SessionPage";
+import SessionPage from "./components/session/SessionPage";
 import authService from "./services/authService";
 import awsConfig from "./aws-config";
 Amplify.configure(awsConfig);
