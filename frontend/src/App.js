@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { Amplify } from "aws-amplify";
-import Authentication from "./components/Authentication";
-import HomePage from "./components/HomePage";
-import SessionSetup from "./components/SessionSetup/SessionSetup";
-import SessionPage from "./components/SessionPage";
+import Authentication from "./components/Authentication/Authentication";
+import HomePage from "./components/HomePage/HomePage";
+import SessionPage from "./components/Session/SessionPage";
 import authService from "./services/authService";
 import awsConfig from "./aws-config";
 Amplify.configure(awsConfig);
@@ -51,15 +50,31 @@ function App() {
   };
 
   const handleStartSession = () => {
-    setCurrentView("sessionSetup");
-  };
+    // Generate new session data
+    const newSessionData = {
+      sessionId: `#${new Date().getFullYear()}-INV-${Math.floor(
+        1000 + Math.random() * 9000
+      )}`,
+      investigator: "M. AlZebari",
+      language: "Arabic",
+      duration: "00:00",
+      witness: "Not set",
+      status: "Ready",
+      witnessData: {
+        fullName: "",
+        idNumber: "",
+      },
+      identityData: {
+        referencePhoto: null,
+        isVerified: false,
+      },
+      translationSettings: {
+        sourceLanguage: "ar",
+        targetLanguage: "en",
+      },
+    };
 
-  const handleBackToDashboard = () => {
-    setCurrentView("home");
-  };
-
-  const handleStartInvestigation = (sessionData) => {
-    setSessionData(sessionData);
+    setSessionData(newSessionData);
     setCurrentView("session");
   };
 
@@ -83,11 +98,6 @@ function App() {
     <div className="App">
       {!isAuthenticated ? (
         <Authentication onAuthSuccess={handleAuthSuccess} />
-      ) : currentView === "sessionSetup" ? (
-        <SessionSetup
-          onBackToDashboard={handleBackToDashboard}
-          onStartInvestigation={handleStartInvestigation}
-        />
       ) : currentView === "session" ? (
         <SessionPage
           user={currentUser}

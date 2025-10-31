@@ -1,6 +1,6 @@
 import React from "react";
 import { LogOut, Play } from "lucide-react";
-import authService from "../services/authService";
+import authService from "../../services/authService";
 
 const HomePage = ({ user, onSignOut, onStartSession }) => {
   const handleSignOut = async () => {
