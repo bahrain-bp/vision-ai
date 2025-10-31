@@ -97,11 +97,11 @@ const WelcomeSidebar = () => (
     <div className="sidebar-content">
       <div className="logo-container">
         <Eye className="app-logo" />
-        <h1 className="app-title">VISION RT</h1>
+        <h1 className="app-title">VISION AI</h1>
       </div>
 
       <div className="welcome-message-container">
-        <h2 className="welcome-title">Welcome to VISION RT</h2>
+        <h2 className="welcome-title">Welcome to VISION AI</h2>
       </div>
     </div>
   </div>
@@ -394,7 +394,7 @@ const AuthenticatedComponent = ({ user, displayMessage, onSignOut }) => {
   return (
     <div className="authenticated-container">
       <Home className="welcome-icon" />
-      <h2 className="welcome-title">Welcome to VISION RT!</h2>
+      <h2 className="welcome-title">Welcome to VISION AI!</h2>
       <p className="welcome-message">You are successfully authenticated.</p>
       {user && (
         <div className="user-info">
