@@ -1,8 +1,53 @@
-myenv
-!jest.config.js
-*.d.ts
-node_modules
+# === Python ===
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.db
+*.sqlite3
+*.log
+*.pot
+*.mo
 
-# CDK asset staging directory
-.cdk.staging
-cdk.out
+# Virtual environments
+.venv/
+venv/
+env/
+myenv/
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# === Node / Frontend ===
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment files
+frontend/.env
+.env
+
+# TypeScript declaration files
+*.d.ts
+
+# Jest config exception (keep it)
+!jest.config.js
+
+# === AWS CDK ===
+.cdk.staging/
+cdk.out/
+
+# === IDEs and OS files ===
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+#Frontend .env
+frontend/.env

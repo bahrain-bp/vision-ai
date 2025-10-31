@@ -169,7 +169,21 @@
   color: var(--text-light);
   z-index: 1;
 }
-
+.password-toggle {
+  position: absolute;
+  right: 12px;
+  background: none;
+  border: none;
+  padding: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-light);
+  transition: color 0.2s;
+  z-index: 1;
+  border-radius: 4px;
+}
 .input-field {
   width: 100%;
   padding: 12px 12px 12px 40px;
@@ -247,7 +261,7 @@
 }
 
 .form-footer {
-  text-align: center;
+  text-align: left;
   margin-top: 20px;
   padding-top: 20px;
   border-top: 1px solid var(--border-light);
