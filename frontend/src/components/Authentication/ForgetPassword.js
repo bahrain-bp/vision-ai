@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { AuthForm, InputField, Button } from "../Authentication";
+import { AuthForm, InputField, Button } from "./Authentication";
 import { AtSign, Key, Lock, User, Eye, EyeOff } from "lucide-react";
 import authService from "../../services/authService";
 
@@ -9,8 +9,6 @@ const ForgotPassword = ({ setView, displayMessage, loading, setLoading }) => {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [step, setStep] = useState(1);
-  const [showNewPassword, setShowNewPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const handleRequestCode = async () => {
     if (!email) {
