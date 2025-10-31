@@ -48,3 +48,6 @@ cdk.out/
 *.swp
 .DS_Store
 Thumbs.db
+
+#Frontend .env
+frontend/.env
