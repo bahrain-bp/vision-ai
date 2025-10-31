@@ -10,11 +10,12 @@ import {
   Key,
   Home,
   Eye,
+  EyeOff,
 } from "lucide-react";
 import authService from "../services/authService";
-
+import ForgetPassword from "./Authentication/ForgetPassword.js"
 // --- REUSABLE COMPONENTS ---
-const Button = ({ children, onClick, loading, icon: Icon, className = "" }) => (
+export const Button = ({ children, onClick, loading, icon: Icon, className = "" }) => (
   <button
     onClick={onClick}
     disabled={loading}
@@ -33,7 +34,7 @@ const Button = ({ children, onClick, loading, icon: Icon, className = "" }) => (
   </button>
 );
 
-const InputField = ({
+ export const InputField = ({
   id,
   label,
   type,
@@ -41,31 +42,57 @@ const InputField = ({
   onChange,
   placeholder,
   icon: Icon,
-}) => (
-  <div className="input-container">
-    <label htmlFor={id} className="input-label">
-      {label}
-    </label>
-    <div className="input-wrapper">
-      {Icon && (
-        <div className="input-icon">
-          <Icon className="icon" />
-        </div>
-      )}
-      <input
-        id={id}
-        type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        required
-        className="input-field"
-      />
+}) => {
+  const isPassword = type === "password";
+    const [showPassword, setShowPassword] = useState(false);
+const inputType = isPassword && showPassword ? "text" : type;
+  return (
+    <div className="input-container">
+      <label htmlFor={id} className="input-label">
+        {label}
+      </label>
+      <div className="input-wrapper">
+        {Icon && (
+          <div className="input-icon">
+            <Icon className="icon" />
+          </div>
+        )}
+        <input
+          id={id}
+          type={inputType}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          required
+          className="input-field"
+        />
+        {isPassword && (
+          <button
+            type="button"
+            className="password-toggle"
+            onClick={() => {
+              setShowPassword(!showPassword);
+            }}
+          >
+            {showPassword ? (
+              <EyeOff className="icon" />
+            ) : (
+              <Eye className="icon" />
+            )}
+          </button>
+        )}
+      </div>
     </div>
-  </div>
-);
+  );};
 
-const AuthForm = ({ title, children, footer, onSwitch, loading }) => (
+export const AuthForm = ({
+  title,
+  children,
+  footer,
+  onSwitch,
+  loading,
+  formFooterStyles,
+}) => (
   <div className="auth-form">
     <div className="form-header">
       <h2 className="form-title">{title}</h2>
@@ -73,7 +100,7 @@ const AuthForm = ({ title, children, footer, onSwitch, loading }) => (
     <form onSubmit={(e) => e.preventDefault()} className="form">
       {children}
       {footer && (
-        <div className="form-footer">
+        <div className="form-footer" style={formFooterStyles}>
           <p className="footer-text">
             {footer.text}{" "}
             <button
@@ -178,6 +205,12 @@ const LoginComponent = ({
         placeholder="Enter your password"
         icon={Lock}
       />
+      <AuthForm
+        footer={{ linkText: "Forget Password?" }}
+        onSwitch={() => setView("forgetPass")}
+        loading={loading}
+        formFooterStyles= {{marginBottom:"1em"}}
+      ></AuthForm>
       <Button onClick={handleSignIn} loading={loading} icon={LogIn}>
         Sign In
       </Button>
@@ -490,6 +523,16 @@ const Authentication = ({ onAuthSuccess }) => {
           user={currentUser}
           displayMessage={displayMessage}
           onSignOut={handleSignOut}
+        />
+      );
+      break;
+    case "forgetPass":
+      CurrentViewComponent = (
+        <ForgetPassword
+          displayMessage={displayMessage}
+          setLoading={setLoading}
+          setView={setView}
+          loading={loading}
         />
       );
       break;
