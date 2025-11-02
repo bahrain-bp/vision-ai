@@ -13,15 +13,79 @@ import AIAssistant from "./AIAssistant";
 import SessionInfo from "./SessionInfo";
 import IdentityVerification from "./IdentityVerification/IdentityVerification";
 
-const RealTimeView = ({
+type SessionState = 'ready' | 'recording' | 'completed';
+
+interface SessionData {
+  sessionId: string;
+  witness: string;
+  language: string;
+  duration: string;
+  status: string;
+  investigator?: string;
+}
+
+interface IdentityData {
+  referencePhoto: File | null;
+  cpr: File | null;
+  passport: File | null;
+  isVerified: boolean;
+}
+
+interface InvestigationData {
+  witness: string;
+  idNumber: string;
+  identityData: IdentityData;
+  investigator: string;
+  duration: string;
+  status: string;
+}
+
+interface WitnessData {
+  fullName: string;
+  idNumber: string;
+}
+
+interface IdentityData {
+  referencePhoto: File | null;
+  cpr: File | null;
+  passport: File | null;
+  isVerified: boolean;
+}
+
+interface TranslationSettings {
+  sourceLanguage: string;
+  targetLanguage: string;
+}
+
+interface SetupData {
+  witnessData: WitnessData;
+  identityData: IdentityData;
+  translationSettings: TranslationSettings;
+}
+
+interface RealTimeViewProps {
+  sessionState: SessionState;
+  setSessionState: (state: SessionState) => void;
+  sessionData: SessionData;
+  setupData: SetupData; 
+  onWitnessDataChange: (field: keyof WitnessData, value: string) => void; 
+  onIdentityDataChange: (field: keyof IdentityData, value: any) => void;
+  onTranslationSettingsChange: (
+    field: keyof TranslationSettings,
+    value: string
+  ) => void; 
+  onVerifyIdentity: () => void;
+}
+
+const RealTimeView: React.FC<RealTimeViewProps> = ({
   sessionState,
   setSessionState,
   sessionData,
-  identityData,
-  onIdentityDataChange,
-  onVerifyIdentity,
+  //identityData,
+  //onIdentityDataChange,
+  //onVerifyIdentity,
 }) => {
-  const [activeTab, setActiveTab] = useState("identity");
+  const [activeTab, setActiveTab] = useState<"identity" | "transcription">("identity");
   const [aiExpanded, setAiExpanded] = useState(false);
   const [isIdentityVerified, setIsIdentityVerified] = useState(false);
 
@@ -30,18 +94,14 @@ const RealTimeView = ({
     setActiveTab("transcription");
   };
 
-  // Add handler for starting investigation
-  const handleStartInvestigation = (investigationData) => {
+  const handleStartInvestigation = (investigationData: InvestigationData) => {
     console.log("Starting investigation with data:", investigationData);
-    // Mark identity as verified and switch to transcription tab
     setIsIdentityVerified(true);
     setActiveTab("transcription");
   };
 
-  // Add handler for going back to dashboard
   const handleBackToDashboard = () => {
     console.log("Going back to dashboard");
-    // Add your navigation logic here
   };
 
   return (
@@ -50,9 +110,9 @@ const RealTimeView = ({
         {sessionState === "ready" && activeTab === "identity" && (
           <div className="recording-content">
             <IdentityVerification
-              identityData={identityData}
-              onIdentityDataChange={onIdentityDataChange}
-              onVerifyIdentity={onVerifyIdentity}
+              //identityData={identityData}
+              //onIdentityDataChange={onIdentityDataChange}
+              //onVerifyIdentity={onVerifyIdentity}
               onStartInvestigation={handleStartInvestigation}
               onBackToDashboard={handleBackToDashboard}
             />
@@ -67,8 +127,7 @@ const RealTimeView = ({
               </div>
               <h2 className="ready-title">Ready to Start</h2>
               <p className="ready-description">
-                Click the button below to begin recording the investigation
-                session.
+                Click the button below to begin recording the investigation session.
               </p>
               <button
                 onClick={handleStartRecording}

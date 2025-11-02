@@ -2,8 +2,41 @@ import React, { useState } from "react";
 import WitnessInfo from "./WitnessInfo";
 import DocumentVerification from "./DocumentVerification";
 
-const IdentityVerification = ({ onBackToDashboard, onStartInvestigation }) => {
-  const [verificationData, setVerificationData] = useState({
+interface WitnessData {
+  fullName: string;
+  idNumber: string;
+}
+
+interface IdentityData {
+  referencePhoto: File | null;
+  cpr: File | null;
+  passport: File | null;
+  isVerified: boolean;
+}
+
+interface VerificationData {
+  witnessData: WitnessData;
+  identityData: IdentityData;
+}
+
+interface InvestigationData {
+  witness: string;
+  idNumber: string;
+  identityData: IdentityData;
+  investigator: string;
+  duration: string;
+  status: string;
+}
+
+interface IdentityVerificationProps {
+  onBackToDashboard: () => void;
+  onStartInvestigation: (data: InvestigationData) => void;
+}
+
+const IdentityVerification: React.FC<IdentityVerificationProps> = ({
+  onStartInvestigation,
+}) => {
+  const [verificationData, setVerificationData] = useState<VerificationData>({
     witnessData: {
       fullName: "",
       idNumber: "",
@@ -11,12 +44,12 @@ const IdentityVerification = ({ onBackToDashboard, onStartInvestigation }) => {
     identityData: {
       referencePhoto: null,
       cpr: null,
-      passport: null, // Make sure passport is in the initial state
+      passport: null,
       isVerified: false,
     },
   });
 
-  const updateWitnessData = (field, value) => {
+  const updateWitnessData = (field: keyof WitnessData, value: string) => {
     setVerificationData((prev) => ({
       ...prev,
       witnessData: {
@@ -26,7 +59,7 @@ const IdentityVerification = ({ onBackToDashboard, onStartInvestigation }) => {
     }));
   };
 
-  const updateIdentityData = (field, value) => {
+  const updateIdentityData = (field: keyof IdentityData, value: any) => {
     setVerificationData((prev) => ({
       ...prev,
       identityData: {
@@ -47,7 +80,6 @@ const IdentityVerification = ({ onBackToDashboard, onStartInvestigation }) => {
       return;
     }
 
-    // FIX: Check for either CPR OR Passport
     if (
       !verificationData.identityData.cpr &&
       !verificationData.identityData.passport
@@ -56,7 +88,7 @@ const IdentityVerification = ({ onBackToDashboard, onStartInvestigation }) => {
       return;
     }
 
-    const investigationData = {
+    const investigationData: InvestigationData = {
       witness: verificationData.witnessData.fullName,
       idNumber: verificationData.witnessData.idNumber,
       identityData: verificationData.identityData,

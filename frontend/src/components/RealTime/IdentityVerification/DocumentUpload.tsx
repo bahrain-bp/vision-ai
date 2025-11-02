@@ -1,15 +1,21 @@
 import React, { useRef } from "react";
-import { Upload, CheckCircle } from "lucide-react";
+import { CheckCircle } from "lucide-react";
 
-const DocumentUpload = ({
+interface DocumentUploadProps {
+  documentType: string;
+  onDocumentUpload: (documentType: string, file: File) => void;
+  uploadedDocument: File | null;
+}
+
+const DocumentUpload: React.FC<DocumentUploadProps> = ({
   documentType,
   onDocumentUpload,
   uploadedDocument,
 }) => {
-  const fileInputRef = useRef(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileUpload = (event) => {
-    const file = event.target.files[0];
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
     if (file) {
       onDocumentUpload(documentType, file);
     }

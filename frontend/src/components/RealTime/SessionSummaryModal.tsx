@@ -1,28 +1,38 @@
-import React from 'react';
-import { X, Download, Share2 } from 'lucide-react';
+import React from "react";
+import { X, Download, Share2 } from "lucide-react";
 
-const SessionSummaryModal = ({ sessionData, onClose }) => {
+interface SessionData {
+  sessionId: string;
+  witness: string;
+  language: string;
+  duration: string;
+  status: string;
+}
+
+interface SessionSummaryModalProps {
+  sessionData: SessionData;
+  onClose: () => void;
+}
+
+const SessionSummaryModal: React.FC<SessionSummaryModalProps> = ({
+  sessionData,
+  onClose,
+}) => {
   return (
     <div className="modal-overlay">
       <div className="summary-modal">
-        {/* Header */}
         <div className="modal-header">
           <h2 className="modal-title">Session Summary</h2>
-          <button
-            onClick={onClose}
-            className="close-button"
-          >
+          <button onClick={onClose} className="close-button">
             <X className="icon" />
           </button>
         </div>
 
-        {/* Body */}
         <div className="modal-body">
           <div className="session-details-card">
             <h3 className="details-title">Session Details</h3>
-            
+
             <div className="details-grid">
-              {/* Left Column */}
               <div className="details-column">
                 <div className="detail-item">
                   <p className="detail-label">Session ID:</p>
@@ -34,7 +44,6 @@ const SessionSummaryModal = ({ sessionData, onClose }) => {
                 </div>
               </div>
 
-              {/* Right Column */}
               <div className="details-column">
                 <div className="detail-item">
                   <p className="detail-label">Witness:</p>
@@ -48,7 +57,6 @@ const SessionSummaryModal = ({ sessionData, onClose }) => {
             </div>
           </div>
 
-          {/* Action Buttons */}
           <div className="modal-actions">
             <button className="action-btn primary">
               <Download className="btn-icon" />
