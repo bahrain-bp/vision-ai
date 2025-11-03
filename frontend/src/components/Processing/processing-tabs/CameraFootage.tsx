@@ -1,6 +1,7 @@
 import React from 'react';
 
-const CameraFootage = ({ sessionData }) => {
+// note: we can add session data, types , and interfaces as needed
+const CameraFootage:  React.FC = () => {
   return (
     <div className="camera-footage-view">
       <h2>Camera Footage Analysis</h2>

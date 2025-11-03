@@ -1,9 +1,10 @@
 import React from 'react';
 
-const Outcome = ({ sessionData }) => {
+// note: we can add session data, types , and interfaces as needed
+const Outcome :  React.FC = () => {
   return (
     <div className="outcome-view">
-      <h2>Session Outcome</h2>
+      <h2>Case Outcome</h2>
       <div className="session-info">
         
       </div>

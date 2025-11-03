@@ -1,9 +1,10 @@
 import React from 'react';
 
-const Rewrite = ({ sessionData }) => {
+// note: we can add session data, types , and interfaces as needed
+const Rewrite:  React.FC = () => {
   return (
     <div className="rewrite-view">
-      <h2>Statement Rewrite</h2>
+      <h2>Report Rewrite</h2>
       <div className="session-info">
         
       </div>

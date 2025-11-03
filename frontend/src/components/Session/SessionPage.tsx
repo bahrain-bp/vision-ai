@@ -166,7 +166,7 @@ const SessionPage: React.FC<SessionPageProps> = ({
             </button>
  
             <div className="nav-center">
-              <h1 className="app-logo-text">VISION-RT</h1>
+              <h1 className="app-logo-text">VISION-AI</h1>
               <div className="session-info-header">
                 <span className="session-label">Session</span>
                 <span className="session-id">
