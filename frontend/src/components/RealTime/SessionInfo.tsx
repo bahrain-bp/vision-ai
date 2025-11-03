@@ -1,7 +1,20 @@
-import React from 'react';
-import { FileText } from 'lucide-react';
+import React from "react";
+import { FileText } from "lucide-react";
 
-const SessionInfo = ({ sessionData }) => {
+interface SessionData {
+  sessionId: string;
+  witness: string;
+  language: string;
+  duration: string;
+  status: string;
+  investigator?: string;
+}
+
+interface SessionInfoProps {
+  sessionData: SessionData;
+}
+
+const SessionInfo: React.FC<SessionInfoProps> = ({ sessionData }) => {
   return (
     <div className="session-info-card">
       <div className="card-header">

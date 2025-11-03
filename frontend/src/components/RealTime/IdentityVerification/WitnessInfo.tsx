@@ -1,6 +1,19 @@
 import React from "react";
 
-const WitnessInfo = ({ witnessData, onWitnessDataChange }) => {
+interface WitnessData {
+  fullName: string;
+  idNumber: string;
+}
+
+interface WitnessInfoProps {
+  witnessData: WitnessData;
+  onWitnessDataChange: (field: keyof WitnessData, value: string) => void;
+}
+
+const WitnessInfo: React.FC<WitnessInfoProps> = ({
+  witnessData,
+  onWitnessDataChange,
+}) => {
   return (
     <div className="session-card">
       <h2 className="card-title">Witness Information</h2>

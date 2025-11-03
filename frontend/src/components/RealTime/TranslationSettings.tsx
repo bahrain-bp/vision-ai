@@ -1,6 +1,19 @@
 import React from "react";
 
-const TranslationSettings = ({
+interface TranslationSettings {
+  sourceLanguage: string;
+  targetLanguage: string;
+}
+
+interface TranslationSettingsProps {
+  translationSettings: TranslationSettings;
+  onTranslationSettingsChange: (
+    field: keyof TranslationSettings,
+    value: string
+  ) => void;
+}
+
+const TranslationSettings: React.FC<TranslationSettingsProps> = ({
   translationSettings,
   onTranslationSettingsChange,
 }) => {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, ReactNode, CSSProperties } from "react";
 import "../../../src/index.css";
 import {
   LogIn,
@@ -11,12 +11,109 @@ import {
   Home,
   Eye,
   EyeOff,
+  LucideIcon,
 } from "lucide-react";
-import ForgetPassword from "./ForgetPassword.js"
+import ForgetPassword from "./ForgetPassword";
 import authService from "../../services/authService";
+import { User } from "../../types/";
+
+// --- TYPE DEFINITIONS ---
+
+type MessageType = "info" | "success" | "error";
+
+type ViewType = "login" | "signup" | "confirm" | "authenticated" | "forgetPass";
+
+
+
+// Error type guard
+interface ErrorWithMessage {
+  message: string;
+  name?: string;
+}
+
+function isErrorWithMessage(error: unknown): error is ErrorWithMessage {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "message" in error &&
+    typeof (error as Record<string, unknown>).message === "string"
+  );
+}
+
+function getErrorMessage(error: unknown): string {
+  if (isErrorWithMessage(error)) return error.message;
+  return String(error);
+}
+
+interface ButtonProps {
+  children: ReactNode;
+  onClick: () => void;
+  loading?: boolean;
+  icon?: LucideIcon;
+  className?: string;
+}
+
+interface InputFieldProps {
+  id: string;
+  label: string;
+  type: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  icon?: LucideIcon;
+}
+
+interface AuthFormProps {
+  title: string;
+  children: ReactNode;
+  footer?: {
+    text?: string;
+    linkText: string;
+  };
+  onSwitch?: () => void;
+  loading?: boolean;
+  formFooterStyles?: CSSProperties;
+}
+
+interface BaseComponentProps {
+  setView: (view: ViewType) => void;
+  displayMessage: (msg: string | null | undefined, type?: MessageType) => void;
+  loading: boolean;
+  setLoading: (loading: boolean) => void;
+}
+
+interface LoginComponentProps extends BaseComponentProps {
+  setUsernameForConfirmation: (username: string) => void;
+  onAuthSuccess: () => Promise<void>;
+}
+
+interface SignupComponentProps extends BaseComponentProps {
+  setUsernameForConfirmation: (username: string) => void;
+}
+
+interface ConfirmSignupComponentProps extends BaseComponentProps {
+  usernameForConfirmation: string;
+}
+
+interface AuthenticatedComponentProps {
+  user: User | null;
+  displayMessage: (msg: string | null, type?: MessageType) => void;
+  onSignOut: () => void;
+}
+
+interface AuthenticationProps {
+  onAuthSuccess?: () => void;
+}
 
 // --- REUSABLE COMPONENTS ---
-export const Button = ({ children, onClick, loading, icon: Icon, className = "" }) => (
+
+export const Button: React.FC<ButtonProps> = ({
+  children,
+  onClick,
+  loading = false,
+  icon: Icon,
+  className = "",
+}) => (
   <button
     onClick={onClick}
     disabled={loading}
@@ -35,7 +132,7 @@ export const Button = ({ children, onClick, loading, icon: Icon, className = "" 
   </button>
 );
 
- export const InputField = ({
+export const InputField: React.FC<InputFieldProps> = ({
   id,
   label,
   type,
@@ -45,8 +142,9 @@ export const Button = ({ children, onClick, loading, icon: Icon, className = "" 
   icon: Icon,
 }) => {
   const isPassword = type === "password";
-    const [showPassword, setShowPassword] = useState(false);
-const inputType = isPassword && showPassword ? "text" : type;
+  const [showPassword, setShowPassword] = useState<boolean>(false);
+  const inputType = isPassword && showPassword ? "text" : type;
+
   return (
     <div className="input-container">
       <label htmlFor={id} className="input-label">
@@ -84,14 +182,15 @@ const inputType = isPassword && showPassword ? "text" : type;
         )}
       </div>
     </div>
-  );};
+  );
+};
 
-export const AuthForm = ({
+export const AuthForm: React.FC<AuthFormProps> = ({
   title,
   children,
   footer,
   onSwitch,
-  loading,
+  loading = false,
   formFooterStyles,
 }) => (
   <div className="auth-form">
@@ -120,7 +219,8 @@ export const AuthForm = ({
 );
 
 // --- WELCOME SIDEBAR COMPONENT ---
-const WelcomeSidebar = () => (
+
+const WelcomeSidebar: React.FC = () => (
   <div className="welcome-sidebar">
     <div className="sidebar-content">
       <div className="logo-container">
@@ -137,7 +237,7 @@ const WelcomeSidebar = () => (
 
 // --- VIEW COMPONENTS ---
 
-const LoginComponent = ({
+const LoginComponent: React.FC<LoginComponentProps> = ({
   setView,
   setUsernameForConfirmation,
   displayMessage,
@@ -145,10 +245,10 @@ const LoginComponent = ({
   setLoading,
   onAuthSuccess,
 }) => {
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
+  const [username, setUsername] = useState<string>("");
+  const [password, setPassword] = useState<string>("");
 
-  const handleSignIn = async () => {
+  const handleSignIn = async (): Promise<void> => {
     if (!username || !password) {
       displayMessage("Please enter username and password.", "error");
       return;
@@ -168,11 +268,15 @@ const LoginComponent = ({
         displayMessage(result.message, "success");
         onAuthSuccess();
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Sign in error:", error);
-      displayMessage(error.message, "error");
+      const errorMsg = getErrorMessage(error);
+      displayMessage(errorMsg, "error");
 
-      if (error.name === "UserNotConfirmedException") {
+      if (
+        isErrorWithMessage(error) &&
+        error.name === "UserNotConfirmedException"
+      ) {
         setUsernameForConfirmation(username);
         setView("confirm");
       }
@@ -206,12 +310,16 @@ const LoginComponent = ({
         placeholder="Enter your password"
         icon={Lock}
       />
-      <AuthForm
-        footer={{ linkText: "Forget Password?" }}
-        onSwitch={() => setView("forgetPass")}
-        loading={loading}
-        formFooterStyles= {{marginBottom:"1em"}}
-      ></AuthForm>
+      <div className="form-footer" style={{ marginBottom: "1em" }}>
+        <button
+          type="button"
+          onClick={() => setView("forgetPass")}
+          disabled={loading}
+          className="footer-link"
+        >
+          Forget Password?
+        </button>
+      </div>
       <Button onClick={handleSignIn} loading={loading} icon={LogIn}>
         Sign In
       </Button>
@@ -219,19 +327,19 @@ const LoginComponent = ({
   );
 };
 
-const SignupComponent = ({
+const SignupComponent: React.FC<SignupComponentProps> = ({
   setView,
   setUsernameForConfirmation,
   displayMessage,
   loading,
   setLoading,
 }) => {
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [firstName, setFirstName] = useState<string>("");
+  const [lastName, setLastName] = useState<string>("");
+  const [email, setEmail] = useState<string>("");
+  const [password, setPassword] = useState<string>("");
 
-  const handleSignUp = async () => {
+  const handleSignUp = async (): Promise<void> => {
     if (!firstName || !lastName || !email || !password) {
       displayMessage("All fields are required.", "error");
       return;
@@ -244,18 +352,13 @@ const SignupComponent = ({
     displayMessage(null);
 
     try {
-      const result = await authService.signUp(
-        username,
-        email,
-        password,
-        `${firstName} ${lastName}`
-      );
+      const result = await authService.signUp(username, email, password);
       displayMessage(result.message, "success");
       setUsernameForConfirmation(username);
       setView("confirm");
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Sign up error:", error);
-      displayMessage(error.message, "error");
+      displayMessage(getErrorMessage(error), "error");
     } finally {
       setLoading(false);
     }
@@ -321,17 +424,19 @@ const SignupComponent = ({
   );
 };
 
-const ConfirmSignupComponent = ({
+const ConfirmSignupComponent: React.FC<ConfirmSignupComponentProps> = ({
   setView,
   usernameForConfirmation,
   displayMessage,
   loading,
   setLoading,
 }) => {
-  const [code, setCode] = useState("");
-  const [username, setUsername] = useState(usernameForConfirmation || "");
+  const [code, setCode] = useState<string>("");
+  const [username, setUsername] = useState<string>(
+    usernameForConfirmation || ""
+  );
 
-  const handleConfirmation = async () => {
+  const handleConfirmation = async (): Promise<void> => {
     if (!username || !code) {
       displayMessage("Username and verification code are required.", "error");
       return;
@@ -344,15 +449,15 @@ const ConfirmSignupComponent = ({
       const result = await authService.confirmSignUp(username, code);
       displayMessage(result.message, "success");
       setTimeout(() => setView("login"), 2000);
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Confirmation error:", error);
-      displayMessage(error.message, "error");
+      displayMessage(getErrorMessage(error), "error");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleResendCode = async () => {
+  const handleResendCode = async (): Promise<void> => {
     if (!username) {
       displayMessage("Please enter your username.", "error");
       return;
@@ -362,9 +467,9 @@ const ConfirmSignupComponent = ({
     try {
       const result = await authService.resendConfirmationCode(username);
       displayMessage(result.message, "success");
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Resend code error:", error);
-      displayMessage(error.message, "error");
+      displayMessage(getErrorMessage(error), "error");
     } finally {
       setLoading(false);
     }
@@ -413,13 +518,17 @@ const ConfirmSignupComponent = ({
   );
 };
 
-const AuthenticatedComponent = ({ user, displayMessage, onSignOut }) => {
-  const handleSignOut = async () => {
+const AuthenticatedComponent: React.FC<AuthenticatedComponentProps> = ({
+  user,
+  displayMessage,
+  onSignOut,
+}) => {
+  const handleSignOut = async (): Promise<void> => {
     try {
       await authService.signOut();
       displayMessage("Successfully signed out.", "info");
       onSignOut();
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Sign out error:", error);
       displayMessage("Error signing out. Please try again.", "error");
     }
@@ -450,17 +559,20 @@ const AuthenticatedComponent = ({ user, displayMessage, onSignOut }) => {
 
 // --- MAIN AUTHENTICATION COMPONENT ---
 
-const Authentication = ({ onAuthSuccess }) => {
-  const [view, setView] = useState("login");
-  const [message, setMessage] = useState(null);
-  const [messageType, setMessageType] = useState("info");
-  const [usernameForConfirmation, setUsernameForConfirmation] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [currentUser, setCurrentUser] = useState(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+const Authentication: React.FC<AuthenticationProps> = ({ onAuthSuccess }) => {
+  const [view, setView] = useState<ViewType>("login");
+  const [message, setMessage] = useState<string | null>(null);
+  const [messageType, setMessageType] = useState<MessageType>("info");
+  const [usernameForConfirmation, setUsernameForConfirmation] =
+    useState<string>("");
+  const [loading, setLoading] = useState<boolean>(false);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
 
-  const displayMessage = (msg, type = "info") => {
-    setMessage(msg);
+  const displayMessage = (
+    msg: string | null | undefined,
+    type: MessageType = "info"
+  ): void => {
+    setMessage(msg || null);
     setMessageType(type);
   };
 
@@ -469,18 +581,18 @@ const Authentication = ({ onAuthSuccess }) => {
       const timer = setTimeout(() => setMessage(null), 5000);
       return () => clearTimeout(timer);
     }
+    return undefined;
   }, [message, messageType]);
 
   useEffect(() => {
     checkAuthStatus();
   }, []);
 
-  const checkAuthStatus = async () => {
+  const checkAuthStatus = async (): Promise<void> => {
     try {
       const result = await authService.getCurrentUser();
       if (result.success && result.user) {
         setCurrentUser(result.user);
-        setIsAuthenticated(true);
         setView("authenticated");
       }
     } catch (error) {
@@ -488,35 +600,42 @@ const Authentication = ({ onAuthSuccess }) => {
     }
   };
 
-  const handleAuthSuccess = async () => {
+  const handleAuthSuccess = async (): Promise<void> => {
     await checkAuthStatus();
     if (onAuthSuccess) {
       onAuthSuccess();
     }
   };
 
-  const handleSignOut = () => {
+  const handleSignOut = (): void => {
     setCurrentUser(null);
-    setIsAuthenticated(false);
     setView("login");
   };
 
-  let CurrentViewComponent;
-  const componentProps = {
+  let CurrentViewComponent: ReactNode;
+  const componentProps: BaseComponentProps = {
     setView,
     displayMessage,
-    usernameForConfirmation,
-    setUsernameForConfirmation,
     loading,
     setLoading,
   };
 
   switch (view) {
     case "signup":
-      CurrentViewComponent = <SignupComponent {...componentProps} />;
+      CurrentViewComponent = (
+        <SignupComponent
+          {...componentProps}
+          setUsernameForConfirmation={setUsernameForConfirmation}
+        />
+      );
       break;
     case "confirm":
-      CurrentViewComponent = <ConfirmSignupComponent {...componentProps} />;
+      CurrentViewComponent = (
+        <ConfirmSignupComponent
+          {...componentProps}
+          usernameForConfirmation={usernameForConfirmation}
+        />
+      );
       break;
     case "authenticated":
       CurrentViewComponent = (
@@ -540,12 +659,16 @@ const Authentication = ({ onAuthSuccess }) => {
     case "login":
     default:
       CurrentViewComponent = (
-        <LoginComponent {...componentProps} onAuthSuccess={handleAuthSuccess} />
+        <LoginComponent
+          {...componentProps}
+          setUsernameForConfirmation={setUsernameForConfirmation}
+          onAuthSuccess={handleAuthSuccess}
+        />
       );
       break;
   }
 
-  const getMessageStyles = () => {
+  const getMessageStyles = (): string => {
     switch (messageType) {
       case "success":
         return "message-success";

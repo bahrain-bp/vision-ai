@@ -3,27 +3,80 @@ import { ArrowLeft, Clock } from "lucide-react";
 import RealTimeView from "../RealTime/RealTimeView";
 import ProcessingView from "../Processing/ProcessingView";
 import SessionSummaryModal from "../RealTime/SessionSummaryModal";
+import { User } from "../../types/";
 
-const SessionPage = ({ user, onSignOut, sessionData, onEndSession }) => {
-  const [activeMainTab, setActiveMainTab] = useState("real-time");
-  const [sessionState, setSessionState] = useState("ready");
-  const [showSummaryModal, setShowSummaryModal] = useState(false);
-  const [setupData, setSetupData] = useState({
-    witnessData: {
-      fullName: sessionData?.witnessData?.fullName || "",
-      idNumber: sessionData?.witnessData?.idNumber || "",
-    },
-    identityData: {
-      referencePhoto: sessionData?.identityData?.referencePhoto || null,
-      isVerified: sessionData?.identityData?.isVerified || false,
-    },
-    translationSettings: {
-      sourceLanguage: sessionData?.translationSettings?.sourceLanguage || "ar",
-      targetLanguage: sessionData?.translationSettings?.targetLanguage || "en",
-    },
-  });
-
-  const currentSessionData = sessionData || {
+ 
+interface WitnessData {
+  fullName: string;
+  idNumber: string;
+}
+interface IdentityData {
+  referencePhoto: File | null;
+  cpr: File | null;
+  passport: File | null;
+  isVerified: boolean;
+}
+ 
+interface TranslationSettings {
+  sourceLanguage: string;
+  targetLanguage: string;
+}
+ 
+interface SetupData {
+  witnessData: WitnessData;
+  identityData: IdentityData;
+  translationSettings: TranslationSettings;
+}
+ 
+interface SessionData {
+  sessionId: string;
+  investigator: string;
+  language: string;
+  duration: string;
+  witness: string;
+  status: string;
+  witnessData?: WitnessData;
+  identityData?: IdentityData;
+  translationSettings?: TranslationSettings;
+}
+ 
+interface SessionPageProps {
+  user: User;
+  onSignOut: () => void;
+  sessionData?: SessionData;
+  onEndSession?: () => void;
+}
+ 
+type SessionState = "ready" | "recording" | "completed";
+type MainTab = "real-time" | "processing";
+ 
+const SessionPage: React.FC<SessionPageProps> = ({
+  //user,
+  onSignOut,
+  sessionData,
+  onEndSession
+}) => {
+  const [activeMainTab, setActiveMainTab] = useState<MainTab>("real-time");
+  const [sessionState, setSessionState] = useState<SessionState>("ready");
+  const [showSummaryModal, setShowSummaryModal] = useState<boolean>(false);
+ const [setupData, setSetupData] = useState<SetupData>({
+   witnessData: {
+     fullName: sessionData?.witnessData?.fullName || "",
+     idNumber: sessionData?.witnessData?.idNumber || "",
+   },
+   identityData: {
+     referencePhoto: sessionData?.identityData?.referencePhoto || null,
+     cpr: sessionData?.identityData?.cpr || null,
+     passport: sessionData?.identityData?.passport || null,
+     isVerified: sessionData?.identityData?.isVerified || false,
+   },
+   translationSettings: {
+     sourceLanguage: sessionData?.translationSettings?.sourceLanguage || "ar",
+     targetLanguage: sessionData?.translationSettings?.targetLanguage || "en",
+   },
+ });
+ 
+  const currentSessionData: SessionData = sessionData || {
     sessionId: "#2024-INV-0042",
     investigator: "M. AlZebari",
     language: "Arabic",
@@ -31,16 +84,16 @@ const SessionPage = ({ user, onSignOut, sessionData, onEndSession }) => {
     witness: "Not set",
     status: "Active",
   };
-
+ 
   if (setupData.witnessData.fullName) {
     currentSessionData.witness = setupData.witnessData.fullName;
   }
-
+ 
   const handleEndSession = () => {
     setSessionState("completed");
     setShowSummaryModal(true);
   };
-
+ 
   const handleCloseSummary = () => {
     setShowSummaryModal(false);
     setSessionState("ready");
@@ -48,7 +101,7 @@ const SessionPage = ({ user, onSignOut, sessionData, onEndSession }) => {
       onEndSession();
     }
   };
-
+ 
   const handleBackToHome = () => {
     if (onEndSession) {
       onEndSession();
@@ -56,8 +109,8 @@ const SessionPage = ({ user, onSignOut, sessionData, onEndSession }) => {
       onSignOut();
     }
   };
-
-  const updateWitnessData = (field, value) => {
+ 
+  const updateWitnessData = (field: keyof WitnessData, value: string) => {
     setSetupData((prev) => ({
       ...prev,
       witnessData: {
@@ -66,8 +119,8 @@ const SessionPage = ({ user, onSignOut, sessionData, onEndSession }) => {
       },
     }));
   };
-
-  const updateIdentityData = (field, value) => {
+ 
+  const updateIdentityData = (field: keyof IdentityData, value: any) => {
     setSetupData((prev) => ({
       ...prev,
       identityData: {
@@ -76,8 +129,8 @@ const SessionPage = ({ user, onSignOut, sessionData, onEndSession }) => {
       },
     }));
   };
-
-  const updateTranslationSettings = (field, value) => {
+ 
+  const updateTranslationSettings = (field: keyof TranslationSettings, value: string) => {
     setSetupData((prev) => ({
       ...prev,
       translationSettings: {
@@ -86,22 +139,22 @@ const SessionPage = ({ user, onSignOut, sessionData, onEndSession }) => {
       },
     }));
   };
-
+ 
   const handleVerifyIdentity = () => {
     if (!setupData.witnessData.fullName) {
       alert("Please enter witness full name.");
       return;
     }
-
+ 
     if (!setupData.identityData.referencePhoto) {
       alert("Please upload a reference photo.");
       return;
     }
-
+ 
     updateIdentityData("isVerified", true);
     alert("Identity verification completed successfully!");
   };
-
+ 
   return (
     <div className="session-page-container">
       <nav className="session-nav">
@@ -111,7 +164,7 @@ const SessionPage = ({ user, onSignOut, sessionData, onEndSession }) => {
               <ArrowLeft className="icon" />
               <span>Back to Home</span>
             </button>
-
+ 
             <div className="nav-center">
               <h1 className="app-logo-text">VISION-RT</h1>
               <div className="session-info-header">
@@ -130,7 +183,7 @@ const SessionPage = ({ user, onSignOut, sessionData, onEndSession }) => {
                 Investigator: {currentSessionData.investigator}
               </p>
             </div>
-
+ 
             <div className="nav-controls">
               <div className="language-controls">
                 <span className="language-label">Language:</span>
@@ -150,7 +203,7 @@ const SessionPage = ({ user, onSignOut, sessionData, onEndSession }) => {
           </div>
         </div>
       </nav>
-
+ 
       <div className="main-tabs-container">
         <div className="main-tabs">
           <button
@@ -171,7 +224,7 @@ const SessionPage = ({ user, onSignOut, sessionData, onEndSession }) => {
           </button>
         </div>
       </div>
-
+ 
       <div className="session-main-content">
         {activeMainTab === "real-time" ? (
           <RealTimeView
@@ -188,7 +241,7 @@ const SessionPage = ({ user, onSignOut, sessionData, onEndSession }) => {
           <ProcessingView sessionData={currentSessionData} />
         )}
       </div>
-
+ 
       {showSummaryModal && (
         <SessionSummaryModal
           sessionData={currentSessionData}
@@ -198,5 +251,5 @@ const SessionPage = ({ user, onSignOut, sessionData, onEndSession }) => {
     </div>
   );
 };
-
+ 
 export default SessionPage;
