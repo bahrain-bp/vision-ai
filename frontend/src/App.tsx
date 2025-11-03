@@ -5,20 +5,55 @@ import HomePage from "./components/HomePage/HomePage";
 import SessionPage from "./components/Session/SessionPage";
 import authService from "./services/authService";
 import awsConfig from "./aws-config";
+import { User } from "./types";
+
 Amplify.configure(awsConfig);
 
-function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [currentUser, setCurrentUser] = useState(null);
-  const [currentView, setCurrentView] = useState("home");
-  const [sessionData, setSessionData] = useState(null);
+// --- TYPE DEFINITIONS ---
+
+
+interface WitnessData {
+  fullName: string;
+  idNumber: string;
+}
+
+interface IdentityData {
+  referencePhoto: string | null;
+  isVerified: boolean;
+}
+
+interface TranslationSettings {
+  sourceLanguage: string;
+  targetLanguage: string;
+}
+
+export interface SessionData {
+  sessionId: string;
+  investigator: string;
+  language: string;
+  duration: string;
+  witness: string;
+  status: string;
+  witnessData: WitnessData;
+  identityData: IdentityData;
+  translationSettings: TranslationSettings;
+}
+
+type ViewType = "home" | "session";
+
+
+const App: React.FC = () => {
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [currentView, setCurrentView] = useState<ViewType>("home");
+  const [sessionData, setSessionData] = useState<SessionData | null>(null);
 
   useEffect(() => {
     checkAuthStatus();
   }, []);
 
-  const checkAuthStatus = async () => {
+  const checkAuthStatus = async (): Promise<void> => {
     setIsLoading(true);
     try {
       const result = await authService.getCurrentUser();
@@ -29,7 +64,7 @@ function App() {
         setIsAuthenticated(false);
         setCurrentUser(null);
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.log("No authenticated user found");
       setIsAuthenticated(false);
       setCurrentUser(null);
@@ -38,20 +73,19 @@ function App() {
     }
   };
 
-  const handleAuthSuccess = () => {
+  const handleAuthSuccess = (): void => {
     checkAuthStatus();
   };
 
-  const handleSignOut = () => {
+  const handleSignOut = (): void => {
     setIsAuthenticated(false);
     setCurrentUser(null);
     setCurrentView("home");
     setSessionData(null);
   };
 
-  const handleStartSession = () => {
-    // Generate new session data
-    const newSessionData = {
+  const handleStartSession = (): void => {
+    const newSessionData: SessionData = {
       sessionId: `#${new Date().getFullYear()}-INV-${Math.floor(
         1000 + Math.random() * 9000
       )}`,
@@ -78,7 +112,7 @@ function App() {
     setCurrentView("session");
   };
 
-  const handleEndSession = () => {
+  const handleEndSession = (): void => {
     setCurrentView("home");
     setSessionData(null);
   };
@@ -98,22 +132,22 @@ function App() {
     <div className="App">
       {!isAuthenticated ? (
         <Authentication onAuthSuccess={handleAuthSuccess} />
-      ) : currentView === "session" ? (
+      ) : currentView === "session" && currentUser && sessionData ? (
         <SessionPage
           user={currentUser}
           onSignOut={handleSignOut}
-          sessionData={sessionData}
+          //sessionData={sessionData}
           onEndSession={handleEndSession}
         />
-      ) : (
+      ) : currentUser ? (
         <HomePage
           user={currentUser}
           onSignOut={handleSignOut}
           onStartSession={handleStartSession}
         />
-      )}
+      ) : null}
     </div>
   );
-}
+};
 
 export default App;

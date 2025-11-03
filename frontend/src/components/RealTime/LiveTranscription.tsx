@@ -1,11 +1,33 @@
-import React from 'react';
-import { FileText, Download, Copy } from 'lucide-react';
+import React from "react";
+import { FileText, Download, Copy } from "lucide-react";
 
-const LiveTranscription = () => {
-  const transcriptLines = [
-    { time: '00:15:23', speaker: 'Ahmad', language: 'AR', text: 'أنا لم أكن على علم بتغيير السياسة' },
-    { time: '00:15:28', speaker: 'M. AlZebari', language: 'AR', text: 'متى علمت بهذا التغيير؟' },
-    { time: '00:15:32', speaker: 'Ahmad', language: 'AR', text: 'في الأسبوع الماضي فقط' },
+interface TranscriptLine {
+  time: string;
+  speaker: string;
+  language: string;
+  text: string;
+}
+
+const LiveTranscription: React.FC = () => {
+  const transcriptLines: TranscriptLine[] = [
+    {
+      time: "00:15:23",
+      speaker: "Ahmad",
+      language: "AR",
+      text: "أنا لم أكن على علم بتغيير السياسة",
+    },
+    {
+      time: "00:15:28",
+      speaker: "M. AlZebari",
+      language: "AR",
+      text: "متى علمت بهذا التغيير؟",
+    },
+    {
+      time: "00:15:32",
+      speaker: "Ahmad",
+      language: "AR",
+      text: "في الأسبوع الماضي فقط",
+    },
   ];
 
   return (
@@ -24,9 +46,9 @@ const LiveTranscription = () => {
       <div className="transcript-container">
         {transcriptLines.map((line, index) => (
           <div key={index} className="transcript-line">
-            <span className="timestamp">{line.time}</span>{' '}
-            <span className="speaker">[{line.speaker}]</span>{' '}
-            <span className="language">{line.language}:</span>{' '}
+            <span className="timestamp">{line.time}</span>{" "}
+            <span className="speaker">[{line.speaker}]</span>{" "}
+            <span className="language">{line.language}:</span>{" "}
             <span className="text">{line.text}</span>
           </div>
         ))}

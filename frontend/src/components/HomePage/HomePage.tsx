@@ -1,13 +1,28 @@
 import React from "react";
 import { LogOut, Play } from "lucide-react";
 import authService from "../../services/authService";
+import { User } from "../../types/";
 
-const HomePage = ({ user, onSignOut, onStartSession }) => {
-  const handleSignOut = async () => {
+// --- TYPE DEFINITIONS ---
+
+interface HomePageProps {
+  user: User | null;
+  onSignOut: () => void;
+  onStartSession: () => void;
+}
+
+// --- HOMEPAGE COMPONENT ---
+
+const HomePage: React.FC<HomePageProps> = ({
+  user,
+  onSignOut,
+  onStartSession,
+}) => {
+  const handleSignOut = async (): Promise<void> => {
     try {
       await authService.signOut();
       onSignOut();
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Sign out error:", error);
       alert("Error signing out. Please try again.");
     }

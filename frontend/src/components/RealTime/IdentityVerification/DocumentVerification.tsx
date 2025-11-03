@@ -1,26 +1,41 @@
 import React, { useRef, useState } from "react";
-import { Upload, CheckCircle, RefreshCw, ArrowRight } from "lucide-react";
+import { CheckCircle, RefreshCw, ArrowRight } from "lucide-react";
 
-const DocumentVerification = ({
+interface IdentityData {
+  referencePhoto: File | null;
+  cpr?: File | null;
+  passport?: File | null;
+  isVerified: boolean;
+}
+
+interface DocumentVerificationProps {
+  identityData: IdentityData;
+  onIdentityDataChange: (field: keyof IdentityData, value: any) => void;
+  onStartInvestigation: () => void;
+}
+
+type DocumentType = "cpr" | "passport";
+
+const DocumentVerification: React.FC<DocumentVerificationProps> = ({
   identityData,
   onIdentityDataChange,
   onStartInvestigation,
 }) => {
-  const fileInputRef = useRef(null);
-  const documentInputRef = useRef(null);
-  const [documentType, setDocumentType] = useState("cpr"); // 'cpr' or 'passport'
-  const [personVerified, setPersonVerified] = useState(false);
-  const [documentVerified, setDocumentVerified] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const documentInputRef = useRef<HTMLInputElement>(null);
+  const [documentType, setDocumentType] = useState<DocumentType>("cpr");
+  const [personVerified, setPersonVerified] = useState<boolean>(false);
+  const [documentVerified, setDocumentVerified] = useState<boolean>(false);
 
-  const handleFileUpload = (event) => {
-    const file = event.target.files[0];
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
     if (file) {
       onIdentityDataChange("referencePhoto", file);
     }
   };
 
-  const handleDocumentUpload = (event) => {
-    const file = event.target.files[0];
+  const handleDocumentUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
     if (file) {
       onIdentityDataChange(documentType, file);
     }
@@ -50,19 +65,16 @@ const DocumentVerification = ({
       return;
     }
 
-    // Update identity verification status
     onIdentityDataChange("isVerified", true);
-
-    // Call the investigation start function
     onStartInvestigation();
   };
 
   const toggleDocumentType = () => {
     setDocumentType((prevType) => (prevType === "cpr" ? "passport" : "cpr"));
-    setDocumentVerified(false); // Reset document verification when switching types
+    setDocumentVerified(false);
   };
 
-  const getDocumentDisplayName = () => {
+  const getDocumentDisplayName = (): string => {
     return documentType === "cpr" ? "CPR" : "Passport";
   };
 
@@ -72,7 +84,6 @@ const DocumentVerification = ({
         <h2 className="card-title">Identity Verification</h2>
 
         <div className="space-y-8">
-          {/* Person Photo Section */}
           <div className="verification-section">
             <label className="form-label">Person Photo *</label>
             <p className="form-description">
@@ -106,7 +117,6 @@ const DocumentVerification = ({
               )}
             </div>
 
-            {/* Verify Person Photo Button */}
             {identityData.referencePhoto && !personVerified && (
               <div className="verify-section-btn">
                 <button onClick={handlePersonVerify} className="btn-verify">
@@ -124,7 +134,6 @@ const DocumentVerification = ({
             )}
           </div>
 
-          {/* Document Upload Section */}
           <div className="verification-section">
             <div className="document-header">
               <label className="form-label">
@@ -176,7 +185,6 @@ const DocumentVerification = ({
               )}
             </div>
 
-            {/* Verify Document Button */}
             {identityData[documentType] && !documentVerified && (
               <div className="verify-section-btn">
                 <button onClick={handleDocumentVerify} className="btn-verify">
@@ -194,7 +202,6 @@ const DocumentVerification = ({
             )}
           </div>
 
-          {/* Complete Verification Button */}
           <button
             onClick={handleCompleteVerification}
             className="btn-success"
