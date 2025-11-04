@@ -9,6 +9,10 @@ from aws_cdk import (
 from constructs import Construct
 
 class SharedInfrastructureStack(Stack):
+    """
+    Shared Infrastructure Stack - Contains ONLY truly shared resources
+    """
+    
     def __init__(self, scope: Construct, construct_id: str, env, **kwargs) -> None: 
         super().__init__(scope, construct_id, env=env, **kwargs) 
         
@@ -22,7 +26,6 @@ class SharedInfrastructureStack(Stack):
             encryption=s3.BucketEncryption.S3_MANAGED,
             removal_policy=RemovalPolicy.RETAIN,
             lifecycle_rules=[
-                # Auto-delete temporary uploads after 7 days if not processed
                 s3.LifecycleRule(
                     id="DeleteUnprocessedUploads",
                     prefix="*/uploaded/",
@@ -37,7 +40,7 @@ class SharedInfrastructureStack(Stack):
                     s3.HttpMethods.POST,
                     s3.HttpMethods.DELETE
                 ],
-                allowed_origins=["*"],  # TODO: Should Restrict to frontend domain in production
+                allowed_origins=["http://localhost:3000"],
                 allowed_headers=["*"],
                 exposed_headers=["ETag"],
                 max_age=3000
@@ -47,24 +50,14 @@ class SharedInfrastructureStack(Stack):
         # ==========================================
         # API GATEWAY - SHARED ACROSS ALL FEATURES
         # ==========================================
-        self.api = apigateway.RestApi(
-            self, "VisionAIAPI",
-            rest_api_name="Vision AI Investigation System API",
-            description="Unified API for all investigation system features",
-            #  base64 image support
+        self.shared_api = apigateway.RestApi(
+            self, "SharedAPI",
+            rest_api_name="Vision AI Shared API",
+            description="Shared API Gateway for ALL Vision AI features",
             binary_media_types=['image/jpeg', 'image/png', 'application/octet-stream'],
-            deploy_options=apigateway.StageOptions(
-                stage_name="prod",
-                throttling_rate_limit=100,
-                throttling_burst_limit=200,
-                # 🚨 TEMPORARILY DISABLE LOGGING TO FIX DEPLOYMENT
-                logging_level=apigateway.MethodLoggingLevel.OFF,  
-                # 🚨 TEMPORARILY DISABLE THESE TO FIX CLOUDWATCH ROLE ISSUE
-                data_trace_enabled=False,  
-                metrics_enabled=False,     
-            ),
+            deploy=False,  
             default_cors_preflight_options=apigateway.CorsOptions(
-                allow_origins=apigateway.Cors.ALL_ORIGINS,  # TODO: Restrict in production
+                allow_origins=apigateway.Cors.ALL_ORIGINS,
                 allow_methods=apigateway.Cors.ALL_METHODS,
                 allow_headers=[
                     'Content-Type',
@@ -78,14 +71,7 @@ class SharedInfrastructureStack(Stack):
         )
         
         # ==========================================
-        # API RESOURCES - Base paths for each feature
-        # ==========================================
-        
-        # /identity - For identity verification feature
-        self.identity_resource = self.api.root.add_resource("identity")
-        
-        # ==========================================
-        # OUTPUTS - Export for other stacks
+        # OUTPUTS
         # ==========================================
         CfnOutput(
             self, "BucketName",
@@ -95,22 +81,8 @@ class SharedInfrastructureStack(Stack):
         )
         
         CfnOutput(
-            self, "BucketArn",
-            value=self.investigation_bucket.bucket_arn,
-            description="Investigation system S3 bucket ARN",
-            export_name="InvestigationBucketArn"
-        )
-        
-        CfnOutput(
-            self, "APIEndpoint",
-            value=self.api.url,
-            description="API Gateway endpoint URL",
-            export_name="VisionAIAPIEndpoint"
-        )
-        
-        CfnOutput(
-            self, "APIId",
-            value=self.api.rest_api_id,
-            description="API Gateway ID",
-            export_name="VisionAIAPIId"
+            self, "SharedAPIId",
+            value=self.shared_api.rest_api_id,
+            description="Shared API Gateway ID for ALL teams",
+            export_name="VisionAISharedAPIId"
         )
