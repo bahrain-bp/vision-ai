@@ -17,10 +17,10 @@ class CognitoStack(cdk.Stack):
         scope: Construct, 
         construct_id: str, 
         app_name: str,
-        env,  # 🎯 ADD THIS PARAMETER
+        env,  
         **kwargs
     ) -> None:
-        super().__init__(scope, construct_id, env=env, **kwargs)  # 🎯 PASS env TO SUPER
+        super().__init__(scope, construct_id, env=env, **kwargs) 
         # 1. Create the Cognito User Pool
         user_pool = cognito.UserPool(
             self,
@@ -79,7 +79,7 @@ class CognitoStack(cdk.Stack):
             prevent_user_existence_errors=True,
             generate_secret=False  # Important for public clients like React
         )
-        # 3. Add a domain for hosted UI (optional but recommended)
+        # 3. Add a domain for hosted UI 
         user_pool_domain = user_pool.add_domain(
             f"{app_name}Domain",
             cognito_domain=cognito.CognitoDomainOptions(
