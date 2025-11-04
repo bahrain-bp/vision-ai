@@ -12,7 +12,6 @@ Amplify.configure(awsConfig);
 
 // --- TYPE DEFINITIONS ---
 
-
 interface WitnessData {
   fullName: string;
   idNumber: string;
@@ -41,7 +40,6 @@ export interface SessionData {
 }
 
 type ViewType = "home" | "session";
-
 
 const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
