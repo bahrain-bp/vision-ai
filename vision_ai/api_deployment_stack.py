@@ -21,7 +21,7 @@ class APIDeploymentStack(Stack):
     ) -> None:
         super().__init__(scope, construct_id, env=env, **kwargs)
         
-        # Import the shared API - CORRECT WAY
+        # Import the shared API 
         shared_api = apigateway.RestApi.from_rest_api_attributes(
             self, "SharedAPI",
             rest_api_id=shared_api_id,
