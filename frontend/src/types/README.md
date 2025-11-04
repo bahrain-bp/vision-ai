@@ -46,7 +46,7 @@
 
 ### `common.ts` - Shared Types
 - User
-- SessionState
+- RecordingStatus
 
 ## Usage
 ```typescript

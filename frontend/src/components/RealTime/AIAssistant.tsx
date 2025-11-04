@@ -1,10 +1,10 @@
 import React from "react";
 import { Sparkles, Copy } from "lucide-react";
 
-type SessionState = "ready" | "recording" | "completed";
+import {RecordingStatus } from "../../types/";
 
 interface AIAssistantProps {
-  sessionState: SessionState;
+  sessionState: RecordingStatus;
 }
 
 const AIAssistant: React.FC<AIAssistantProps> = ({ sessionState }) => {
@@ -17,16 +17,16 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ sessionState }) => {
   return (
     <div className="ai-assistant-content">
       <button
-        disabled={sessionState === "ready"}
+        disabled={sessionState === "off"}
         className={`generate-questions-btn ${
-          sessionState === "ready" ? "disabled" : ""
+          sessionState === "off" ? "disabled" : ""
         }`}
       >
         <Sparkles className="btn-icon" />
         <span>Generate Questions</span>
       </button>
 
-      {sessionState === "recording" && (
+      {sessionState === "on" && (
         <div className="suggested-questions">
           <p className="suggestions-title">Suggested Questions:</p>
           {suggestedQuestions.map((question, index) => {
@@ -49,7 +49,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ sessionState }) => {
         </div>
       )}
 
-      {sessionState === "ready" && (
+      {sessionState === "off" && (
         <p className="ai-placeholder">Start recording to generate questions</p>
       )}
     </div>

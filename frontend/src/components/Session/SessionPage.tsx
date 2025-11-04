@@ -3,7 +3,8 @@ import { ArrowLeft, Clock } from "lucide-react";
 import RealTimeView from "../RealTime/RealTimeView";
 import ProcessingView from "../Processing/ProcessingView";
 import SessionSummaryModal from "../RealTime/SessionSummaryModal";
-import { User } from "../../types/";
+import { User,RecordingStatus } from "../../types/";
+import { useTranscription } from "../../hooks/useTranscription";
 
  
 interface WitnessData {
@@ -47,7 +48,6 @@ interface SessionPageProps {
   onEndSession?: () => void;
 }
  
-type SessionState = "ready" | "recording" | "completed";
 type MainTab = "real-time" | "processing";
  
 const SessionPage: React.FC<SessionPageProps> = ({
@@ -57,8 +57,9 @@ const SessionPage: React.FC<SessionPageProps> = ({
   onEndSession
 }) => {
   const [activeMainTab, setActiveMainTab] = useState<MainTab>("real-time");
-  const [sessionState, setSessionState] = useState<SessionState>("ready");
+  const [sessionState, setSessionState] = useState<RecordingStatus>("off");
   const [showSummaryModal, setShowSummaryModal] = useState<boolean>(false);
+    const { stopRecording } = useTranscription();
  const [setupData, setSetupData] = useState<SetupData>({
    witnessData: {
      fullName: sessionData?.witnessData?.fullName || "",
@@ -90,13 +91,13 @@ const SessionPage: React.FC<SessionPageProps> = ({
   }
  
   const handleEndSession = () => {
-    setSessionState("completed");
-    setShowSummaryModal(true);
+    stopRecording(setSessionState);
+    //setShowSummaryModal(true);
   };
  
   const handleCloseSummary = () => {
     setShowSummaryModal(false);
-    setSessionState("ready");
+    setSessionState("off");
     if (onEndSession) {
       onEndSession();
     }
@@ -172,7 +173,7 @@ const SessionPage: React.FC<SessionPageProps> = ({
                 <span className="session-id">
                   {currentSessionData.sessionId}
                 </span>
-                {sessionState === "recording" && (
+                {sessionState === "on" && (
                   <span className="live-indicator">
                     <span className="live-dot"></span>
                     <span>LIVE</span>
@@ -194,7 +195,7 @@ const SessionPage: React.FC<SessionPageProps> = ({
                 <Clock className="icon" />
                 <span>{currentSessionData.duration}</span>
               </div>
-              {sessionState === "recording" && (
+              {sessionState === "on" && (
                 <button onClick={handleEndSession} className="end-session-btn">
                   End Session
                 </button>

@@ -1,7 +1,8 @@
 import React, { useState } from "react";
 import { Key, Mail, Lock, ArrowLeft } from "lucide-react";
-import { Button, InputField, AuthForm } from "./Authentication";
+import { AuthForm } from "./Authentication";
 import authService from "../../services/authService";
+import { Button, InputField } from "../common/common";
 
 // --- TYPE DEFINITIONS ---
 

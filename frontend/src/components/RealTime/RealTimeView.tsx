@@ -7,13 +7,13 @@ import {
   ChevronUp,
   ChevronDown,
 } from "lucide-react";
-import LiveTranscription from "./LiveTranscription";
+import LiveTranscription from "../LiveTranscription/LiveTranscription";
 import Translation from "./Translation";
 import AIAssistant from "./AIAssistant";
 import SessionInfo from "./SessionInfo";
 import IdentityVerification from "./IdentityVerification/IdentityVerification";
 
-type SessionState = 'ready' | 'recording' | 'completed';
+import { RecordingStatus } from "../../types/";
 
 interface SessionData {
   sessionId: string;
@@ -64,16 +64,16 @@ interface SetupData {
 }
 
 interface RealTimeViewProps {
-  sessionState: SessionState;
-  setSessionState: (state: SessionState) => void;
+  sessionState: RecordingStatus;
+  setSessionState: (state: RecordingStatus) => void;
   sessionData: SessionData;
-  setupData: SetupData; 
-  onWitnessDataChange: (field: keyof WitnessData, value: string) => void; 
+  setupData: SetupData;
+  onWitnessDataChange: (field: keyof WitnessData, value: string) => void;
   onIdentityDataChange: (field: keyof IdentityData, value: any) => void;
   onTranslationSettingsChange: (
     field: keyof TranslationSettings,
     value: string
-  ) => void; 
+  ) => void;
   onVerifyIdentity: () => void;
 }
 
@@ -88,11 +88,7 @@ const RealTimeView: React.FC<RealTimeViewProps> = ({
   const [activeTab, setActiveTab] = useState<"identity" | "transcription">("identity");
   const [aiExpanded, setAiExpanded] = useState(false);
   const [isIdentityVerified, setIsIdentityVerified] = useState(false);
-
-  const handleStartRecording = () => {
-    setSessionState("recording");
-    setActiveTab("transcription");
-  };
+  const [startRecording, setStartRecording] = useState(false);
 
   const handleStartInvestigation = (investigationData: InvestigationData) => {
     console.log("Starting investigation with data:", investigationData);
@@ -107,7 +103,7 @@ const RealTimeView: React.FC<RealTimeViewProps> = ({
   return (
     <div className="realtime-view">
       <div className="main-content">
-        {sessionState === "ready" && activeTab === "identity" && (
+        {sessionState === "off" && activeTab === "identity" && (
           <div className="recording-content">
             <IdentityVerification
               //identityData={identityData}
@@ -119,7 +115,7 @@ const RealTimeView: React.FC<RealTimeViewProps> = ({
           </div>
         )}
 
-        {sessionState === "ready" && activeTab === "transcription" && (
+        {sessionState === "off" && activeTab === "transcription" && (
           <div className="ready-state">
             <div className="ready-content">
               <div className="play-icon-container">
@@ -127,10 +123,15 @@ const RealTimeView: React.FC<RealTimeViewProps> = ({
               </div>
               <h2 className="ready-title">Ready to Start</h2>
               <p className="ready-description">
-                Click the button below to begin recording the investigation session.
+                Click the button below to begin recording the investigation
+                session.
               </p>
               <button
-                onClick={handleStartRecording}
+                onClick={() => {
+                  setStartRecording(true);
+                  setSessionState("on");
+                  setActiveTab("transcription");
+                }}
                 className="start-recording-btn"
               >
                 <Play className="btn-icon" />
@@ -140,11 +141,14 @@ const RealTimeView: React.FC<RealTimeViewProps> = ({
           </div>
         )}
 
-        {sessionState === "recording" && (
+        {sessionState === "on" && (
           <div className="recording-content">
             {activeTab === "transcription" && (
               <>
-                <LiveTranscription />
+                <LiveTranscription
+                  startRecordingProp={startRecording}
+                  setSessionState={setSessionState}
+                />
                 <Translation />
               </>
             )}
@@ -167,10 +171,7 @@ const RealTimeView: React.FC<RealTimeViewProps> = ({
 
           <button
             onClick={() => setActiveTab("transcription")}
-            className={`sidebar-btn ${
-              activeTab === "transcription" ? "active" : ""
-            } ${sessionState === "ready" ? "disabled" : ""}`}
-            disabled={sessionState === "ready"}
+            className="sidebar-btn"
           >
             <FileText className="btn-icon" />
             <span>Transcription & Translation</span>
