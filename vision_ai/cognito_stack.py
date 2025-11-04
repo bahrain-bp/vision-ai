@@ -17,9 +17,10 @@ class CognitoStack(cdk.Stack):
         scope: Construct, 
         construct_id: str, 
         app_name: str,
+        env,  # 🎯 ADD THIS PARAMETER
         **kwargs
     ) -> None:
-        super().__init__(scope, construct_id, **kwargs)
+        super().__init__(scope, construct_id, env=env, **kwargs)  # 🎯 PASS env TO SUPER
         # 1. Create the Cognito User Pool
         user_pool = cognito.UserPool(
             self,
