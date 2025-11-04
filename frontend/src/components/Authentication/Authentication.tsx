@@ -4,19 +4,16 @@ import {
   LogIn,
   UserPlus,
   MailCheck,
-  Loader,
   Lock,
   AtSign,
   Key,
   Home,
   Eye,
-  EyeOff,
-  LucideIcon,
 } from "lucide-react";
 import ForgetPassword from "./ForgetPassword";
 import authService from "../../services/authService";
 import { User } from "../../types/";
-
+import { Button, InputField } from "../common/common";
 // --- TYPE DEFINITIONS ---
 
 type MessageType = "info" | "success" | "error";
@@ -45,23 +42,6 @@ function getErrorMessage(error: unknown): string {
   return String(error);
 }
 
-interface ButtonProps {
-  children: ReactNode;
-  onClick: () => void;
-  loading?: boolean;
-  icon?: LucideIcon;
-  className?: string;
-}
-
-interface InputFieldProps {
-  id: string;
-  label: string;
-  type: string;
-  value: string;
-  onChange: (value: string) => void;
-  placeholder: string;
-  icon?: LucideIcon;
-}
 
 interface AuthFormProps {
   title: string;
@@ -106,84 +86,6 @@ interface AuthenticationProps {
 }
 
 // --- REUSABLE COMPONENTS ---
-
-export const Button: React.FC<ButtonProps> = ({
-  children,
-  onClick,
-  loading = false,
-  icon: Icon,
-  className = "",
-}) => (
-  <button
-    onClick={onClick}
-    disabled={loading}
-    className={`button ${
-      loading ? "button-loading" : "button-normal"
-    } ${className}`}
-  >
-    {loading ? (
-      <Loader className="spinner" />
-    ) : (
-      <>
-        {Icon && <Icon className="icon" />}
-        <span>{children}</span>
-      </>
-    )}
-  </button>
-);
-
-export const InputField: React.FC<InputFieldProps> = ({
-  id,
-  label,
-  type,
-  value,
-  onChange,
-  placeholder,
-  icon: Icon,
-}) => {
-  const isPassword = type === "password";
-  const [showPassword, setShowPassword] = useState<boolean>(false);
-  const inputType = isPassword && showPassword ? "text" : type;
-
-  return (
-    <div className="input-container">
-      <label htmlFor={id} className="input-label">
-        {label}
-      </label>
-      <div className="input-wrapper">
-        {Icon && (
-          <div className="input-icon">
-            <Icon className="icon" />
-          </div>
-        )}
-        <input
-          id={id}
-          type={inputType}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
-          required
-          className="input-field"
-        />
-        {isPassword && (
-          <button
-            type="button"
-            className="password-toggle"
-            onClick={() => {
-              setShowPassword(!showPassword);
-            }}
-          >
-            {showPassword ? (
-              <EyeOff className="icon" />
-            ) : (
-              <Eye className="icon" />
-            )}
-          </button>
-        )}
-      </div>
-    </div>
-  );
-};
 
 export const AuthForm: React.FC<AuthFormProps> = ({
   title,

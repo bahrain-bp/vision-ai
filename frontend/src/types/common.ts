@@ -4,3 +4,4 @@ export interface User {
   [key: string]: any;
   email: string;
 }
+export type RecordingStatus = "on" | "off" | "paused";
