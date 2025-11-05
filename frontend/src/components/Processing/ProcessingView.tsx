@@ -1,8 +1,9 @@
 import React, { useState } from "react";
-import { Loader } from "lucide-react";
-import "../../ProcessingView.css";
+import {
+  BadgeCheck, Wand2, Camera, Lightbulb, CircleAlert, UploadCloud,
+} from "lucide-react";
+import "./ProcessingView.css";
 
-// import processing tab components 
 import Classification from "./processing-tabs/Classification";
 import Rewrite from "./processing-tabs/Rewrite";
 import CameraFootage from "./processing-tabs/CameraFootage";
@@ -17,91 +18,68 @@ export interface SessionData {
   duration?: string;
   witness?: string;
   status?: string;
-  // we can other fields as needed later 
 }
 
-interface ProcessingViewProps {
-  sessionData: SessionData;
-}
+interface ProcessingViewProps { sessionData: SessionData; }
 
 interface Tab {
-  id: string; 
+  id: string;
   label: string;
-  component: React.ComponentType<{ sessionData: SessionData}>;
+  icon: React.ReactNode;
+  component: React.ComponentType<{ sessionData: SessionData }>;
 }
 
-
 const ProcessingView: React.FC<ProcessingViewProps> = ({ sessionData }) => {
-  const [activeTab, setActiveTab] = useState<string>("Classification");
-  const [isProcessing, setIsProcessing] = useState<boolean>(true); // processing state 
-
+  const [mode, setMode] = useState<"real" | "processing">("processing");
+  const [activeTab, setActiveTab] = useState<string>("Rewrite");
 
   const tabs: Tab[] = [
-    {id: "Classification", label:"Classification", component:Classification},
-    {id: "Rewrite", label:"Rewrite", component:Rewrite}, 
-    {id: "CameraFootage", label:"Camera Footage", component:CameraFootage},
-    {id: "AISuggestions", label:"AI Suggestions", component:AISuggestions},
-    {id: "Contradictions", label:"Contradictions", component:Contradictions},
-    {id: "Outcome", label:"Outcome", component:Outcome }
+    { id: "Classification", label: "Classification", icon: <BadgeCheck size={14} />, component: Classification },
+    { id: "Rewrite", label: "Rewrite", icon: <Wand2 size={14} />, component: Rewrite },
+    { id: "CameraFootage", label: "Camera footage", icon: <Camera size={14} />, component: CameraFootage },
+    { id: "AISuggestions", label: "AI Suggestions", icon: <Lightbulb size={14} />, component: AISuggestions },
+    { id: "Contradictions", label: "Contradictions", icon: <CircleAlert size={14} />, component: Contradictions },
+    { id: "Outcome", label: "Outcome", icon: <UploadCloud size={14} />, component: Outcome },
+  ];
 
+  const Active = tabs.find((t) => t.id === activeTab)!.component;
 
-  ]; 
-   
-  // logic of the cont button could be changed later when theres actual backend processing  
-  const handleContinue = (): void => {
-    setIsProcessing(false);
-  }
-
-  const renderTabContent = (): JSX.Element | null => {
-    if (isProcessing) {
-      return (
-        <div className="processing-content">
-          <Loader className="processing-spinner" />
-          <h2 className="processing-title">Processing Session Data</h2>
-          <p className="processing-description">
-            Analyzing transcription and translation quality...
-          </p>
-          <p className="session-reference">
-            Session: {sessionData.sessionId}
-          </p>
-          <button
-            className="continue-btn"
-            onClick={handleContinue}
-          >
-            Continue
+  return (
+    <div className="page">
+      <header className="app-header">
+        <h1 className="app-title">AI Audio Assistant</h1>
+        <p className="app-subtitle">
+          Record, transcribe, translate, summarize, and analyze your audio in real-time
+        </p>
+        <div className="mode-switch">
+          <button className={`mode-btn ${mode === "real" ? "active" : ""}`} onClick={() => setMode("real")} type="button">
+            Real-Time
+          </button>
+          <button className={`mode-btn ${mode === "processing" ? "active" : ""}`} onClick={() => setMode("processing")} type="button">
+            Processing
           </button>
         </div>
-      );
-    }
-    
-    const ActiveComponent = tabs.find(tab => tab.id === activeTab)?.component;
-    return ActiveComponent ? <ActiveComponent sessionData={sessionData} /> : null;
-  };
-  
-  // dynamic tab render 
-  return (
-    <div className="processing-view">
-      <div className="processing-tabs">
-        {tabs.map(tab => (
+      </header>
+
+      <div className="pill-tabs">
+        {tabs.map((t) => (
           <button
-            key={tab.id}
-            className={`tab-btn ${activeTab === tab.id ? "active" : ""} ${isProcessing ? "disabled" : ""}`}
-            onClick={() => !isProcessing && setActiveTab(tab.id)}
-            disabled={isProcessing}
+            key={t.id}
+            type="button"
+            className={`pill ${activeTab === t.id ? "selected" : ""}`}
+            onClick={() => setActiveTab(t.id)}
           >
-            {tab.label}
-            {!isProcessing && activeTab === tab.id && <div className="tab-indicator" />}
+            <span className="pill-icon">{t.icon}</span>
+            {t.label}
           </button>
         ))}
       </div>
 
-      <div className="tab-content">
-        {renderTabContent()}
-      </div>
+      <section className="content-area">
+        <Active sessionData={sessionData} />
+      </section>
     </div>
   );
-
- 
 };
 
 export default ProcessingView;
