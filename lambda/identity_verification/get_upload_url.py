@@ -16,7 +16,8 @@ def handler(event, context):
         "caseId": "CASE-001",
         "sessionId": "session-20250103-123456",
         "fileType": "image/jpeg",
-        "fileName": "citizen-id.jpg"
+        "fileName": "citizen-id.jpg",
+        "uploadType": "document"  # or "witness"
     }
     """
     try:
@@ -26,6 +27,7 @@ def handler(event, context):
         session_id = body.get('sessionId')
         file_type = body.get('fileType', 'image/jpeg')
         file_name = body.get('fileName', 'document.jpg')
+        upload_type = body.get('uploadType', 'document')  # document or witness
         
         # Validate inputs
         if not case_id or not session_id:
@@ -40,13 +42,29 @@ def handler(event, context):
                 })
             }
         
+        # Validate uploadType
+        if upload_type not in ['document', 'witness']:
+            return {
+                'statusCode': 400,
+                'headers': {
+                    'Access-Control-Allow-Origin': '*',
+                    'Content-Type': 'application/json'
+                },
+                'body': json.dumps({
+                    'error': 'uploadType must be "document" or "witness"'
+                })
+            }
+        
         # Generate unique file name to avoid collisions
         timestamp = datetime.now().strftime('%Y%m%d-%H%M%S')
         unique_id = str(uuid.uuid4())[:8]
         safe_file_name = f"{timestamp}_{unique_id}_{file_name}"
         
-        # S3 key for uploaded document
-        s3_key = f"cases/{case_id}/sessions/{session_id}/01-identity-verification/documents/uploaded/{safe_file_name}"
+        # S3 key for uploaded file - different paths based on upload type
+        if upload_type == 'document':
+            s3_key = f"cases/{case_id}/sessions/{session_id}/01-identity-verification/documents/uploaded/{safe_file_name}"
+        else:  # witness
+            s3_key = f"cases/{case_id}/sessions/{session_id}/01-identity-verification/photos/witness-photo/{safe_file_name}"
         
         # Generate presigned URL (valid for 10 minutes)
         presigned_url = s3.generate_presigned_url(
@@ -69,6 +87,7 @@ def handler(event, context):
                 'uploadUrl': presigned_url,
                 's3Key': s3_key,
                 'bucket': BUCKET_NAME,
+                'uploadType': upload_type,
                 'expiresIn': 600
             })
         }
