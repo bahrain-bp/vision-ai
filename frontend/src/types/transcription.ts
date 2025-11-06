@@ -3,3 +3,4 @@ export interface TranscriptLine {
   speaker: string;
   text: string;
 }
+

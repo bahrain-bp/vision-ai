@@ -1814,3 +1814,266 @@
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+
+/* Translation Styles */
+.translation-badge {
+  background: #3b82f6;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  margin-left: 8px;
+  font-weight: 600;
+}
+
+.translation-status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 12px;
+  font-size: 12px;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.status-dot.idle { background: #6b7280; }
+.status-dot.translating { background: #f59e0b; animation: pulse 2s infinite; }
+.status-dot.completed { background: #10b981; }
+.status-dot.error { background: #ef4444; }
+
+.status-text {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.translation-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings-btn {
+  background: none;
+  border: none;
+  padding: 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  color: #6b7280;
+  transition: all 0.2s;
+}
+
+.settings-btn:hover {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.language-select {
+  padding: 6px 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  background: white;
+  font-size: 12px;
+}
+
+.translation-settings {
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.setting-group {
+  margin-bottom: 12px;
+}
+
+.setting-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #374151;
+}
+
+.setting-checkbox {
+  margin: 0;
+}
+
+.setting-select {
+  padding: 4px 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  background: white;
+  font-size: 12px;
+}
+
+.manual-translation h4 {
+  margin: 0 0 8px 0;
+  font-size: 14px;
+  color: #374151;
+  font-weight: 600;
+}
+
+.manual-inputs {
+  display: flex;
+  gap: 8px;
+}
+
+.manual-input {
+  padding: 6px 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.speaker-input {
+  width: 80px;
+}
+
+.text-input {
+  flex: 1;
+}
+
+.manual-translate-btn {
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.manual-translate-btn:hover:not(:disabled) {
+  background: #2563eb;
+}
+
+.manual-translate-btn:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+}
+
+.translation-stats {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.stat-item {
+  font-size: 12px;
+  color: #6b7280;
+  background: #f3f4f6;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.no-translation {
+  text-align: center;
+  color: #6b7280;
+  font-style: italic;
+  padding: 40px 0;
+  font-size: 14px;
+}
+
+.translation-line {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 8px;
+}
+
+.line-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.timestamp {
+  font-size: 11px;
+  color: #6b7280;
+  font-family: monospace;
+}
+
+.speaker-badge {
+  background: #3b82f6;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.confidence-badge {
+  background: #10b981;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.line-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.original-text,
+.translated-text {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.language-tag {
+  background: #f3f4f6;
+  color: #374151;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  min-width: 20px;
+  text-align: center;
+}
+
+.original-text .text {
+  color: #374151;
+  font-size: 13px;
+}
+
+.translated-text .text {
+  color: #1f2937;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.action-btn.danger {
+  background: #ef4444;
+  color: white;
+}
+
+.action-btn.danger:hover {
+  background: #dc2626;
+}
+
+/* RTL Support for Arabic */
+.text[lang="ar"] {
+  direction: rtl;
+  text-align: right;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+/* Animations */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}

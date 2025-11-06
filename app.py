@@ -47,6 +47,7 @@ identity_stack = IdentityVerificationStack(
     description="Identity verification: CPR extraction and face comparison"
 )
 
+
 # ==========================================
 # 4. API DEPLOYMENT STACK
 # Deploys API after all routes are added
