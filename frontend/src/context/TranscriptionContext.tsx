@@ -2,7 +2,7 @@ import React, { createContext, useState, useCallback, ReactNode } from "react";
 import RecordingService from "../services/LiveTranscription/RecordingService";
 import { RecordingStatus } from "../types/";
 import {TranscriptLine} from "../types"
-
+import TranscribeService from "../services/LiveTranscription/TranscribeService";
 export interface TranscriptionContextType {
   transcript: TranscriptLine[];
   audioStatus: boolean;
@@ -42,7 +42,9 @@ export const TranscriptionProvider: React.FC<{ children: ReactNode }> = ({
   const startRecording = useCallback(
     async (setSessionState?: (state: RecordingStatus) => void) => {
       const result = await RecordingService.startRecording();
-
+      const client = await TranscribeService.getClient();
+      //debugging
+      console.log("CLIENT: ",client);
       if (result.success) {
         updateStatuses(setRecordingStatus, setAudioStatus, setSessionState);
         return true;
