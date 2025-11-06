@@ -1,6 +1,8 @@
-import React, { useState, useRef } from "react";
+import React, { useRef, useState } from "react";
 import "../../../ProcessingView.css";
 
+// note: currently using local state instead of hooks/context to simulate ui/workflow
+// Local interfaces for mock data
 interface Event {
   id: string;
   timestamp: number;
@@ -18,29 +20,80 @@ interface AnalysisResult {
 }
 
 const CameraFootage: React.FC = () => {
+  // Local state instead of hooks/context
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
-  const [currentTime, setCurrentTime] = useState<number>(0);
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(
     null
   );
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+
   const videoRef = useRef<HTMLVideoElement>(null);
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
     const file = event.target.files?.[0];
-    if (file && file.type.startsWith("video/")) {
+    if (file) {
       setVideoFile(file);
+      // Create a local URL for the video
       const url = URL.createObjectURL(file);
       setVideoUrl(url);
     }
   };
 
+  const startAnalysis = async () => {
+    setIsAnalyzing(true);
+
+    // Mock analysis delay
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+
+    // Mock analysis result
+    const mockResult: AnalysisResult = {
+      events: [
+        {
+          id: "1",
+          timestamp: 10,
+          description: "Person detected entering the frame.",
+          confidence: 0.95,
+          type: "person",
+          bbox: { x: 20, y: 30, width: 15, height: 25 },
+        },
+        {
+          id: "2",
+          timestamp: 30,
+          description: "Vehicle detected moving across the frame.",
+          confidence: 0.89,
+          type: "vehicle",
+          bbox: { x: 45, y: 20, width: 30, height: 20 },
+        },
+        {
+          id: "3",
+          timestamp: 60,
+          description: "Suspicious activity detected in the corner.",
+          confidence: 0.75,
+          type: "activity",
+          bbox: { x: 75, y: 15, width: 20, height: 18 },
+        },
+      ],
+      summary:
+        "Detected 3 events: 1 person, 1 vehicle, and 1 suspicious activity.",
+      duration: 120,
+      processedAt: new Date(),
+    };
+
+    setAnalysisResult(mockResult);
+    setIsAnalyzing(false);
+  };
+
+  const selectEvent = (event: Event) => {
+    setSelectedEvent(event);
+  };
+
   const handleTimelineClick = (timestamp: number) => {
     if (videoRef.current) {
       videoRef.current.currentTime = timestamp;
-      setCurrentTime(timestamp);
     }
   };
 
@@ -52,21 +105,27 @@ const CameraFootage: React.FC = () => {
       .padStart(2, "0")}`;
   };
 
+  // Get video duration from the video element or use mock data
+  const getVideoDuration = (): number => {
+    return videoRef.current?.duration || 0;
+  };
+
   return (
     <div className="camera-footage-wrapper">
       <div className="camera-title">Camera Footage Analysis</div>
       <p className="camera-description">
-        Upload and analyze surveillance footage for evidence extraction
+        *Upload and analyze surveillance footage for evidence extraction
       </p>
 
       <div className="camera-footage-container">
         {/* Video Upload & Player Section */}
         <div className="tab-section">
-          <div className="tab-section-title">Video Upload & Analysis</div>
+          <div className="tab-section-title">Video Upload</div>
           <div className="tab-section-content">
             {!videoUrl ? (
               /* Upload Section */
               <div className="video-upload-area">
+                {/* Hidden File Input */}
                 <input
                   type="file"
                   accept="video/*"
@@ -74,6 +133,8 @@ const CameraFootage: React.FC = () => {
                   className="hidden"
                   id="video-upload"
                 />
+
+                {/* Label for File Input */}
                 <label htmlFor="video-upload" className="upload-label">
                   <div className="upload-content">
                     <div className="upload-icon">📹</div>
@@ -81,11 +142,19 @@ const CameraFootage: React.FC = () => {
                     <div className="upload-subtitle">
                       MP4, AVI, MOV up to 2GB
                     </div>
-                    <div className="upload-instruction">
-                      Click to browse or drag and drop
-                    </div>
                   </div>
                 </label>
+
+                {/* Upload Button */}
+                <button
+                  type="button"
+                  className="continue-btn"
+                  onClick={() =>
+                    document.getElementById("video-upload")?.click()
+                  }
+                >
+                  Click to browse or drag and drop
+                </button>
               </div>
             ) : (
               /* Video Player Section */
@@ -96,34 +165,18 @@ const CameraFootage: React.FC = () => {
                     src={videoUrl}
                     controls
                     className="video-player"
-                    onTimeUpdate={(e) =>
-                      setCurrentTime((e.target as HTMLVideoElement).currentTime)
-                    }
                   >
                     Your browser does not support the video tag.
                   </video>
-
-                  {/* Video Overlay for Bounding Boxes */}
-                  {selectedEvent?.bbox && (
-                    <div
-                      className="video-overlay"
-                      style={{
-                        left: `${selectedEvent.bbox.x}%`,
-                        top: `${selectedEvent.bbox.y}%`,
-                        width: `${selectedEvent.bbox.width}%`,
-                        height: `${selectedEvent.bbox.height}%`,
-                      }}
-                    />
-                  )}
                 </div>
 
                 {/* Video Controls */}
                 <div className="video-controls">
                   <div className="video-info">
-                    {videoFile?.name} • {formatTime(currentTime)}
+                    {videoFile?.name} • {formatTime(getVideoDuration())}
                   </div>
                   <button
-                    onClick={() => setIsAnalyzing(true)}
+                    onClick={startAnalysis}
                     disabled={isAnalyzing}
                     className={`continue-btn ${isAnalyzing ? "analyzing" : ""}`}
                   >
@@ -160,11 +213,11 @@ const CameraFootage: React.FC = () => {
                     Detected Events ({analysisResult.events.length})
                   </h4>
                   <div className="events-list">
-                    {analysisResult.events.map((event) => (
+                    {analysisResult.events.map((event: Event) => (
                       <div
                         key={event.id}
                         onClick={() => {
-                          setSelectedEvent(event);
+                          selectEvent(event);
                           handleTimelineClick(event.timestamp);
                         }}
                         className={`event-item ${
