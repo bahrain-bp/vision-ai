@@ -10,7 +10,7 @@ from constructs import Construct
 
 class SharedInfrastructureStack(Stack):
     """
-    Shared Infrastructure Stack - Contains ONLY truly shared resources
+    Shared Infrastructure Stack - Contains ONLY shared resources
     """
     
     def __init__(self, scope: Construct, construct_id: str, env, **kwargs) -> None: 
