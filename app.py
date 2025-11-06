@@ -37,7 +37,7 @@ shared_stack = SharedInfrastructureStack(
 
 # ==========================================
 # 3. IDENTITY VERIFICATION STACK
-# Uses shared API by ID (no circular dependency)
+# Uses shared API by ID 
 # ==========================================
 identity_stack = IdentityVerificationStack(
     app, f"{app_name}-identity-verification-stack", env=env,

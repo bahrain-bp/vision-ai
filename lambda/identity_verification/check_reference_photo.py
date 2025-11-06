@@ -9,12 +9,17 @@ def handler(event, context):
     """
     Check if reference photo exists in global-assets
     
-    GET /identity/check-reference/{cpr}
-    Path parameter: cpr 
+    GET /identity/check-reference/{cpr} - via API Gateway
+    OR direct invoke with cprNumber in body - via Lambda invoke
     """
     try:
-        # Get CPR from path parameters
-        cpr_number = event.get('pathParameters', {}).get('cpr')
+        # Try to get CPR from path parameters (API Gateway)
+        cpr_number = event.get('pathParameters', {}).get('cpr') if event.get('pathParameters') else None
+        
+        # If not in path, try body (direct Lambda invoke)
+        if not cpr_number:
+            body = json.loads(event.get('body', '{}')) if isinstance(event.get('body'), str) else event
+            cpr_number = body.get('cprNumber')
         
         if not cpr_number:
             return {
