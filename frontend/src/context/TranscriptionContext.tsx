@@ -2,14 +2,16 @@ import React, { createContext, useState, useCallback, ReactNode } from "react";
 import RecordingService from "../services/LiveTranscription/RecordingService";
 import { RecordingStatus } from "../types/";
 import {TranscriptLine} from "../types"
-import TranscribeService from "../services/LiveTranscription/TranscribeService";
 export interface TranscriptionContextType {
   transcript: TranscriptLine[];
   audioStatus: boolean;
   recordingStatus: RecordingStatus;
   addLine: (line: TranscriptLine) => void;
-  startRecording: (setSessionState?: (state: RecordingStatus) => void) => Promise<boolean>;
-  stopRecording: (setSessionState?: (state: RecordingStatus) => void) => void; 
+  startRecording: (
+    setSessionState?: (state: RecordingStatus) => void,
+    onTranscriptUpdate?: (text: string) => void,
+  ) => Promise<boolean>;
+  stopRecording: (setSessionState?: (state: RecordingStatus) => void) => void;
 }
 
 export const TranscriptionContext = createContext<
@@ -40,11 +42,11 @@ export const TranscriptionProvider: React.FC<{ children: ReactNode }> = ({
   const [audioStatus, setAudioStatus] = useState(false);
   const [recordingStatus, setRecordingStatus] = useState<RecordingStatus>("off");
   const startRecording = useCallback(
-    async (setSessionState?: (state: RecordingStatus) => void) => {
-      const result = await RecordingService.startRecording();
-      const client = await TranscribeService.getClient();
-      //debugging
-      console.log("CLIENT: ",client);
+    async (
+      setSessionState?: (state: RecordingStatus) => void,
+      onTranscriptUpdate?: (text: string) => void,
+    ) => {
+      const result = await RecordingService.startRecording(onTranscriptUpdate);
       if (result.success) {
         updateStatuses(setRecordingStatus, setAudioStatus, setSessionState);
         return true;
