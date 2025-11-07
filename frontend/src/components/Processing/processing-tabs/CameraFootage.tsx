@@ -1,8 +1,13 @@
 import React, { useRef, useState } from "react";
+// Custom Hooks
+//import { useVideoUpload } from "../../../hooks/useVideoUpload";
+//import { useVideoAnalysisOperations } from "../../../hooks/useVideoAnalysisOperations";
+
 import "../../../ProcessingView.css";
 
-// note: currently using local state instead of hooks/context to simulate ui/workflow
+// note: currently using local state and logic instead of hooks/context/services to simulate ui/workflow
 // Local interfaces for mock data
+// add session data
 interface Event {
   id: string;
   timestamp: number;

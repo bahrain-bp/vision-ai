@@ -1,14 +1,16 @@
-// Custom hook for managing video analysis process
 /**
- * Triggers analysis jobs (Bedrock Data Automation jobs)
-   Manages the analysis state (progress, results, errors)
-   Handles event selection and interaction with the analysis results
+ * Custom hook for managing video analysis process
+ * 
+ * Responsibilities:
+ * - Manages React state for video analysis (progress, results, errors)
+ * - Delegates backend operations (Bedrock job creation, result polling) to the service layer
+ * - Handles event selection and interaction with analysis results
+ * 
+ * Note: backend logic is simulated for now and will be replaced during integration
  */
-// note: mock logic will be replaced later during backend integration 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 //import { useVideoAnalysis } from "../context/VideoAnalysisContext";
-
-
+//import service later
 interface Event {
   id: string;
   timestamp: number;
@@ -30,16 +32,15 @@ export const useVideoAnalysisOperations = () => {
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const startAnalysis = async (s3Key: string) => {
+  const startAnalysis = useCallback(async (s3Key: string) => {
     try {
       setError(null);
       setIsAnalyzing(true);
 
-      // TODO: Use s3Key for backend integration
-      console.log('Analyzing video:', s3Key);
+      console.log("Analyzing video:", s3Key);
 
       // Simulate analysis delay
-      await new Promise((resolve) => setTimeout(resolve, 3000)); // Simulate 3-second delay
+      await new Promise((resolve) => setTimeout(resolve, 3000));
 
       // Mock analysis result
       const mockResult: AnalysisResult = {
@@ -65,17 +66,18 @@ export const useVideoAnalysisOperations = () => {
       };
 
       setAnalysisResult(mockResult);
-      setIsAnalyzing(false);
     } catch (err) {
-      setError("Failed to start analysis");
-      setIsAnalyzing(false);
+      const errorMsg = err instanceof Error ? err.message : "Failed to start analysis";
+      setError(errorMsg);
       throw err;
+    } finally {
+      setIsAnalyzing(false);
     }
-  };
+  }, []);
 
-  const selectEvent = (event: Event) => {
+  const selectEvent = useCallback((event: Event) => {
     setSelectedEvent(event);
-  };
+  }, []);
 
   return {
     startAnalysis,
