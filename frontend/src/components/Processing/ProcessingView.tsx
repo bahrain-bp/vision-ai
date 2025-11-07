@@ -7,7 +7,7 @@ import Classification from "./processing-tabs/Classification";
 import Rewrite from "./processing-tabs/Rewrite";
 import CameraFootage from "./processing-tabs/CameraFootage";
 import AISuggestions from "./processing-tabs/AISuggestions";
-import Contradictions from "./processing-tabs/Contradictions";
+import Contradictions from "./processing-tabs/Contradiction/Contradictions";
 import Outcome from "./processing-tabs/Outcome";
 
 export interface SessionData {
