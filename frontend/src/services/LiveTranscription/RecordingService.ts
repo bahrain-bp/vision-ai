@@ -69,7 +69,7 @@ class RecordingService {
         audio: {
           echoCancellation: false,
           noiseSuppression: false,
-          sampleRate: 16000,
+          sampleRate: 44100,
         },
       });
 
@@ -87,41 +87,40 @@ class RecordingService {
       this.getAudioCapture(stream);
  */
 
-      let transcribeClient: any;
+      let transcribeClient1: any;
+      let transcribeClient2: any;
       const session = await getUserCredentials();
 
-      transcribeClient = new TranscribeStreamingClient({
+      transcribeClient1 = new TranscribeStreamingClient({
         region: process.env.REACT_APP_AWS_REGION!,
         credentials: {
           accessKeyId: session!.credentials!.accessKeyId,
           secretAccessKey: session.credentials!.secretAccessKey,
-          sessionToken: session!.credentials!.sessionToken, // 👈 include this!
+          sessionToken: session!.credentials!.sessionToken,
         },
       });
 
-      console.log("Fetched credentials:", session.credentials);
+         transcribeClient2 = new TranscribeStreamingClient({
+           region: process.env.REACT_APP_AWS_REGION!,
+           credentials: {
+             accessKeyId: session!.credentials!.accessKeyId,
+             secretAccessKey: session.credentials!.secretAccessKey,
+             sessionToken: session!.credentials!.sessionToken,
+           },
+         });
 
-      const audioStreamTracks = new MediaStream(audioStream.getAudioTracks()); // wrap in MediaStream
-      let microphoneStream = new MicrophoneStream();
-      //microphoneStream.setStream(audioStream);
+      //console.log("Fetched credentials:", session.credentials);
+
+      //const audioStreamTracks = new MediaStream(displayStream);
+
+      /*
       const combinedStream = await this.combineAudioStreams(
         audioStreamTracks,
         displayStream
       );
+      */
+      // microphoneStream.setStream(combinedStream);
 
-      microphoneStream.setStream(combinedStream);
-
-      const encodePCMChunk = (chunk: any) => {
-        const input = MicrophoneStream.toRaw(chunk);
-        let offset = 0;
-        const buffer = new ArrayBuffer(input.length * 2);
-        const view = new DataView(buffer);
-        for (let i = 0; i < input.length; i++, offset += 2) {
-          let s = Math.max(-1, Math.min(1, input[i]));
-          view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7fff, true);
-        }
-        return Buffer.from(buffer);
-      };
       /*
   const getAudioStream = async function* () {
       const chunk = await new Promise((resolve) => {
@@ -133,62 +132,19 @@ class RecordingService {
     
   };
   */
-      const SAMPLE_RATE = 44100;
-
-      async function* getAudioStream(micStream: any) {
-        const queue: any[] = [];
-        micStream.on("data", (chunk: any) => queue.push(chunk));
-
-        while (RecordingService.getInstance().getIsRecording()) {
-          if (queue.length > 0) {
-            const chunk = queue.shift();
-            yield { AudioEvent: { AudioChunk: encodePCMChunk(chunk) } };
-          } else {
-            await new Promise((r) => setTimeout(r, 20));
-          }
+      this.createTranscript(transcribeClient1, audioStream, "microphone").catch(
+        (err) => {
+          console.error("❌ Microphone failed:", err);
         }
-      }
+      );
 
-      const command = new StartStreamTranscriptionCommand({
-        LanguageCode: "en-US",
-        MediaEncoding: "pcm",
-        MediaSampleRateHertz: SAMPLE_RATE,
-        ShowSpeakerLabel: true,
-        AudioStream: getAudioStream(microphoneStream),
-      });
-      const data = await transcribeClient.send(command);
+      await new Promise((resolve) => setTimeout(resolve, 1000));
 
-
-      //TranscribeService.startTranscription( data);
-      for await (const event of data.TranscriptResultStream) {
-        const results = event.TranscriptEvent?.Transcript?.Results;
-        console.log(event);
-        for (const result of results) {
-          if (
-            !result.IsPartial &&
-            result.Alternatives &&
-            result.Alternatives.length > 0
-          ) {
-            const transcript = result.Alternatives[0]?.Transcript;
-            if (transcript) {
-              console.log("📝 Final:", transcript);
-
-              if (this.transcriptCallback) {
-                this.transcriptCallback(transcript+'\n');
-              }
-            }
-          } else if (
-            result.IsPartial &&
-            result.Alternatives &&
-            result.Alternatives.length > 0
-          ) {
-            const transcript = result.Alternatives[0]?.Transcript;
-            if (transcript) {
-              console.log("⏳ Partial:", transcript);
-            }
-          }
+      this.createTranscript(transcribeClient2, displayStream, "display").catch(
+        (err) => {
+          console.error("❌ Display failed:", err);
         }
-      }
+      );
 
       return { success: true, displayStream };
     } catch (err) {
@@ -198,6 +154,90 @@ class RecordingService {
     }
   }
 
+  async createTranscript(
+    transcribeClient: TranscribeStreamingClient,
+    stream: MediaStream,
+    source: "display" | "microphone" 
+  ) {
+    const encodePCMChunk = (chunk: any) => {
+      const input = MicrophoneStream.toRaw(chunk);
+      let offset = 0;
+      const buffer = new ArrayBuffer(input.length * 2);
+      const view = new DataView(buffer);
+      for (let i = 0; i < input.length; i++, offset += 2) {
+        let s = Math.max(-1, Math.min(1, input[i]));
+        view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+      }
+      return Buffer.from(buffer);
+    };
+
+    const microphoneStream = new MicrophoneStream();
+    microphoneStream.setStream(stream);
+
+    await new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error(`[${source}] Timeout`));
+      }, 2000);
+
+      microphoneStream.once("data", () => {
+        console.log(`[${source}] Audio ready`);
+        clearTimeout(timeout);
+        resolve();
+      });
+    });
+
+    async function* getAudioStream() {
+      const queue: any[] = [];
+      microphoneStream.on("data", (chunk: any) => queue.push(chunk));
+
+      while (RecordingService.getInstance().getIsRecording()) {
+        if (queue.length > 0) {
+          const chunk = queue.shift();
+          yield { AudioEvent: { AudioChunk: encodePCMChunk(chunk) } };
+        } else {
+          await new Promise((r) => setTimeout(r, 20));
+        }
+      }
+    }
+
+    const SAMPLE_RATE = 44100; // ✅ Match actual sample rate
+
+    const command = new StartStreamTranscriptionCommand({
+      LanguageCode: "en-US",
+      MediaEncoding: "pcm",
+      MediaSampleRateHertz: SAMPLE_RATE,
+      ShowSpeakerLabel: true,
+      AudioStream: getAudioStream(), 
+    });
+let data;
+try {
+  data = await transcribeClient.send(command);
+  console.log(`${source} transcription started successfully`); // ✅ Fixed parentheses
+} catch (err) {
+  console.error(`${source} transcription client error:`, err); // ✅ Fixed parentheses
+  throw err;
+}
+    if (!data?.TranscriptResultStream) return;
+
+    for await (const event of data.TranscriptResultStream) {
+      const results = event.TranscriptEvent?.Transcript?.Results;
+      if (!results) continue;
+
+      for (const result of results) {
+        if(!result) return;
+        if(!result.Alternatives)return;
+        if(result.IsPartial){
+          console.log(result); //debuging
+        }
+        if (!result.IsPartial && result.Alternatives?.length > 0) {
+          const transcript = result.Alternatives[0]?.Transcript;
+          if (transcript && this.transcriptCallback) {
+            this.transcriptCallback(`[${source}]: ${transcript}\n`);
+          }
+        }
+      }
+    }
+  }
   getAudioStatus(): {
     hasAudio: boolean;
     enabled: boolean;
