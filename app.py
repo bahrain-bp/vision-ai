@@ -44,8 +44,11 @@ identity_stack = IdentityVerificationStack(
     investigation_bucket=shared_stack.investigation_bucket,
     shared_api_id=shared_stack.shared_api.rest_api_id,
     shared_api_root_resource_id=shared_stack.shared_api.rest_api_root_resource_id,
-    description="Identity verification: CPR extraction and face comparison"
+    description="Identity verification: CPR extraction, name extraction, and face comparison with CloudWatch logging"
 )
+
+# Ensure identity stack depends on shared stack
+identity_stack.add_dependency(shared_stack)
 
 # ==========================================
 # 4. API DEPLOYMENT STACK
@@ -55,11 +58,15 @@ deployment_stack = APIDeploymentStack(
     app, f"{app_name}-api-deployment-stack", env=env,
     shared_api_id=shared_stack.shared_api.rest_api_id,
     shared_api_root_resource_id=shared_stack.shared_api.rest_api_root_resource_id,
-    description="API Gateway deployment"
+    description="API Gateway deployment with CloudWatch logging enabled"
 )
+
+# Ensure deployment happens after identity stack
+deployment_stack.add_dependency(identity_stack)
 
 # Add tags
 cdk.Tags.of(app).add("Project", "VisionAI")
 cdk.Tags.of(app).add("ManagedBy", "CDK")
+cdk.Tags.of(app).add("Environment", "Production")
 
 app.synth()
