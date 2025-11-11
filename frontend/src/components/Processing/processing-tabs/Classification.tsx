@@ -4,11 +4,13 @@ import { Upload } from "lucide-react";
 const Classification: React.FC = () => {
   const [file, setFile] = useState<File | null>(null);
   const [text, setText] = useState<string>("");
+  const [category, setCategory] = useState<string>("");
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setFile(e.target.files[0]);
       setText("");
+      setCategory("");
     }
   };
 
@@ -18,6 +20,16 @@ const Classification: React.FC = () => {
       return;
     }
     setText(`✅ Text successfully extracted from: ${file.name}`);
+    const detectedCategory = "Violation"; // sample
+    setCategory(detectedCategory);
+  };
+
+  const handleSave = () => {
+    if (!text) {
+      alert("Please Extract data first!");
+      return;
+    }
+    alert("The extracted text saved successfully");
   };
 
   return (
@@ -65,9 +77,18 @@ const Classification: React.FC = () => {
               text || "Extracted text will appear here after processing..."
             }
           />
-          <button className="extract-btn" onClick={handleExtract}>
-            Extract Text
-          </button>
+          <div className="category-row">
+            <h3>Category</h3>
+            <textarea 
+              className="category-textarea"
+              readOnly
+              value={category || ""}
+            />
+          </div>
+          <div className="actions">
+            <button className="extract-btn" onClick={handleExtract}>Extract</button>
+            <button className="extract-btn" onClick={handleSave}>Save</button>
+          </div>
         </div>
       </div>
     </div>
