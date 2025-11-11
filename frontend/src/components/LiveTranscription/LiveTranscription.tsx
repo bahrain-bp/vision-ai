@@ -1,40 +1,36 @@
 import React, { useEffect } from "react";
 import { FileText, Download, Copy } from "lucide-react";
 import { useTranscription } from "../../hooks/useTranscription";
-import { RecordingStatus } from "../../types/";
+import { RecordingStatus,TranscriptionResult } from "../../types/";
 import { useState } from "react";
-
 interface LiveTranscriptionProps {
   startRecordingProp: boolean;
   setSessionState: (state: RecordingStatus) => void;
+  selectedLanguage: string;
 }
-
-
 
 
 const LiveTranscription: React.FC<LiveTranscriptionProps> = ({
   startRecordingProp,
   setSessionState,
+  selectedLanguage,
 }) => {
-  const {
-    //transcript, // All transcript lines
-    audioStatus, // Audio detected or not
-    recordingStatus,
-    startRecording, // Function to start
-    stopRecording, // Function to stop
-    // addLine, // Function to add line (for AWS Transcribe later)
-  } = useTranscription();
+  const { audioStatus, recordingStatus, startRecording, stopRecording } =
+    useTranscription();
 
-const [liveTranscript, setLiveTranscript] = useState<string>("");
+  const [liveTranscript, setLiveTranscript] =
+    useState<TranscriptionResult | null>(null);
+  const [fullTranscript, setFullTranscript] = useState<string>("");
 
   useEffect(() => {
     if (startRecordingProp && recordingStatus === "off") {
       const start = async () => {
         const success = await startRecording(
           setSessionState,
-          (text: string) => {
-          setLiveTranscript((prev: string) => prev + text);
-          }
+          (text: TranscriptionResult) => {
+            setLiveTranscript(text);
+          },
+          selectedLanguage
         );
         if (!success) {
           console.error("Failed to start recording");
@@ -43,7 +39,11 @@ const [liveTranscript, setLiveTranscript] = useState<string>("");
       start();
     }
   }, [startRecordingProp, recordingStatus, startRecording, setSessionState]);
-
+  useEffect(() => {
+    if (liveTranscript?.formattedTranscript) {
+      setFullTranscript((prev) => prev + liveTranscript.formattedTranscript);
+    }
+  }, [liveTranscript]);
   return (
     <div className="transcription-card">
       <div className="card-header">
@@ -64,7 +64,7 @@ const [liveTranscript, setLiveTranscript] = useState<string>("");
         </div>
       </div>
       <textarea
-        value={liveTranscript}
+        value={fullTranscript}
         readOnly
         placeholder="Transcript will appear here..."
         style={{
@@ -76,7 +76,7 @@ const [liveTranscript, setLiveTranscript] = useState<string>("");
           border: "1px solid #ddd",
           borderRadius: "4px",
           resize: "vertical",
-          whiteSpace: "pre-wrap", 
+          whiteSpace: "pre-wrap",
         }}
       />
 

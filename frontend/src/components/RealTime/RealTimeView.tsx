@@ -12,6 +12,7 @@ import Translation from "./Translation";
 import AIAssistant from "./AIAssistant";
 import SessionInfo from "./SessionInfo";
 import IdentityVerification from "./IdentityVerification/IdentityVerification";
+import { LanguageCode } from "@aws-sdk/client-transcribe-streaming";
 
 import { RecordingStatus } from "../../types/";
 
@@ -89,6 +90,7 @@ const RealTimeView: React.FC<RealTimeViewProps> = ({
   const [aiExpanded, setAiExpanded] = useState(false);
   const [isIdentityVerified, setIsIdentityVerified] = useState(false);
   const [startRecording, setStartRecording] = useState(false);
+  const [selectedLanguage, setSelectedLanguage] = useState<string>("en-US");
 
   const handleStartInvestigation = (investigationData: InvestigationData) => {
     console.log("Starting investigation with data:", investigationData);
@@ -116,29 +118,53 @@ const RealTimeView: React.FC<RealTimeViewProps> = ({
         )}
 
         {sessionState === "off" && activeTab === "transcription" && (
-          <div className="ready-state">
-            <div className="ready-content">
-              <div className="play-icon-container">
-                <Play className="play-icon" />
+          <>
+            <div className="ready-state">
+              <div className="ready-content">
+                <div className="play-icon-container">
+                  <Play className="play-icon" />
+                </div>
+                <h2 className="ready-title">Ready to Start</h2>
+                <p className="ready-description">
+                  Click the button below to begin recording the investigation
+                  session.
+                </p>
+                <button
+                  onClick={() => {
+                    setStartRecording(true);
+                    setSessionState("on");
+                    setActiveTab("transcription");
+                  }}
+                  className="start-recording-btn"
+                >
+                  <Play className="btn-icon" />
+                  <span>Start Recording</span>
+                </button>
+                <br></br>
+                Select the language you need
+                <br></br>
+                {LanguageCode && (
+                  <select
+                    value={selectedLanguage}
+                    onChange={(e) => setSelectedLanguage(e.target.value)}
+                  >
+                    {Object.entries(LanguageCode).map(([code, name]) => {
+                      const formattedCode =
+                        code.split("_")[0].toLowerCase() +
+                        "-" +
+                        code.split("_")[1].toUpperCase();
+
+                      return (
+                        <option key={code} value={formattedCode}>
+                          {name}
+                        </option>
+                      );
+                    })}
+                  </select>
+                )}
               </div>
-              <h2 className="ready-title">Ready to Start</h2>
-              <p className="ready-description">
-                Click the button below to begin recording the investigation
-                session.
-              </p>
-              <button
-                onClick={() => {
-                  setStartRecording(true);
-                  setSessionState("on");
-                  setActiveTab("transcription");
-                }}
-                className="start-recording-btn"
-              >
-                <Play className="btn-icon" />
-                <span>Start Recording</span>
-              </button>
             </div>
-          </div>
+          </>
         )}
 
         {sessionState === "on" && (
@@ -148,6 +174,7 @@ const RealTimeView: React.FC<RealTimeViewProps> = ({
                 <LiveTranscription
                   startRecordingProp={startRecording}
                   setSessionState={setSessionState}
+                  selectedLanguage={selectedLanguage}
                 />
                 <Translation />
               </>

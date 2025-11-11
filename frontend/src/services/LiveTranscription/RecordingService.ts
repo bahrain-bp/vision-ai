@@ -5,30 +5,30 @@ import {
   StartStreamTranscriptionCommand,
 } from "@aws-sdk/client-transcribe-streaming";
 import { getUserCredentials } from "../authService";
+import {TranscribedWord,TranscriptionResult} from "../../types"
 //import textField from "../LiveTranscription/TranscribeService"
+import { LanguageCode } from "@aws-sdk/client-transcribe-streaming";
+
+
 class RecordingService {
   private static instance: RecordingService;
-  private mediaStream: MediaStream | null = null;
+
   private recordingStatus: RecordingStatus = "off";
+
   private onAudioProcess: any | null = null;
 
   // The main audio context that manages the audio graph and processing
   private audioContext: AudioContext | null = null;
 
-  // Represents the microphone or media stream input as an AudioNode
-  // This allows the audio to be routed into the Web Audio API graph
-  private source: MediaStreamAudioSourceNode | null = null;
-
-  // ScriptProcessorNode allows access to raw audio data in JavaScript
-  // Used to split audio into chunks and process them in real-time
-  //private processor: ScriptProcessorNode | null = null;
-
-  // Raw audio chunks as ArrayBuffer (16-bit PCM)
-  //private audioChunks: ArrayBuffer[] = [];
-
   private audioStream: MediaStream | null = null;
+
   private displayStream: MediaStream | null = null;
-  private transcriptCallback: ((text: string) => void) | null = null;
+
+  private sampleRate: number = 48000;
+
+  private transcriptCallback: ((text: TranscriptionResult) => void) | null =
+    null;
+
   private constructor() {}
 
   static getInstance(): RecordingService {
@@ -38,11 +38,12 @@ class RecordingService {
     return RecordingService.instance;
   }
 
+  //unused
   async combineAudioStreams(
     stream1: MediaStream,
     stream2: MediaStream
   ): Promise<MediaStream> {
-    this.audioContext = new AudioContext({ sampleRate: 16000 });
+    this.audioContext = new AudioContext({ sampleRate: this.sampleRate });
     // Create sources from both streams
     const source1 = this.audioContext.createMediaStreamSource(stream1);
     const source2 = this.audioContext.createMediaStreamSource(stream2);
@@ -57,57 +58,49 @@ class RecordingService {
     return destination.stream;
   }
 
-  async startRecording(onTranscriptUpdate?: (text: string) => void): Promise<{
+  async startRecording(
+    onTranscriptUpdate?: (text: TranscriptionResult) => void,
+    selectedLanguage?: string
+  ): Promise<{
     success: boolean;
     displayStream?: MediaStream;
   }> {
     this.transcriptCallback = onTranscriptUpdate || null;
-    const SAMPLE_RATE: any = 44100;
 
     if (this.recordingStatus === "on") return { success: false };
 
     try {
-      this.recordingStatus = "on";
-
-       this.displayStream = await navigator.mediaDevices.getDisplayMedia({
+      this.displayStream = await navigator.mediaDevices.getDisplayMedia({
         video: true,
         audio: {
           echoCancellation: false,
           noiseSuppression: false,
-          sampleRate: SAMPLE_RATE,
+          sampleRate: this.sampleRate,
         },
       });
-      //await new Promise((resolve) => setTimeout(resolve, 2000));
 
       this.audioStream = await navigator.mediaDevices.getUserMedia({
         audio: true,
       });
-      /*
-      if (stream.getAudioTracks().length === 0) {
-        stream.getTracks().forEach((t) => t.stop());
-        this.recordingStatus = "off";
-        return { success: false };
-      }
-     
-      this.mediaStream = stream;
-      this.getAudioCapture(stream);
- */
 
-      let transcribeClient1: any;
-      //let transcribeClient2: any;
+      let transcribeClient: TranscribeStreamingClient;
+
       const session = await getUserCredentials();
 
-      transcribeClient1 = new TranscribeStreamingClient({
+      transcribeClient = new TranscribeStreamingClient({
         region: process.env.REACT_APP_AWS_REGION!,
         credentials: {
           accessKeyId: session!.credentials!.accessKeyId,
           secretAccessKey: session.credentials!.secretAccessKey,
           sessionToken: session!.credentials!.sessionToken,
         },
-        logger: console, // prints all SDK info to browser console
+        //logger: console, // Debugging
       });
 
-      transcribeClient1.middlewareStack.add(
+      /*
+      // Debugging middleware - logs AWS SDK requests and responses
+
+      transcribeClient.middlewareStack.add(
         (next: any, _: any) => async (args: any) => {
           console.log("AWS SDK Request:", args);
           const result = await next(args);
@@ -116,62 +109,34 @@ class RecordingService {
         },
         { step: "initialize" }
       );
-      /*  
-      transcribeClient2 = new TranscribeStreamingClient({
-           region: process.env.REACT_APP_AWS_REGION!,
-           credentials: {
-             accessKeyId: session!.credentials!.accessKeyId,
-             secretAccessKey: session.credentials!.secretAccessKey,
-             sessionToken: session!.credentials!.sessionToken,
-           },
-         });
-
-      //console.log("Fetched credentials:", session.credentials);
-
-      //const audioStreamTracks = new MediaStream(displayStream);
-
-      /*
-      const combinedStream = await this.combineAudioStreams(
-        audioStreamTracks,
-        displayStream
-      );
+      
       */
-      // microphoneStream.setStream(combinedStream);
 
-      /*
-  const getAudioStream = async function* () {
-      const chunk = await new Promise((resolve) => {
-        (microphoneStream as any).on("data", (dataChunk: any) => {
-          resolve(dataChunk);
-        });
-      });
-      yield { AudioEvent: { AudioChunk: encodePCMChunk(chunk) } };
-    
-  };
-  */
+      // Small Timeouts to ensure no race conditions
+
       await new Promise((resolve) => setTimeout(resolve, 2000));
 
-      this.createTranscript(
-        transcribeClient1,
+      this.startTranscriptionStream(
+        transcribeClient,
         this.audioStream,
         "microphone",
-        SAMPLE_RATE
-      ).catch((err) => {
-        console.error("Microphone failed:", err);
-      });
+        this.sampleRate,
+        selectedLanguage
+      );
 
       await new Promise((resolve) => setTimeout(resolve, 2000));
 
-      this.createTranscript(
-        transcribeClient1,
+      this.startTranscriptionStream(
+        transcribeClient,
         this.displayStream,
         "display",
-        SAMPLE_RATE
-      ).catch((err) => {
-        console.error("Display failed:", err);
-      });
-      
-      return { success: true, displayStream: this.displayStream  };
+        this.sampleRate,
+        selectedLanguage
+      );
+
+      this.recordingStatus = "on";
+
+      return { success: true, displayStream: this.displayStream };
     } catch (err) {
       console.error("Recording error:", err);
       this.recordingStatus = "off";
@@ -179,11 +144,12 @@ class RecordingService {
     }
   }
 
-  async createTranscript(
+  async startTranscriptionStream(
     transcribeClient: TranscribeStreamingClient,
     stream: MediaStream,
     source: "display" | "microphone",
-    SAMPLE_RATE: any
+    SAMPLE_RATE: any,
+    selectedLanguage?: String
   ) {
     const encodePCMChunk = (chunk: any) => {
       const input = MicrophoneStream.toRaw(chunk);
@@ -200,19 +166,6 @@ class RecordingService {
     const microphoneStream = new MicrophoneStream();
     microphoneStream.setStream(stream);
 
-    /*
-    await new Promise<void>((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        reject(new Error(`[${source}] Timeout`));
-      }, 2000);
-
-      microphoneStream.once("data", () => {
-        console.log(`[${source}] Audio ready`);
-        clearTimeout(timeout);
-        resolve();
-      });
-    });
-*/
     const getAudioStream = async function* () {
       for await (const chunk of microphoneStream) {
         if (chunk.length <= SAMPLE_RATE) {
@@ -226,7 +179,9 @@ class RecordingService {
     };
 
     const command = new StartStreamTranscriptionCommand({
-      LanguageCode: "en-US",
+      LanguageCode: selectedLanguage
+        ? (selectedLanguage as LanguageCode)
+        : "en-US", 
       MediaEncoding: "pcm",
       MediaSampleRateHertz: SAMPLE_RATE,
       ShowSpeakerLabel: true,
@@ -234,9 +189,14 @@ class RecordingService {
     });
     let data;
     try {
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
       data = await transcribeClient.send(command);
       console.log(`${source} transcription started successfully`);
     } catch (err: unknown) {
+      /*
+      //Debugging
+
       if (err instanceof Error) {
         console.group("🛑 Detailed Transcribe Error");
 
@@ -266,6 +226,8 @@ class RecordingService {
       } else {
         console.error("Unknown error type:", err);
       }
+        */
+      console.error(`${source} transcription error`, err);
     }
 
     if (!data?.TranscriptResultStream) return;
@@ -278,71 +240,78 @@ class RecordingService {
         if (!result) return;
         if (!result.Alternatives) return;
         if (result.IsPartial) {
-          console.log(result); //debuging
+          //console.log(result); //debuging
         }
+
         if (!result.IsPartial && result.Alternatives?.length > 0) {
-          const transcript = result.Alternatives[0]?.Transcript;
-          if (transcript && this.transcriptCallback) {
-            this.transcriptCallback(
-              `[${
-                source === "microphone" ? "Investigator" : "Witness"
-              }]: ${transcript}\n`
-            );
+          const Items = result.Alternatives[0].Items;
+          if (Items) {
+            if (Items.length > 0) {
+              const transcriptWords: TranscribedWord[] = Items.map(
+                (item, index) => ({
+                  id: index,
+                  content: item.Content ?? "N/A",
+                  confidence: item.Confidence ?? 0,
+                  speaker: item.Speaker ?? "0",
+                })
+              );
+              const speaker =
+                source === "microphone" ? "Investigator" : "Witness";
+
+              const fullDetailTranscript: TranscriptionResult = {
+                words: transcriptWords,
+                speaker,
+                formattedTranscript:
+                  `[${speaker}]: ` +
+                  transcriptWords.map((item) => item.content).join(" ") +
+                  `\n`,
+              };
+              if (this.transcriptCallback) {
+                this.transcriptCallback(fullDetailTranscript);
+              }
+            }
           }
+          /*
+          const transcript = result.Alternatives[0]?.Transcript;
+
+          if (transcript && this.transcriptCallback) {
+            this.transcriptCallback(fullDetailTranscript);
+          }
+            */
         }
       }
     }
   }
+  //To do later
   getAudioStatus(): {
     hasAudio: boolean;
     enabled: boolean;
     readyState?: string;
   } {
-    if (!this.mediaStream) {
-      return { hasAudio: false, enabled: false };
-    }
-
-    const audioTracks = this.mediaStream.getAudioTracks();
-
-    if (audioTracks.length === 0) {
-      return { hasAudio: false, enabled: false };
-    }
-
-    const track = audioTracks[0];
     return {
       hasAudio: true,
-      enabled: track.enabled,
-      readyState: track.readyState,
+      enabled: true,
+      readyState: "",
     };
   }
 
   stopRecording(): void {
-    if (this.mediaStream) {
-      this.mediaStream.getTracks().forEach((t) => t.stop());
-      this.mediaStream = null;
-    }
     if (this.audioContext && this.onAudioProcess) {
       this.onAudioProcess = null;
-      this.source?.disconnect();
-      //this.processor?.disconnect();
     }
 
-
-   if (this.displayStream) {
-     this.displayStream.getTracks().forEach((track) => track.stop());
-     this.displayStream = null;
-   }
-     if (this.audioStream) {
-       this.audioStream.getTracks().forEach((track) => track.stop());
-       this.audioStream = null;
-     }
+    if (this.displayStream) {
+      this.displayStream.getTracks().forEach((track) => track.stop());
+      this.displayStream = null;
+    }
+    if (this.audioStream) {
+      this.audioStream.getTracks().forEach((track) => track.stop());
+      this.audioStream = null;
+    }
 
     this.recordingStatus = "off";
   }
 
-  getStream(): MediaStream | null {
-    return this.mediaStream;
-  }
   getRecordingStatus(): RecordingStatus {
     return this.recordingStatus;
   }
@@ -350,34 +319,6 @@ class RecordingService {
   getIsRecording(): boolean {
     return this.recordingStatus === "on" ? true : false;
   }
-  /*
-  getAudioCapture(stream: MediaStream): void {
-    //capture audio samples in 16kHz
-    this.audioContext = new AudioContext({ sampleRate: 16000 });
-
-    //convert stream audio to AudioNode so it can be used in the Web Audio API
-    this.source = this.audioContext.createMediaStreamSource(stream);
-
-    //Splits the audio into chunks of 4096 samples.
-    this.processor = this.audioContext.createScriptProcessor(4096, 1, 1);
-
-    this.onAudioProcess = this.processor.onaudioprocess = (event) => {
-      const inputData = event.inputBuffer.getChannelData(0);
-      // Convert to Int16Array (PCM format for AWS)
-      const pcmData = new Int16Array(inputData.length);
-
-      this.audioChunks.push(pcmData.buffer);
-
-      //DeBug
-      //console.log(this.audioChunks);
-    };
-    //Routes the raw audio to be processed
-    this.source.connect(this.processor);
-
-    //Connect audio processor to the audio output to be processed
-    this.processor.connect(this.audioContext.destination);
-  }
-    */
 }
 
 export default RecordingService.getInstance();
