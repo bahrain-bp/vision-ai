@@ -164,7 +164,7 @@ class IdentityVerificationStack(Stack):
         orchestrator_log_group.grant_write(orchestrator_lambda)
         
         # ==========================================
-        # ADD ROUTES TO SHARED API GATEWAY
+        #  ROUTES TO SHARED API GATEWAY
         # ==========================================
         
         # /identity resource on SHARED API
@@ -172,56 +172,58 @@ class IdentityVerificationStack(Stack):
         
         # POST /identity/verify (Main orchestrator endpoint)
         verify_resource = identity_resource.add_resource("verify")
+        # ADD CORS preflight for verify endpoint
+        verify_resource.add_cors_preflight(
+            allow_origins=apigateway.Cors.ALL_ORIGINS, 
+            allow_methods=["POST", "OPTIONS"],
+            allow_headers=[
+                "Content-Type",
+                "X-Amz-Date",
+                "Authorization",
+                "X-Api-Key",
+                "X-Amz-Security-Token",
+                "Content-Length"
+            ],
+            allow_credentials=False, 
+            max_age=Duration.days(1)
+        )
+
         verify_resource.add_method(
             "POST",
             apigateway.LambdaIntegration(
                 orchestrator_lambda, 
-                proxy=True,
-                integration_responses=[
-                    apigateway.IntegrationResponse(
-                        status_code="200",
-                        response_parameters={
-                            "method.response.header.Access-Control-Allow-Origin": "'*'"
-                        }
-                    )
-                ]
+                proxy=True  
             ),
-            authorization_type=apigateway.AuthorizationType.NONE,
-            method_responses=[
-                apigateway.MethodResponse(
-                    status_code="200",
-                    response_parameters={
-                        "method.response.header.Access-Control-Allow-Origin": True
-                    }
-                )
-            ]
+            authorization_type=apigateway.AuthorizationType.NONE
+         
         )
         
         # POST /identity/upload-url (Upload URL generator)
         upload_url_resource = identity_resource.add_resource("upload-url")
+
+        # CORS preflight for OPTIONS requests
+        upload_url_resource.add_cors_preflight(
+            allow_origins=apigateway.Cors.ALL_ORIGINS, 
+            allow_methods=["POST", "OPTIONS"],
+            allow_headers=[
+                "Content-Type",
+                "X-Amz-Date",
+                "Authorization",
+                "X-Api-Key",
+                "X-Amz-Security-Token",
+                "Content-Length"
+            ],
+            allow_credentials=False, 
+            max_age= Duration.days(1)
+        )
+
         upload_url_resource.add_method(
             "POST",
             apigateway.LambdaIntegration(
                 get_upload_url_lambda, 
-                proxy=True,
-                integration_responses=[
-                    apigateway.IntegrationResponse(
-                        status_code="200",
-                        response_parameters={
-                            "method.response.header.Access-Control-Allow-Origin": "'*'"
-                        }
-                    )
-                ]
+                proxy=True, 
             ),
-            authorization_type=apigateway.AuthorizationType.NONE,
-            method_responses=[
-                apigateway.MethodResponse(
-                    status_code="200",
-                    response_parameters={
-                        "method.response.header.Access-Control-Allow-Origin": True
-                    }
-                )
-            ]
+            authorization_type=apigateway.AuthorizationType.NONE
         )
         
         # ==========================================
