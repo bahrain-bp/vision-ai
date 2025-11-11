@@ -4,14 +4,16 @@ from aws_cdk import (
     aws_lambda as _lambda,
     aws_apigateway as apigateway,
     aws_iam as iam,
+    aws_logs as logs,
     Duration,
     CfnOutput,
+    RemovalPolicy,
 )
 from constructs import Construct
 
 class IdentityVerificationStack(Stack):
     """
-    Identity Verification Stack - Adds routes to SHARED API Gateway
+    Identity Verification Stack - Simplified with only 2 Lambda functions
     """
     
     def __init__(
@@ -36,31 +38,21 @@ class IdentityVerificationStack(Stack):
         )
         
         # ==========================================
-        # CREATE SEPARATE ROLES TO AVOID CIRCULAR DEPENDENCIES
+        # IAM ROLE FOR LAMBDA FUNCTIONS
         # ==========================================
-        
-        # Base role for Lambda functions (without API Gateway permissions)
-        base_lambda_role = iam.Role(
+        lambda_role = iam.Role(
             self, "IdentityVerificationLambdaRole",
             assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
-            description="Base role for Identity Verification Lambda functions"
+            description="Role for Identity Verification Lambda functions",
+            managed_policies=[
+                iam.ManagedPolicy.from_aws_managed_policy_name(
+                    "service-role/AWSLambdaBasicExecutionRole"
+                )
+            ]
         )
         
-        # CloudWatch Logs permissions
-        base_lambda_role.add_to_policy(iam.PolicyStatement(
-            effect=iam.Effect.ALLOW,
-            actions=[
-                "logs:CreateLogGroup",
-                "logs:CreateLogStream", 
-                "logs:PutLogEvents"
-            ],
-            resources=[
-                f"arn:aws:logs:{env.region}:{env.account}:log-group:/aws/lambda/*"
-            ]
-        ))
-        
         # S3 permissions - scoped to the specific bucket
-        base_lambda_role.add_to_policy(iam.PolicyStatement(
+        lambda_role.add_to_policy(iam.PolicyStatement(
             effect=iam.Effect.ALLOW,
             actions=[
                 "s3:GetObject",
@@ -69,19 +61,17 @@ class IdentityVerificationStack(Stack):
                 "s3:HeadObject",
                 "s3:CopyObject"
             ],
-            resources=[
-                f"{investigation_bucket.bucket_arn}/*"
-            ]
+            resources=[f"{investigation_bucket.bucket_arn}/*"]
         ))
         
-        base_lambda_role.add_to_policy(iam.PolicyStatement(
+        lambda_role.add_to_policy(iam.PolicyStatement(
             effect=iam.Effect.ALLOW,
             actions=["s3:ListBucket"],
             resources=[investigation_bucket.bucket_arn]
         ))
         
         # Textract permissions
-        base_lambda_role.add_to_policy(iam.PolicyStatement(
+        lambda_role.add_to_policy(iam.PolicyStatement(
             effect=iam.Effect.ALLOW,
             actions=[
                 "textract:DetectDocumentText",
@@ -91,152 +81,87 @@ class IdentityVerificationStack(Stack):
         ))
         
         # Rekognition permissions
-        base_lambda_role.add_to_policy(iam.PolicyStatement(
+        lambda_role.add_to_policy(iam.PolicyStatement(
             effect=iam.Effect.ALLOW,
             actions=[
                 "rekognition:DetectFaces",
-                "rekognition:CompareFaces"
+                "rekognition:CompareFaces",
+                "rekognition:DetectLabels"
             ],
             resources=["*"]
         ))
         
-        # ==========================================
-        # LAMBDA FUNCTIONS (Individual Components)
-        # ==========================================
-        
-        get_upload_url_lambda = _lambda.Function(
-            self, "GetUploadUrlFunction",
-            runtime=_lambda.Runtime.PYTHON_3_11,
-            handler="get_upload_url.handler",
-            code=_lambda.Code.from_asset("lambda/identity_verification"),
-            role=base_lambda_role,
-            timeout=Duration.seconds(30),
-            memory_size=256,
-            environment={"BUCKET_NAME": investigation_bucket.bucket_name},
-            description="Generate presigned URL for document upload"
-        )
-        
-        extract_cpr_lambda = _lambda.Function(
-            self, "ExtractCPRFunction",
-            runtime=_lambda.Runtime.PYTHON_3_11,
-            handler="extract_cpr.handler",
-            code=_lambda.Code.from_asset("lambda/identity_verification"),
-            role=base_lambda_role,
-            timeout=Duration.seconds(60),
-            memory_size=512,
-            environment={"BUCKET_NAME": investigation_bucket.bucket_name},
-            description="Extract CPR number from document using Textract"
-        )
-        
-        check_reference_lambda = _lambda.Function(
-            self, "CheckReferencePhotoFunction",
-            runtime=_lambda.Runtime.PYTHON_3_11,
-            handler="check_reference_photo.handler",
-            code=_lambda.Code.from_asset("lambda/identity_verification"),
-            role=base_lambda_role,
-            timeout=Duration.seconds(30),
-            memory_size=256,
-            environment={"BUCKET_NAME": investigation_bucket.bucket_name},
-            description="Check if reference photo exists in global-assets"
-        )
-        
-        extract_face_lambda = _lambda.Function(
-            self, "ExtractFaceFunction",
-            runtime=_lambda.Runtime.PYTHON_3_11,
-            handler="extract_face.handler",
-            code=_lambda.Code.from_asset("lambda/identity_verification"),
-            role=base_lambda_role,
-            timeout=Duration.seconds(60),
-            memory_size=1024,
-            environment={"BUCKET_NAME": investigation_bucket.bucket_name},
-            description="Extract face from document using Rekognition face detection"
-        )
-        
-        compare_faces_lambda = _lambda.Function(
-            self, "CompareFacesFunction",
-            runtime=_lambda.Runtime.PYTHON_3_11,
-            handler="compare_faces.handler",
-            code=_lambda.Code.from_asset("lambda/identity_verification"),
-            role=base_lambda_role,
-            timeout=Duration.seconds(30),
-            memory_size=512,
-            environment={"BUCKET_NAME": investigation_bucket.bucket_name},
-            description="Compare faces using Rekognition"
-        )
-        
-        # ==========================================
-        # ORCHESTRATOR FUNCTION 
-        # ==========================================
-        
-        orchestrator_role = iam.Role(
-            self, "OrchestratorRole",
-            assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
-            description="Role for Identity Verification Orchestrator"
-        )
-        
-        # Copy all base permissions
-        orchestrator_role.add_to_policy(iam.PolicyStatement(
+        # CloudWatch Logs permissions 
+        lambda_role.add_to_policy(iam.PolicyStatement(
             effect=iam.Effect.ALLOW,
             actions=[
                 "logs:CreateLogGroup",
-                "logs:CreateLogStream", 
+                "logs:CreateLogStream",
                 "logs:PutLogEvents"
             ],
-            resources=[
-                f"arn:aws:logs:{env.region}:{env.account}:log-group:/aws/lambda/*"
-            ]
+            resources=["arn:aws:logs:*:*:*"]
         ))
         
-        # S3 permissions - scoped to the specific bucket
-        orchestrator_role.add_to_policy(iam.PolicyStatement(
-            effect=iam.Effect.ALLOW,
-            actions=[
-                "s3:GetObject",
-                "s3:PutObject",
-                "s3:DeleteObject",
-                "s3:HeadObject",
-                "s3:CopyObject"
-            ],
-            resources=[
-                f"{investigation_bucket.bucket_arn}/*"
-            ]
-        ))
+        # ==========================================
+        # CLOUDWATCH LOG GROUPS
+        # ==========================================
+        upload_url_log_group = logs.LogGroup(
+            self, "GetUploadUrlLogGroup",
+            log_group_name="/aws/lambda/vision-ai-identity-upload-url",
+            retention=logs.RetentionDays.ONE_MONTH,
+            removal_policy=RemovalPolicy.DESTROY
+        )
         
-        orchestrator_role.add_to_policy(iam.PolicyStatement(
-            effect=iam.Effect.ALLOW,
-            actions=["s3:ListBucket"],
-            resources=[investigation_bucket.bucket_arn]
-        ))
+        orchestrator_log_group = logs.LogGroup(
+            self, "OrchestratorLogGroup",
+            log_group_name="/aws/lambda/vision-ai-identity-orchestrator",
+            retention=logs.RetentionDays.ONE_MONTH,
+            removal_policy=RemovalPolicy.DESTROY
+        )
         
-        # Add Lambda invoke permissions
-        orchestrator_role.add_to_policy(iam.PolicyStatement(
-            effect=iam.Effect.ALLOW,
-            actions=["lambda:InvokeFunction"],
-            resources=[
-                extract_cpr_lambda.function_arn,
-                check_reference_lambda.function_arn,
-                extract_face_lambda.function_arn,
-                compare_faces_lambda.function_arn
-            ]
-        ))
+        # ==========================================
+        # LAMBDA FUNCTIONS
+        # ==========================================
         
+        # 1. Get Upload URL Function (Separate)
+        get_upload_url_lambda = _lambda.Function(
+            self, "GetUploadUrlFunction",
+            function_name="vision-ai-get-upload-url",
+            runtime=_lambda.Runtime.PYTHON_3_11,
+            handler="get_upload_url.handler",
+            code=_lambda.Code.from_asset("lambda/identity_verification"),
+            role=lambda_role,
+            timeout=Duration.seconds(30),
+            memory_size=256,
+            environment={
+                "BUCKET_NAME": investigation_bucket.bucket_name,
+                "LOG_LEVEL": "INFO"
+            },
+            description="Generate presigned URL for document and photo uploads"
+        )
+        
+        # Grant log group permissions
+        upload_url_log_group.grant_write(get_upload_url_lambda)
+        
+        # 2. Identity Verification Orchestrator 
         orchestrator_lambda = _lambda.Function(
             self, "IdentityVerificationOrchestratorFunction",
+            function_name="vision-ai-identity-verification-orchestrator",
             runtime=_lambda.Runtime.PYTHON_3_11,
             handler="identity_verification_orchestrator.handler",
             code=_lambda.Code.from_asset("lambda/identity_verification"),
-            role=orchestrator_role,
+            role=lambda_role,
             timeout=Duration.seconds(180),  # 3 minutes for complete workflow
-            memory_size=512,  
+            memory_size=1024, 
             environment={
                 "BUCKET_NAME": investigation_bucket.bucket_name,
-                "EXTRACT_CPR_FUNCTION": extract_cpr_lambda.function_name,
-                "CHECK_REFERENCE_FUNCTION": check_reference_lambda.function_name,
-                "EXTRACT_FACE_FUNCTION": extract_face_lambda.function_name,
-                "COMPARE_FACES_FUNCTION": compare_faces_lambda.function_name
+                "LOG_LEVEL": "INFO"
             },
-            description="Orchestrate complete identity verification workflow"
+            description="All-in-one identity verification: CPR extraction, name extraction, reference check, and face comparison"
         )
+        
+        # Grant log group permissions
+        orchestrator_log_group.grant_write(orchestrator_lambda)
         
         # ==========================================
         # ADD ROUTES TO SHARED API GATEWAY
@@ -245,68 +170,94 @@ class IdentityVerificationStack(Stack):
         # /identity resource on SHARED API
         identity_resource = self.shared_api.root.add_resource("identity")
         
-        # POST /identity/verify (Orchestrated workflow)
+        # POST /identity/verify (Main orchestrator endpoint)
         verify_resource = identity_resource.add_resource("verify")
         verify_resource.add_method(
             "POST",
-            apigateway.LambdaIntegration(orchestrator_lambda, proxy=True),
-            authorization_type=apigateway.AuthorizationType.NONE
+            apigateway.LambdaIntegration(
+                orchestrator_lambda, 
+                proxy=True,
+                integration_responses=[
+                    apigateway.IntegrationResponse(
+                        status_code="200",
+                        response_parameters={
+                            "method.response.header.Access-Control-Allow-Origin": "'*'"
+                        }
+                    )
+                ]
+            ),
+            authorization_type=apigateway.AuthorizationType.NONE,
+            method_responses=[
+                apigateway.MethodResponse(
+                    status_code="200",
+                    response_parameters={
+                        "method.response.header.Access-Control-Allow-Origin": True
+                    }
+                )
+            ]
         )
         
-        # POST /identity/upload-url (Individual function)
+        # POST /identity/upload-url (Upload URL generator)
         upload_url_resource = identity_resource.add_resource("upload-url")
         upload_url_resource.add_method(
             "POST",
-            apigateway.LambdaIntegration(get_upload_url_lambda, proxy=True),
-            authorization_type=apigateway.AuthorizationType.NONE
-        )
-        
-        # POST /identity/extract-cpr (Individual function)
-        extract_cpr_resource = identity_resource.add_resource("extract-cpr")
-        extract_cpr_resource.add_method(
-            "POST",
-            apigateway.LambdaIntegration(extract_cpr_lambda, proxy=True),
-            authorization_type=apigateway.AuthorizationType.NONE
-        )
-        
-        # GET /identity/check-reference/{cpr} (Individual function)
-        check_reference_resource = identity_resource.add_resource("check-reference")
-        check_reference_cpr = check_reference_resource.add_resource("{cpr}")
-        check_reference_cpr.add_method(
-            "GET",
-            apigateway.LambdaIntegration(check_reference_lambda, proxy=True),
+            apigateway.LambdaIntegration(
+                get_upload_url_lambda, 
+                proxy=True,
+                integration_responses=[
+                    apigateway.IntegrationResponse(
+                        status_code="200",
+                        response_parameters={
+                            "method.response.header.Access-Control-Allow-Origin": "'*'"
+                        }
+                    )
+                ]
+            ),
             authorization_type=apigateway.AuthorizationType.NONE,
-            request_parameters={"method.request.path.cpr": True}
-        )
-        
-        # POST /identity/extract-face (Individual function)
-        extract_face_resource = identity_resource.add_resource("extract-face")
-        extract_face_resource.add_method(
-            "POST",
-            apigateway.LambdaIntegration(extract_face_lambda, proxy=True),
-            authorization_type=apigateway.AuthorizationType.NONE
-        )
-        
-        # POST /identity/compare-faces (Individual function)
-        compare_faces_resource = identity_resource.add_resource("compare-faces")
-        compare_faces_resource.add_method(
-            "POST",
-            apigateway.LambdaIntegration(compare_faces_lambda, proxy=True),
-            authorization_type=apigateway.AuthorizationType.NONE
+            method_responses=[
+                apigateway.MethodResponse(
+                    status_code="200",
+                    response_parameters={
+                        "method.response.header.Access-Control-Allow-Origin": True
+                    }
+                )
+            ]
         )
         
         # ==========================================
         # OUTPUTS
         # ==========================================
         CfnOutput(
-            self, "IdentityVerificationReady",
-            value="Identity verification routes added to shared API",
-            description="Confirmation that identity verification features were deployed",
-            export_name="IdentityVerificationReady"
+            self, "IdentityVerificationEndpoint",
+            value="POST /identity/verify",
+            description="Main endpoint for identity verification workflow",
+            export_name="IdentityVerificationEndpoint"
         )
         
         CfnOutput(
-            self, "IndividualFunctionsAvailable",
-            value="All individual functions accessible via /identity/* routes",
-            description="Individual functions can be called directly if needed"
+            self, "UploadUrlEndpoint",
+            value="POST /identity/upload-url",
+            description="Endpoint for generating presigned upload URLs",
+            export_name="UploadUrlEndpoint"
+        )
+        
+        CfnOutput(
+            self, "OrchestratorFunctionArn",
+            value=orchestrator_lambda.function_arn,
+            description="ARN of the identity verification orchestrator function",
+            export_name="IdentityOrchestratorArn"
+        )
+        
+        CfnOutput(
+            self, "OrchestratorLogGroupOutput",
+            value=orchestrator_log_group.log_group_name,
+            description="CloudWatch Log Group for Identity Verification Orchestrator",
+            export_name="IdentityOrchestratorLogGroup"
+        )
+        
+        CfnOutput(
+            self, "UploadUrlLogGroupOutput",
+            value=upload_url_log_group.log_group_name,
+            description="CloudWatch Log Group for Upload URL Generator",
+            export_name="UploadUrlLogGroup"
         )

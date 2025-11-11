@@ -1,6 +1,13 @@
-export interface TranscriptLine {
-  timestamp: string;
+export interface TranscribedWord {
+  id: number;
+  content: string;
+  confidence: number; 
   speaker: string;
-  text: string;
+}
+
+export interface TranscriptionResult {
+  words: TranscribedWord[];
+  speaker: string;
+  formattedTranscript: string; 
 }
 
