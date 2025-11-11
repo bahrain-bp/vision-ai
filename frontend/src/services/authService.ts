@@ -172,6 +172,7 @@ export async function getUserCredentials(){
     return {
       credentials: session.credentials,
       // Tokens from User Pool
+      secretAccessKey: session.credentials?.secretAccessKey,
       idToken: session.tokens?.idToken?.toString(),
       accessToken: session.tokens?.accessToken?.toString(),
     };
