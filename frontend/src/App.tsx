@@ -7,6 +7,7 @@ import authService from "./services/authService";
 import awsConfig from "./aws-config";
 import { User } from "./types";
 import { TranscriptionProvider } from "./context/TranscriptionContext";
+import { TranslationProvider } from "./context/TranslationContext";
 
 Amplify.configure(awsConfig);
 
@@ -133,12 +134,14 @@ const App: React.FC = () => {
         <Authentication onAuthSuccess={handleAuthSuccess} />
       ) : currentView === "session" && currentUser && sessionData ? (
         <TranscriptionProvider>
+          <TranslationProvider>
           <SessionPage
             user={currentUser}
             onSignOut={handleSignOut}
             //sessionData={sessionData}
             onEndSession={handleEndSession}
           />
+          </TranslationProvider>
         </TranscriptionProvider>
       ) : currentUser ? (
         <HomePage

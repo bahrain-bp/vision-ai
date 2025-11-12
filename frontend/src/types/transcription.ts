@@ -10,3 +10,4 @@ export interface TranscriptionResult {
   speaker: string;
   formattedTranscript: string; 
 }
+

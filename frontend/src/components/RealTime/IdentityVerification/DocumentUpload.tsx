@@ -6,7 +6,7 @@ interface DocumentUploadProps {
   onDocumentUpload: (documentType: string, file: File) => void;
   uploadedDocument: File | null;
 }
-
+ 
 const DocumentUpload: React.FC<DocumentUploadProps> = ({
   documentType,
   onDocumentUpload,

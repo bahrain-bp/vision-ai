@@ -1,0 +1,10 @@
+{
+  "vision-ai-shared-infrastructure-stack": {
+    "ExportsOutputRefSharedAPI64CEF264D6EA9E72": "yphcka81y6",
+    "BucketName": "vision-rt-investigation-system",
+    "SharedAPIId": "yphcka81y6",
+    "ExportsOutputFnGetAttInvestigationBucketA083103FArn6869CEDB": "arn:aws:s3:::vision-rt-investigation-system",
+    "ExportsOutputFnGetAttSharedAPI64CEF264RootResourceId42C3AADE": "pnhlxztgag",
+    "ExportsOutputRefInvestigationBucketA083103F1C5E8EB5": "vision-rt-investigation-system"
+  }
+}

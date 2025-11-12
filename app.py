@@ -48,8 +48,10 @@ identity_stack = IdentityVerificationStack(
     description="Identity verification: CPR extraction, name extraction, and face comparison with CloudWatch logging"
 )
 
+
 # Ensure identity stack depends on shared stack
 identity_stack.add_dependency(shared_stack)
+
 
 # ==========================================
 # 4. API DEPLOYMENT STACK
