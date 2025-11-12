@@ -25,6 +25,6 @@
     "declarationMap": true,
     "sourceMap": true
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "webpack.config.js"],
   "exclude": ["node_modules", "dist", "build"]
 }
