@@ -6,7 +6,7 @@ from datetime import datetime
 bedrock = boto3.client('bedrock-runtime', region_name='us-east-1')
 s3 = boto3.client('s3')
 
-BUCKET_NAME = os.environ['BUCKET_NAME']
+BUCKET_NAME = os.environ.get('BUCKET_NAME', 'vision-investigation-system-052804446370')
 MODEL_ID = 'amazon.nova-lite-v1:0'
 
 def lambda_handler(event, context):

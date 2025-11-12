@@ -22,11 +22,10 @@ class RewriteStack(Stack):
     ) -> None:
         super().__init__(scope, construct_id, env=env, **kwargs)
         
-        # S3 Bucket in us-east-1 (private)
-        rewrite_bucket = s3.Bucket(
+        # Use existing S3 bucket
+        rewrite_bucket = s3.Bucket.from_bucket_name(
             self, "RewriteBucket",
-            encryption=s3.BucketEncryption.S3_MANAGED,
-            block_public_access=s3.BlockPublicAccess.BLOCK_ALL
+            bucket_name="vision-investigation-system-052804446370"
         )
         
         # Lambda Function
@@ -38,12 +37,15 @@ class RewriteStack(Stack):
             timeout=Duration.seconds(300),
             memory_size=512,
             environment={
-                'BUCKET_NAME': rewrite_bucket.bucket_name
+                'BUCKET_NAME': 'vision-investigation-system-052804446370'
             }
         )
         
-        # Grant permissions
-        rewrite_bucket.grant_read_write(rewrite_lambda)
+        # Grant permissions to existing bucket
+        rewrite_lambda.add_to_role_policy(iam.PolicyStatement(
+            actions=['s3:PutObject', 's3:GetObject'],
+            resources=[f'arn:aws:s3:::vision-investigation-system-052804446370/rewritten/*']
+        ))
         
         rewrite_lambda.add_to_role_policy(iam.PolicyStatement(
             actions=['bedrock:InvokeModel'],
@@ -67,12 +69,6 @@ class RewriteStack(Stack):
         )
         
         # Outputs
-        CfnOutput(
-            self, "RewriteBucketName",
-            value=rewrite_bucket.bucket_name,
-            description="S3 bucket for rewritten documents"
-        )
-        
         CfnOutput(
             self, "RewriteLambdaArn",
             value=rewrite_lambda.function_arn,
