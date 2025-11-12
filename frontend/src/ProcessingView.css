@@ -631,9 +631,13 @@
   color: var(--text-medium);
 }
 
-.upload-icon {
+.upload-icon-cam {
+   display: flex;
+  justify-content: center;
+  align-items: center;
   font-size: 3rem;
   margin-bottom: 1rem;
+  
 }
 
 .upload-text {

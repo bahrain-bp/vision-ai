@@ -142,7 +142,7 @@ const CameraFootage: React.FC = () => {
                 {/* Label for File Input */}
                 <label htmlFor="video-upload" className="upload-label">
                   <div className="upload-content">
-                    <div className="upload-icon">📹</div>
+                    <div className="upload-icon-cam">📹</div>
                     <div className="upload-text">Upload Video File</div>
                     <div className="upload-subtitle">
                       MP4, AVI, MOV up to 2GB
