@@ -12,9 +12,10 @@ app = cdk.App()
 
 # Environment configuration
 env = cdk.Environment(
-    account="128663321866", 
-    region="us-east-1" 
+    account=os.environ.get('CDK_DEFAULT_ACCOUNT'),
+    region="us-east-1"
 )
+ 
 app_name = "vision-ai"
 
 # ==========================================
