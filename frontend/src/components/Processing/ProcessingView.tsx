@@ -45,7 +45,7 @@ const ProcessingView: React.FC<ProcessingViewProps> = ({ sessionData }) => {
     {
       id: "Rewrite",
       label: "Rewrite",
-      render: () => <Rewrite />,
+      render: () => <Rewrite sessionData={sessionData} />,
     },
     {
       id: "CameraFootage",
