@@ -41,21 +41,6 @@ export interface SessionData {
 
 type ViewType = "home" | "session";
 
-const SKIP_AUTH =
-  process.env.REACT_APP_SKIP_AUTH === "true" ||
-  process.env.NODE_ENV === "development";
-
-const mockUser: User = {
-  // adjust properties to match your actual User type
-  id: "dev-user-1",
-  userId: "dev-user-1",
-  username: "dev_user",
-  email: "dev@example.com",
-  name: "Dev User",
-  roles: ["developer"],
-  // add any other fields your app expects on User
-};
-
 const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -64,15 +49,6 @@ const App: React.FC = () => {
   const [sessionData, setSessionData] = useState<SessionData | null>(null);
 
   useEffect(() => {
-    // If we're skipping auth for dev, set mock user immediately
-    if (SKIP_AUTH) {
-      setCurrentUser(mockUser);
-      setIsAuthenticated(true);
-      setIsLoading(false);
-      return;
-    }
-
-    // Otherwise run normal auth check
     checkAuthStatus();
   }, []);
 
@@ -88,7 +64,7 @@ const App: React.FC = () => {
         setCurrentUser(null);
       }
     } catch (error: unknown) {
-      console.log("No authenticated user found", error);
+      console.log("No authenticated user found");
       setIsAuthenticated(false);
       setCurrentUser(null);
     } finally {
