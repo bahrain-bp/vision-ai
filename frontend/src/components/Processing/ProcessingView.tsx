@@ -100,6 +100,8 @@ const ProcessingView: React.FC<ProcessingViewProps> = ({ sessionData }) => {
     return activeTabConfig ? activeTabConfig.render() : null;
   };
   
+  const isAISuggestionsActive = !isProcessing && activeTab === "AISuggestions";
+
   // dynamic tab render 
   return (
     <div className="processing-view">
@@ -117,7 +119,7 @@ const ProcessingView: React.FC<ProcessingViewProps> = ({ sessionData }) => {
         ))}
       </div>
 
-      <div className="tab-content">
+      <div className={`tab-content ${isAISuggestionsActive ? "ai-tab-content" : ""}`}>
         {renderTabContent()}
       </div>
     </div>
