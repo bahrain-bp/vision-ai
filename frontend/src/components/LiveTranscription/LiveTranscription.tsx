@@ -1,14 +1,14 @@
-import React, { useEffect } from "react";
-import { FileText, Download, Copy } from "lucide-react";
+import React, { useEffect, useRef } from "react";
+import { FileText, Download, Copy, Loader } from "lucide-react";
 import { useTranscription } from "../../hooks/useTranscription";
-import { RecordingStatus,TranscriptionResult } from "../../types/";
+import { RecordingStatus, TranscriptionResult } from "../../types/";
 import { useState } from "react";
+
 interface LiveTranscriptionProps {
   startRecordingProp: boolean;
   setSessionState: (state: RecordingStatus) => void;
   selectedLanguage: string;
 }
-
 
 const LiveTranscription: React.FC<LiveTranscriptionProps> = ({
   startRecordingProp,
@@ -21,29 +21,64 @@ const LiveTranscription: React.FC<LiveTranscriptionProps> = ({
   const [liveTranscript, setLiveTranscript] =
     useState<TranscriptionResult | null>(null);
   const [fullTranscript, setFullTranscript] = useState<string>("");
+  const [isStarting, setIsStarting] = useState(false);
+  const hasStarted = useRef(false);
 
   useEffect(() => {
-    if (startRecordingProp && recordingStatus === "off") {
+    if (
+      startRecordingProp &&
+      recordingStatus === "off" &&
+      !hasStarted.current
+    ) {
+      hasStarted.current = true;
+
       const start = async () => {
-        const success = await startRecording(
-          setSessionState,
-          (text: TranscriptionResult) => {
-            setLiveTranscript(text);
-          },
-          selectedLanguage
-        );
-        if (!success) {
-          console.error("Failed to start recording");
+        setIsStarting(true);
+
+        try {
+          const success = await startRecording(
+            setSessionState,
+            (text: TranscriptionResult) => {
+              setLiveTranscript(text);
+            },
+            selectedLanguage
+          );
+
+          if (!success) {
+            console.error("Failed to start recording");
+            hasStarted.current = false;
+          }
+        } catch (error) {
+          console.error("Error starting recording:", error);
+          hasStarted.current = false;
+        } finally {
+          setIsStarting(false);
         }
       };
+
       start();
     }
-  }, [startRecordingProp, recordingStatus, startRecording, setSessionState]);
+  }, [startRecordingProp, recordingStatus, selectedLanguage]);
+
   useEffect(() => {
     if (liveTranscript?.formattedTranscript) {
       setFullTranscript((prev) => prev + liveTranscript.formattedTranscript);
     }
   }, [liveTranscript]);
+
+  if (isStarting) {
+    return (
+      <div className="processing-content w-full">
+        <div className="transcription-card">
+          <div className="starting-state">
+            <Loader className="processing-spinner" />
+            <p>Initializing recording session...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="transcription-card">
       <div className="card-header">

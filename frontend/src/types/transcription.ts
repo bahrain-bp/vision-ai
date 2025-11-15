@@ -10,3 +10,11 @@ export interface TranscriptionResult {
   speaker: string;
   formattedTranscript: string; 
 }
+
+export type Sources = "display" | "microphone";
+
+export type Speakers = "Investigator" | "Witness";
+
+export const getSpeakerFromSource = (source: Sources): Speakers => {
+  return source === "microphone" ? "Investigator" : "Witness";
+};

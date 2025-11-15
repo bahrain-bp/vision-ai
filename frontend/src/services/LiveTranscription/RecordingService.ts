@@ -166,15 +166,41 @@ class RecordingService {
     const microphoneStream = new MicrophoneStream();
     microphoneStream.setStream(stream);
 
-    const getAudioStream = async function* () {
-      for await (const chunk of microphoneStream) {
-        if (chunk.length <= SAMPLE_RATE) {
-          yield {
-            AudioEvent: {
-              AudioChunk: encodePCMChunk(chunk),
-            },
-          };
+    /**
+     * Async generator that yields audio chunks in PCM format
+     * Validates chunk size before yielding to prevent invalid data
+     */
+    const getAudioStream = async function* (): AsyncGenerator<{ AudioEvent: { AudioChunk: Buffer } }> {
+      try {
+        for await (const chunk of microphoneStream) {
+          // Validate chunk exists and is not empty
+          if (!chunk || chunk.length === 0) {
+            console.debug('[Audio] Skipping empty chunk');
+            continue;
+          }
+
+          // Validate chunk size is reasonable (not exceeding sample rate per frame)
+          // This prevents processing abnormally large chunks
+          if (chunk.length > SAMPLE_RATE * 2) {
+            console.warn(`[Audio] Chunk size (${chunk.length}) exceeds expected threshold, skipping`);
+            continue;
+          }
+
+          try {
+            const encodedChunk = encodePCMChunk(chunk);
+            yield {
+              AudioEvent: {
+                AudioChunk: encodedChunk,
+              },
+            };
+          } catch (encodeError) {
+            console.error('[Audio] Failed to encode chunk:', encodeError);
+            continue;
+          }
         }
+      } catch (streamError) {
+        console.error('[Audio] Error reading from microphone stream:', streamError);
+        throw streamError;
       }
     };
 
