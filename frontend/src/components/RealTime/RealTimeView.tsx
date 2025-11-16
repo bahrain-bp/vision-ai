@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import {
-  FileText,
   User,
   MessageSquare,
   ChevronUp,
@@ -158,9 +157,11 @@ const RealTimeView: React.FC<RealTimeViewProps> = ({
 
           <button
             onClick={() => setActiveTab("transcription")}
-            className="sidebar-btn"
+            className={`sidebar-btn ${
+              activeTab === "transcription" ? "active" : ""
+            }`}
           >
-            <FileText className="btn-icon" />
+            <User className="btn-icon" />
             <span>Transcription & Translation</span>
           </button>
         </div>

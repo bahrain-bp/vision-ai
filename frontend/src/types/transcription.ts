@@ -8,7 +8,8 @@ export interface TranscribedWord {
 export interface TranscriptionResult {
   words: TranscribedWord[];
   speaker: string;
-  formattedTranscript: string; 
+  formattedTranscript: string;
+  timeStamp: string;
 }
 
 export type Sources = "display" | "microphone";

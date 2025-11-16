@@ -15,8 +15,6 @@ import { LanguageCode } from "@aws-sdk/client-transcribe-streaming";
 import StreamManager from "./StreamManager";
 import { StartStreamTranscriptionCommandOutput } from "@aws-sdk/client-transcribe-streaming";
 
-
-
 class TranscribeService {
   private displayStatus: RecordingStatus = "off";
 
@@ -137,18 +135,22 @@ class TranscribeService {
 
     microphoneStream.setStream(stream);
 
-    const command: StartStreamTranscriptionCommand =new StartStreamTranscriptionCommand({
-        LanguageCode: selectedLanguage
-          ? (selectedLanguage as LanguageCode)
-          : "en-US",
-        MediaEncoding: "pcm",
-        MediaSampleRateHertz: sampleRate,
-        ShowSpeakerLabel: true,
-        AudioStream: this.getAudioStream(
-          microphoneStream,
-          this.mediaManager.getSampleRate()
-        ),
-      });
+const command: StartStreamTranscriptionCommand =
+  new StartStreamTranscriptionCommand({
+    LanguageCode:
+      selectedLanguage === "auto"
+        ? undefined
+        : (selectedLanguage as LanguageCode),
+    MediaEncoding: "pcm",
+    MediaSampleRateHertz: sampleRate,
+    IdentifyMultipleLanguages: selectedLanguage === "auto",
+    LanguageOptions: selectedLanguage === "auto" ? "ar-SA,en-US" : undefined, 
+    ShowSpeakerLabel: selectedLanguage !== "auto",
+    AudioStream: this.getAudioStream(
+      microphoneStream,
+      this.mediaManager.getSampleRate()
+    ),
+  });
 
     const data: StartStreamTranscriptionCommandOutput = await transcribeClient.send(command);
 
@@ -203,14 +205,23 @@ class TranscribeService {
           
           const speaker: Speakers = getSpeakerFromSource(source);
 
-          const fullDetailTranscript: TranscriptionResult = {
-            words: transcriptWords,
-            speaker,
-            formattedTranscript:
-              `[${speaker}]: ` +
-              transcriptWords.map((item) => item.content).join(" ") +
-              `\n`,
-          };
+            const timeStamp = new Date().toLocaleString("en-US", {
+              hour: "2-digit",
+              minute: "2-digit",
+              second: "2-digit",
+              hour12: false,
+            });
+
+            const fullDetailTranscript: TranscriptionResult = {
+              words: transcriptWords,
+              speaker,
+              timeStamp: timeStamp,
+              formattedTranscript:
+                `[${timeStamp}] ${speaker}: ` +
+                transcriptWords.map((item) => item.content).join(" ") +
+                `\n\n`,
+            };
+
 
           if (this.transcriptCallback) {
             this.transcriptCallback(fullDetailTranscript);

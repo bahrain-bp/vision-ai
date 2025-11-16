@@ -1,7 +1,8 @@
 import React, { useEffect, useRef } from "react";
-import { FileText, Download, Copy, Loader } from "lucide-react";
+import { FileText, Copy, Loader } from "lucide-react";
 import { useTranscription } from "../../hooks/useTranscription";
 import { RecordingStatus, TranscriptionResult } from "../../types/";
+import PDFExporter from "./PDFExporter";
 import { useState } from "react";
 
 interface LiveTranscriptionProps {
@@ -15,7 +16,7 @@ const LiveTranscription: React.FC<LiveTranscriptionProps> = ({
   setSessionState,
   selectedLanguage,
 }) => {
-  const { audioStatus, recordingStatus, startRecording, stopRecording } =
+  const { audioStatus, recordingStatus, startRecording } =
     useTranscription();
 
   const [liveTranscript, setLiveTranscript] =
@@ -66,18 +67,18 @@ const LiveTranscription: React.FC<LiveTranscriptionProps> = ({
     }
   }, [liveTranscript]);
 
-  if (isStarting) {
-    return (
-      <div className="processing-content w-full">
-        <div className="transcription-card">
-          <div className="starting-state">
-            <Loader className="processing-spinner" />
-            <p>Initializing recording session...</p>
-          </div>
-        </div>
+if (isStarting) {
+  return (
+    <div className="flex items-center justify-center w-full min-h-[400px]">
+      <div className="flex flex-col items-center gap-4">
+        <Loader className="w-8 h-8 animate-spin text-blue-500" />
+        <p className="text-gray-600 font-medium">
+          Initializing recording session...
+        </p>
       </div>
-    );
-  }
+    </div>
+  );
+}
 
   return (
     <div className="transcription-card">
@@ -118,10 +119,13 @@ const LiveTranscription: React.FC<LiveTranscriptionProps> = ({
       <div className="action-buttons">
         <button
           className="action-btn"
-          onClick={() => stopRecording(setSessionState)}
+          //onClick={() => stopRecording(setSessionState)}
         >
-          <Download className="btn-icon" />
-          <span>Download</span>
+          <PDFExporter
+            transcript={fullTranscript}
+            title={"Investigation Transcript"}
+            fileName={"Transcript"}
+          />
         </button>
         <button className="action-btn">
           <Copy className="btn-icon" />

@@ -39,22 +39,40 @@ const TranscriptionSessionSetup: React.FC<TranscriptionSessionSetupProps> = ({
           <span>Start Recording</span>
         </button>
 
-        <div className="language-selector">
-          <label htmlFor="language-select">Select the language you need</label>
+        <div className="language-selector mt-6 w-full max-w-md">
+          <label
+            htmlFor="language-select"
+            className="block text-sm font-medium text-gray-700 mb-2"
+          >
+            Select Language
+          </label>
           <select
             id="language-select"
             value={selectedLanguage}
             onChange={(e) => setSelectedLanguage(e.target.value)}
+            className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg shadow-sm 
+             focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 
+             text-gray-900 cursor-pointer hover:border-gray-400 transition-colors"
           >
+            <option value="auto">Auto Detect</option>
+
             {Object.entries(LanguageCode).map(([code, name]) => {
               const formattedCode =
                 code.split("_")[0].toLowerCase() +
                 "-" +
                 code.split("_")[1].toUpperCase();
 
+              // Use browser's built-in Intl API for language names
+              const displayName =
+                new Intl.DisplayNames(["en"], { type: "language" }).of(
+                  formattedCode.split("-")[0]
+                ) || name;
+
+              const region = formattedCode.split("-")[1];
+
               return (
                 <option key={code} value={formattedCode}>
-                  {name}
+                  {displayName} ({region})
                 </option>
               );
             })}
