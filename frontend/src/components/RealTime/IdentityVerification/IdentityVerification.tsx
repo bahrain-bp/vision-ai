@@ -7,13 +7,15 @@ import {
   PersonType,
 } from "../../../types/identityVerification";
 import IdentityVerificationService from "../../../services/IdentityVerification/IdentityVerificationService";
+import { Copy, Check } from "lucide-react";
 
 const IdentityVerification: React.FC<IdentityVerificationProps> = ({
   onStartInvestigation,
 }) => {
   const [caseId, setCaseId] = useState<string>("");
   const [sessionId, setSessionId] = useState<string>("");
-  const [personType] = useState<PersonType>("witness");
+  const [personType, setPersonType] = useState<PersonType>("witness");
+  const [copiedField, setCopiedField] = useState<string | null>(null);
 
   const [identityData, setIdentityData] = useState<IdentityData>({
     referencePhoto: null,
@@ -33,9 +35,8 @@ const IdentityVerification: React.FC<IdentityVerificationProps> = ({
     console.log("Identity Verification initialized:", {
       caseId: newCaseId,
       sessionId: newSessionId,
-      personType,
     });
-  }, [personType]);
+  }, []);
 
   const updateIdentityData = useCallback(
     (field: keyof IdentityData, value: File | boolean | null) => {
@@ -55,8 +56,8 @@ const IdentityVerification: React.FC<IdentityVerificationProps> = ({
       }
 
       const investigationData: InvestigationData = {
-        witness: extractedPersonName || "Name to be extracted", // Will be extracted from documents
-        idNumber: "To be extracted", // Will be extracted from documents
+        witness: extractedPersonName || "Name to be extracted",
+        idNumber: "To be extracted",
         identityData: identityData,
         investigator: "M. AlZebari",
         duration: "00:00",
@@ -71,21 +72,77 @@ const IdentityVerification: React.FC<IdentityVerificationProps> = ({
     [caseId, sessionId, identityData, onStartInvestigation]
   );
 
+  const copyToClipboard = async (text: string, field: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedField(field);
+      setTimeout(() => setCopiedField(null), 2000);
+    } catch (err) {
+      console.error("Failed to copy:", err);
+    }
+  };
+
   return (
     <div className="identity-verification-container">
       <div className="identity-verification-content">
         <div className="verification-header">
           <h1 className="verification-title">Identity Verification</h1>
-          <div className="session-info">
-            <p className="session-detail">
-              <strong>Case ID:</strong> {caseId}
-            </p>
-            <p className="session-detail">
-              <strong>Session ID:</strong> {sessionId}
-            </p>
-            <p className="session-detail">
-              <strong>Person Type:</strong> {personType.toUpperCase()}
-            </p>
+          <div className="session-info-grid">
+            <div className="session-info-card">
+              <div className="session-info-content">
+                <span className="session-label">Case ID</span>
+                <div className="session-value-container">
+                  <span className="session-value">{caseId}</span>
+                  <button
+                    onClick={() => copyToClipboard(caseId, "caseId")}
+                    className="copy-button"
+                    title="Copy Case ID"
+                  >
+                    {copiedField === "caseId" ? (
+                      <Check size={16} className="text-green-500" />
+                    ) : (
+                      <Copy size={16} />
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="session-info-card">
+              <div className="session-info-content">
+                <span className="session-label">Session ID</span>
+                <div className="session-value-container">
+                  <span className="session-value">{sessionId}</span>
+                  <button
+                    onClick={() => copyToClipboard(sessionId, "sessionId")}
+                    className="copy-button"
+                    title="Copy Session ID"
+                  >
+                    {copiedField === "sessionId" ? (
+                      <Check size={16} className="text-green-500" />
+                    ) : (
+                      <Copy size={16} />
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="session-info-card">
+              <div className="session-info-content">
+                <span className="session-label">Person Type</span>
+                <select
+                  value={personType}
+                  onChange={(e) => setPersonType(e.target.value as PersonType)}
+                  className="person-type-select"
+                  disabled={identityData.isVerified}
+                >
+                  <option value="witness">Witness</option>
+                  <option value="accused">Accused</option>
+                  <option value="victim">Victim</option>
+                </select>
+              </div>
+            </div>
           </div>
         </div>
 

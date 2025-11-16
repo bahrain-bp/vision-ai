@@ -5,6 +5,8 @@ import {
   ArrowRight,
   Loader2,
   AlertCircle,
+  XCircle,
+  ImageIcon,
 } from "lucide-react";
 import {
   DocumentVerificationProps,
@@ -12,6 +14,8 @@ import {
   VerificationState,
 } from "../../../types/identityVerification";
 import IdentityVerificationService from "../../../services/IdentityVerification/IdentityVerificationService";
+
+const MAX_VERIFICATION_ATTEMPTS = 3;
 
 const DocumentVerification: React.FC<DocumentVerificationProps> = ({
   identityData,
@@ -24,6 +28,23 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const documentInputRef = useRef<HTMLInputElement>(null);
   const [documentType, setDocumentType] = useState<DocumentType>("cpr");
+  const [verificationAttempts, setVerificationAttempts] = useState<number>(0);
+  const [manualOverrideReason, setManualOverrideReason] = useState<string>("");
+  const [showManualOverride, setShowManualOverride] = useState<boolean>(false);
+  const [uploadedPhotoPreview, setUploadedPhotoPreview] = useState<
+    string | null
+  >(null);
+  const [comparisonPhotoPreview, setComparisonPhotoPreview] = useState<
+    string | null
+  >(null);
+  const [loadingReferencePhoto, setLoadingReferencePhoto] =
+    useState<boolean>(false);
+  const [previousDocumentKey, setPreviousDocumentKey] = useState<string | null>(
+    null
+  );
+  const [previousPersonPhotoKey, setPreviousPersonPhotoKey] = useState<
+    string | null
+  >(null);
 
   const [verificationState, setVerificationState] = useState<VerificationState>(
     {
@@ -35,17 +56,14 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
     }
   );
 
-  // Memoized document display name
   const documentDisplayName = useMemo(() => {
     return documentType === "cpr" ? "CPR" : "Passport";
   }, [documentType]);
 
-  // Memoized current document
   const currentDocument = useMemo(() => {
     return identityData[documentType];
   }, [identityData, documentType]);
 
-  // Memoized handler for file uploads
   const handleFileUpload = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0];
@@ -53,17 +71,40 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
 
       const validation = IdentityVerificationService.validateFile(file);
       if (!validation.valid) {
-        alert(validation.error);
+        setVerificationState((prev) => ({
+          ...prev,
+          error: validation.error || "Invalid file",
+        }));
         return;
       }
 
+      // Validate it's an image (not a PDF document)
+      if (file.type === "application/pdf") {
+        setVerificationState((prev) => ({
+          ...prev,
+          error:
+            "Person photo must be an image (JPG or PNG), not a PDF document. Please upload a photo.",
+        }));
+        return;
+      }
+
+      // Create preview
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setUploadedPhotoPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+
       onIdentityDataChange("referencePhoto", file);
+      setVerificationState((prev) => ({
+        ...prev,
+        error: null,
+      }));
       console.log("Person photo uploaded:", file.name);
     },
     [onIdentityDataChange]
   );
 
-  // Memoized handler for document uploads
   const handleDocumentUpload = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0];
@@ -71,7 +112,10 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
 
       const validation = IdentityVerificationService.validateFile(file);
       if (!validation.valid) {
-        alert(validation.error);
+        setVerificationState((prev) => ({
+          ...prev,
+          error: validation.error || "Invalid file",
+        }));
         return;
       }
 
@@ -84,15 +128,30 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
     [documentType, onIdentityDataChange]
   );
 
-  // Memoized handler for complete verification
   const handleCompleteVerification = useCallback(async () => {
     if (!identityData.referencePhoto) {
-      alert("Please upload a person photo first.");
+      setVerificationState((prev) => ({
+        ...prev,
+        error: "Please upload a person photo first.",
+      }));
       return;
     }
 
     if (!currentDocument) {
-      alert(`Please upload a ${documentDisplayName} document first.`);
+      setVerificationState((prev) => ({
+        ...prev,
+        error: `Please upload a ${documentDisplayName} document first.`,
+      }));
+      return;
+    }
+
+    // Check if max attempts reached
+    if (verificationAttempts >= MAX_VERIFICATION_ATTEMPTS) {
+      setVerificationState((prev) => ({
+        ...prev,
+        error: `Maximum verification attempts (${MAX_VERIFICATION_ATTEMPTS}) reached. Please use manual override or end session.`,
+      }));
+      setShowManualOverride(true);
       return;
     }
 
@@ -106,6 +165,9 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
     try {
       console.log("Starting identity verification workflow...");
 
+      // Increment attempt number BEFORE sending request
+      const currentAttempt = verificationAttempts + 1;
+
       const result =
         await IdentityVerificationService.completeIdentityVerification(
           caseId,
@@ -113,10 +175,48 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
           currentDocument,
           identityData.referencePhoto,
           personType,
-          undefined 
+          undefined,
+          undefined,
+          undefined,
+          currentAttempt // Pass current attempt number
         );
 
       console.log("Verification completed:", result);
+
+      // Store the keys for potential cleanup on retry
+      setPreviousDocumentKey(result.verificationSummaryKey);
+      setPreviousPersonPhotoKey(result.verificationSummaryKey);
+
+      // Always create preview for uploaded photo
+      const photoReader = new FileReader();
+      photoReader.onloadend = () => {
+        setUploadedPhotoPreview(photoReader.result as string);
+      };
+      photoReader.readAsDataURL(identityData.referencePhoto);
+
+      // Create preview based on photo source
+      if (result.photoSource === "global-assets") {
+        // Use the presigned URL from the orchestrator response
+        setLoadingReferencePhoto(true);
+        if (result.referencePhotoUrl) {
+          console.log(
+            "Using presigned reference photo URL from orchestrator:",
+            result.referencePhotoUrl
+          );
+          setComparisonPhotoPreview(result.referencePhotoUrl);
+        } else {
+          console.log("No reference photo URL available");
+          setComparisonPhotoPreview(null);
+        }
+        setLoadingReferencePhoto(false);
+      } else {
+        // For citizen-id-document, show the document preview
+        const docReader = new FileReader();
+        docReader.onloadend = () => {
+          setComparisonPhotoPreview(docReader.result as string);
+        };
+        docReader.readAsDataURL(currentDocument);
+      }
 
       setVerificationState((prev) => ({
         ...prev,
@@ -124,31 +224,33 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
         verificationResult: result,
       }));
 
-      onIdentityDataChange("isVerified", true);
-
+      // Update attempt counter AFTER successful request
+      setVerificationAttempts(currentAttempt);
 
       if (result.match) {
-        alert(
-          `Identity Verified!\n\n` +
-            `Name: ${result.personName}\n` +
-            `CPR: ${result.cprNumber}\n` +
-            `Nationality: ${result.nationality}\n` +
-            `Similarity: ${result.similarity}%\n` +
-            `Confidence: ${result.confidence}`
-        );
-        onStartInvestigation();
+        onIdentityDataChange("isVerified", true);
+        setShowManualOverride(false);
       } else {
-        alert(
-          `Identity Verification Failed\n\n` +
-            `The person photo does not match the document.\n` +
-            `Similarity: ${result.similarity}%\n\n` +
-            `Please verify the documents and try again.`
-        );
+        // Show manual override option immediately after 3rd attempt
+        if (currentAttempt >= MAX_VERIFICATION_ATTEMPTS) {
+          console.log(
+            "Maximum attempts reached, showing manual override options"
+          );
+          setShowManualOverride(true);
+          setVerificationState((prev) => ({
+            ...prev,
+            error: `Verification failed after ${MAX_VERIFICATION_ATTEMPTS} attempts. Please choose an option below.`,
+          }));
+        }
       }
     } catch (error) {
       console.error("Verification error:", error);
       const errorMessage =
         error instanceof Error ? error.message : "Verification failed";
+
+      // Increment attempt counter even on error
+      const currentAttempt = verificationAttempts + 1;
+      setVerificationAttempts(currentAttempt);
 
       setVerificationState((prev) => ({
         ...prev,
@@ -156,11 +258,17 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
         error: errorMessage,
       }));
 
-      alert(
-        `Verification Error\n\n` +
-          `${errorMessage}\n\n` +
-          `Please try again or contact support.`
-      );
+      // Show manual override option immediately after 3rd attempt
+      if (currentAttempt >= MAX_VERIFICATION_ATTEMPTS) {
+        console.log(
+          "Maximum attempts reached (error case), showing manual override options"
+        );
+        setShowManualOverride(true);
+        setVerificationState((prev) => ({
+          ...prev,
+          error: `${errorMessage}. Maximum attempts (${MAX_VERIFICATION_ATTEMPTS}) reached. Please choose an option below.`,
+        }));
+      }
     }
   }, [
     caseId,
@@ -170,24 +278,259 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
     documentDisplayName,
     personType,
     onIdentityDataChange,
+    verificationAttempts,
+  ]);
+
+  const handleManualOverride = useCallback(async () => {
+    if (!manualOverrideReason.trim()) {
+      setVerificationState((prev) => ({
+        ...prev,
+        error: "Please provide a reason for manual verification override.",
+      }));
+      return;
+    }
+
+    if (!identityData.referencePhoto || !currentDocument) {
+      setVerificationState((prev) => ({
+        ...prev,
+        error: "Missing required files for manual override.",
+      }));
+      return;
+    }
+
+    setVerificationState((prev) => ({
+      ...prev,
+      isVerifying: true,
+      error: null,
+    }));
+
+    try {
+      console.log("Processing manual verification override:", {
+        caseId,
+        sessionId,
+        personType,
+        reason: manualOverrideReason,
+        attempts: verificationAttempts,
+      });
+
+      // If we have previous keys from a failed attempt, use those
+      // Otherwise, upload the files now
+      let documentKey = previousDocumentKey;
+      let personPhotoKey = previousPersonPhotoKey;
+
+      if (!documentKey || !personPhotoKey) {
+        console.log("No previous upload keys found, uploading files now...");
+
+        // Upload document
+        documentKey = await IdentityVerificationService.uploadDocument(
+          caseId,
+          sessionId,
+          currentDocument
+        );
+        console.log("Document uploaded for manual override:", documentKey);
+
+        // Upload person photo
+        personPhotoKey = await IdentityVerificationService.uploadPersonPhoto(
+          caseId,
+          sessionId,
+          identityData.referencePhoto,
+          personType
+        );
+        console.log(
+          "Person photo uploaded for manual override:",
+          personPhotoKey
+        );
+      }
+
+      // Send verification request with manual override flag
+      const result = await IdentityVerificationService.verifyIdentity({
+        caseId,
+        sessionId,
+        documentKey,
+        personPhotoKey,
+        personType,
+        manualOverride: true,
+        overrideReason: manualOverrideReason,
+        attemptNumber: verificationAttempts || MAX_VERIFICATION_ATTEMPTS,
+      });
+
+      console.log("Manual override completed:", result);
+
+      // Mark as verified
+      onIdentityDataChange("isVerified", true);
+
+      // Store override result
+      setVerificationState((prev) => ({
+        ...prev,
+        isVerifying: false,
+        verificationResult: result,
+      }));
+
+      setShowManualOverride(false);
+
+      // Proceed to investigation
+      setTimeout(() => {
+        onStartInvestigation();
+      }, 500);
+    } catch (error) {
+      console.error("Manual override error:", error);
+      setVerificationState((prev) => ({
+        ...prev,
+        isVerifying: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Manual override failed. Please try again.",
+      }));
+    }
+  }, [
+    manualOverrideReason,
+    caseId,
+    sessionId,
+    personType,
+    verificationAttempts,
+    previousDocumentKey,
+    previousPersonPhotoKey,
+    identityData.referencePhoto,
+    currentDocument,
+    onIdentityDataChange,
     onStartInvestigation,
   ]);
+
+  const handleRetryVerification = useCallback(async () => {
+    // Check if max attempts reached before allowing retry
+    if (verificationAttempts >= MAX_VERIFICATION_ATTEMPTS) {
+      console.log("Cannot retry - max attempts reached");
+      setVerificationState((prev) => ({
+        ...prev,
+        error: `Maximum verification attempts (${MAX_VERIFICATION_ATTEMPTS}) reached. Please choose an option below.`,
+      }));
+      setShowManualOverride(true);
+      return;
+    }
+
+    console.log("Retrying verification, clearing previous state");
+
+    // Delete previous verification files if they exist
+    if (previousDocumentKey || previousPersonPhotoKey) {
+      try {
+        await IdentityVerificationService.deletePreviousVerificationFiles(
+          caseId,
+          sessionId,
+          personType,
+          verificationAttempts
+        );
+        console.log("Previous verification files deleted successfully");
+      } catch (error) {
+        console.error("Error deleting previous verification files:", error);
+        // Continue with retry even if deletion fails
+      }
+    }
+
+    setVerificationState((prev) => ({
+      ...prev,
+      error: null,
+      verificationResult: null,
+    }));
+    setManualOverrideReason("");
+    setComparisonPhotoPreview(null);
+    setShowManualOverride(false); // Hide manual override on retry
+  }, [
+    caseId,
+    sessionId,
+    personType,
+    verificationAttempts,
+    previousDocumentKey,
+    previousPersonPhotoKey,
+  ]);
+
+  const handleEndSession = useCallback(() => {
+    const confirmEnd = window.confirm(
+      "Are you sure you want to end this session? All verification data will be lost."
+    );
+
+    if (confirmEnd) {
+      // Reset all state
+      setVerificationAttempts(0);
+      setShowManualOverride(false);
+      setManualOverrideReason("");
+      setUploadedPhotoPreview(null);
+      setComparisonPhotoPreview(null);
+      setPreviousDocumentKey(null);
+      setPreviousPersonPhotoKey(null);
+
+      // Reset identity data
+      onIdentityDataChange("referencePhoto", null);
+      onIdentityDataChange("cpr", null);
+      onIdentityDataChange("passport", null);
+      onIdentityDataChange("isVerified", false);
+
+      setVerificationState({
+        isUploading: false,
+        isVerifying: false,
+        uploadProgress: { document: 0, photo: 0 },
+        error: null,
+        verificationResult: null,
+      });
+
+      console.log("Session ended by user");
+    }
+  }, [onIdentityDataChange]);
 
   const toggleDocumentType = useCallback(() => {
     setDocumentType((prevType) => (prevType === "cpr" ? "passport" : "cpr"));
   }, []);
 
-  // Memoized verification disabled state
   const isVerificationDisabled = useMemo(() => {
     return (
       !identityData.referencePhoto ||
       !currentDocument ||
-      verificationState.isVerifying
+      verificationState.isVerifying ||
+      identityData.isVerified ||
+      verificationAttempts >= MAX_VERIFICATION_ATTEMPTS
     );
   }, [
     identityData.referencePhoto,
     currentDocument,
     verificationState.isVerifying,
+    identityData.isVerified,
+    verificationAttempts,
+  ]);
+
+  const canRetry = useMemo(() => {
+    const canRetryResult =
+      verificationAttempts < MAX_VERIFICATION_ATTEMPTS &&
+      !identityData.isVerified;
+    console.log("canRetry calculation:", {
+      verificationAttempts,
+      MAX_VERIFICATION_ATTEMPTS,
+      isVerified: identityData.isVerified,
+      canRetry: canRetryResult,
+      showManualOverride,
+    });
+    return canRetryResult;
+  }, [verificationAttempts, identityData.isVerified, showManualOverride]);
+
+  const attemptsRemaining = useMemo(() => {
+    return Math.max(0, MAX_VERIFICATION_ATTEMPTS - verificationAttempts);
+  }, [verificationAttempts]);
+
+  // Debug: Log state changes
+  React.useEffect(() => {
+    console.log("State Update:", {
+      verificationAttempts,
+      showManualOverride,
+      canRetry,
+      attemptsRemaining,
+      hasVerificationResult: !!verificationState.verificationResult,
+      isMatch: verificationState.verificationResult?.match,
+    });
+  }, [
+    verificationAttempts,
+    showManualOverride,
+    canRetry,
+    attemptsRemaining,
+    verificationState.verificationResult,
   ]);
 
   return (
@@ -195,10 +538,49 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
       <div className="session-card">
         <h2 className="card-title">Identity Verification</h2>
 
+        {/* Verification Attempts Counter */}
+        {verificationAttempts > 0 && (
+          <div className="verification-attempts">
+            <span className="attempts-label">Verification Attempts:</span>
+            <span
+              className={`attempts-count ${
+                verificationAttempts >= MAX_VERIFICATION_ATTEMPTS
+                  ? "text-red-600 font-bold"
+                  : ""
+              }`}
+            >
+              {verificationAttempts} / {MAX_VERIFICATION_ATTEMPTS}
+            </span>
+            {attemptsRemaining > 0 && (
+              <span className="attempts-remaining text-sm text-gray-600 ml-2">
+                ({attemptsRemaining} remaining)
+              </span>
+            )}
+            {verificationAttempts >= MAX_VERIFICATION_ATTEMPTS && (
+              <span className="text-sm text-red-600 ml-2 font-semibold">
+                - Maximum attempts reached
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Error Banner */}
         {verificationState.error && (
           <div className="error-banner">
             <AlertCircle size={20} />
             <span>{verificationState.error}</span>
+          </div>
+        )}
+
+        {/* Success Banner */}
+        {verificationState.verificationResult?.match && (
+          <div className="success-banner">
+            <CheckCircle size={20} />
+            <span>
+              Identity Verified Successfully!
+              {verificationState.verificationResult.manualOverride &&
+                " (Manual Override)"}
+            </span>
           </div>
         )}
 
@@ -228,7 +610,9 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
                 onChange={handleFileUpload}
                 accept=".jpg,.jpeg,.png"
                 className="hidden"
-                disabled={verificationState.isVerifying}
+                disabled={
+                  verificationState.isVerifying || identityData.isVerified
+                }
                 aria-label="Upload person photo"
               />
 
@@ -237,7 +621,9 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
 
               <button
                 className="upload-button"
-                disabled={verificationState.isVerifying}
+                disabled={
+                  verificationState.isVerifying || identityData.isVerified
+                }
                 type="button"
               >
                 Upload Person Photo
@@ -252,21 +638,6 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
                   </span>
                 </div>
               )}
-
-              {verificationState.isVerifying &&
-                verificationState.uploadProgress.photo > 0 && (
-                  <div className="upload-progress">
-                    <div className="progress-bar">
-                      <div
-                        className="progress-fill"
-                        style={{
-                          width: `${verificationState.uploadProgress.photo}%`,
-                        }}
-                      />
-                    </div>
-                    <span>{verificationState.uploadProgress.photo}%</span>
-                  </div>
-                )}
             </div>
           </div>
 
@@ -280,7 +651,9 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
                 onClick={toggleDocumentType}
                 className="toggle-document-btn"
                 type="button"
-                disabled={verificationState.isVerifying}
+                disabled={
+                  verificationState.isVerifying || identityData.isVerified
+                }
               >
                 <RefreshCw size={16} />
                 Verify with {documentType === "cpr" ? "Passport" : "CPR"}{" "}
@@ -310,7 +683,9 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
                 onChange={handleDocumentUpload}
                 accept=".jpg,.jpeg,.png,.pdf"
                 className="hidden"
-                disabled={verificationState.isVerifying}
+                disabled={
+                  verificationState.isVerifying || identityData.isVerified
+                }
                 aria-label={`Upload ${documentDisplayName.toLowerCase()} document`}
               />
 
@@ -321,7 +696,9 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
 
               <button
                 className="upload-button"
-                disabled={verificationState.isVerifying}
+                disabled={
+                  verificationState.isVerifying || identityData.isVerified
+                }
                 type="button"
               >
                 Upload {documentDisplayName}
@@ -334,43 +711,292 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
                   <span>{currentDocument.name} uploaded successfully</span>
                 </div>
               )}
-
-              {verificationState.isVerifying &&
-                verificationState.uploadProgress.document > 0 && (
-                  <div className="upload-progress">
-                    <div className="progress-bar">
-                      <div
-                        className="progress-fill"
-                        style={{
-                          width: `${verificationState.uploadProgress.document}%`,
-                        }}
-                      />
-                    </div>
-                    <span>{verificationState.uploadProgress.document}%</span>
-                  </div>
-                )}
             </div>
           </div>
 
+          {/* Verification Result Display OR Manual Override After Max Attempts */}
+          {(verificationState.verificationResult ||
+            (showManualOverride &&
+              verificationAttempts >= MAX_VERIFICATION_ATTEMPTS)) && (
+            <div className="verification-result-container">
+              {verificationState.verificationResult && (
+                <>
+                  <h3 className="result-title">Verification Results</h3>
+
+                  {/* Image Comparison */}
+                  <div className="image-comparison-grid">
+                    <div className="comparison-image-card">
+                      <div className="image-label">Uploaded Photo</div>
+                      {uploadedPhotoPreview ? (
+                        <img
+                          src={uploadedPhotoPreview}
+                          alt="Uploaded person for verification"
+                          className="comparison-image"
+                        />
+                      ) : (
+                        <div className="image-placeholder">
+                          <ImageIcon size={48} />
+                          <span>No preview available</span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="comparison-image-card">
+                      <div className="image-label">
+                        Comparison Source (
+                        {verificationState.verificationResult.photoSource})
+                      </div>
+                      {verificationState.verificationResult.photoSource ===
+                      "global-assets" ? (
+                        loadingReferencePhoto ? (
+                          <div className="image-placeholder">
+                            <Loader2 size={48} className="animate-spin" />
+                            <span>Loading reference photo...</span>
+                          </div>
+                        ) : comparisonPhotoPreview ? (
+                          <img
+                            src={comparisonPhotoPreview}
+                            alt="Reference from database"
+                            className="comparison-image"
+                            onError={(e) => {
+                              console.error(
+                                "Failed to load reference photo" + e
+                              );
+                              setComparisonPhotoPreview(null);
+                            }}
+                          />
+                        ) : (
+                          <div className="image-placeholder">
+                            <ImageIcon size={48} />
+                            <span>Reference photo from database</span>
+                          </div>
+                        )
+                      ) : comparisonPhotoPreview ? (
+                        <img
+                          src={comparisonPhotoPreview}
+                          alt="Comparison source from document"
+                          className="comparison-image"
+                        />
+                      ) : (
+                        <div className="image-placeholder">
+                          <ImageIcon size={48} />
+                          <span>Loading document photo...</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Results Text Area */}
+                  <div className="result-details">
+                    <div className="result-row">
+                      <span className="result-label">Name:</span>
+                      <span className="result-value">
+                        {verificationState.verificationResult.personName}
+                      </span>
+                    </div>
+                    <div className="result-row">
+                      <span className="result-label">CPR Number:</span>
+                      <span className="result-value">
+                        {verificationState.verificationResult.cprNumber}
+                      </span>
+                    </div>
+                    <div className="result-row">
+                      <span className="result-label">Nationality:</span>
+                      <span className="result-value">
+                        {verificationState.verificationResult.nationality}
+                      </span>
+                    </div>
+                    <div className="result-row">
+                      <span className="result-label">Similarity Score:</span>
+                      <span className="result-value">
+                        {verificationState.verificationResult.similarity}%
+                      </span>
+                    </div>
+                    <div className="result-row">
+                      <span className="result-label">Confidence:</span>
+                      <span className="result-value">
+                        {verificationState.verificationResult.confidence}
+                      </span>
+                    </div>
+                    <div className="result-row">
+                      <span className="result-label">Status:</span>
+                      <span
+                        className={`result-value ${
+                          verificationState.verificationResult.match
+                            ? "text-green-600"
+                            : "text-red-600"
+                        }`}
+                      >
+                        {verificationState.verificationResult.match
+                          ? "✓ VERIFIED"
+                          : "✗ NOT VERIFIED"}
+                      </span>
+                    </div>
+                    {verificationState.verificationResult.manualOverride && (
+                      <div className="result-row">
+                        <span className="result-label">Override Reason:</span>
+                        <span className="result-value text-orange-600">
+                          {verificationState.verificationResult.overrideReason}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+
+              {/* Action Buttons for Failed Verification or Max Attempts Reached */}
+              {((!verificationState.verificationResult?.match &&
+                verificationState.verificationResult &&
+                !verificationState.verificationResult.manualOverride) ||
+                (showManualOverride &&
+                  verificationAttempts >= MAX_VERIFICATION_ATTEMPTS)) && (
+                <div className="verification-actions">
+                  {/* Show Retry button only if attempts remaining */}
+                  {canRetry && !showManualOverride && (
+                    <button
+                      onClick={handleRetryVerification}
+                      className="btn-secondary"
+                      type="button"
+                    >
+                      <RefreshCw size={18} />
+                      Retry Verification ({attemptsRemaining}{" "}
+                      {attemptsRemaining === 1 ? "attempt" : "attempts"} left)
+                    </button>
+                  )}
+
+                  {/* Show Manual Override section after 3 attempts */}
+                  {showManualOverride && (
+                    <div className="manual-override-section">
+                      <div className="override-warning">
+                        <AlertCircle size={20} />
+                        <div>
+                          <p className="font-semibold mb-2">
+                            Maximum verification attempts (
+                            {MAX_VERIFICATION_ATTEMPTS}) reached.
+                          </p>
+                          <p className="text-sm">
+                            {verificationState.verificationResult
+                              ? "The automated verification has failed. Choose one of the following options to proceed:"
+                              : "An error occurred during verification. Choose one of the following options to proceed:"}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 space-y-4">
+                        {/* Option 1: Accept Verification with Reason */}
+                        <div className="border-2 border-orange-200 rounded-lg p-4 bg-orange-50">
+                          <h4 className="font-semibold text-orange-800 mb-2 flex items-center gap-2">
+                            <CheckCircle size={18} />
+                            Option 1: Accept Verification Anyway
+                          </h4>
+                          <p className="text-sm text-gray-700 mb-3">
+                            If you believe the identity is correct despite the
+                            failed automated verification, you can manually
+                            approve it by providing a detailed reason.
+                          </p>
+
+                          <textarea
+                            value={manualOverrideReason}
+                            onChange={(e) =>
+                              setManualOverrideReason(e.target.value)
+                            }
+                            placeholder="Enter detailed reason for manual approval (e.g., 'Photo quality issues due to lighting but identity confirmed through additional documentation', 'Technical difficulties with facial recognition but documents are authentic and verified manually')..."
+                            className="override-reason-input w-full"
+                            rows={4}
+                            disabled={verificationState.isVerifying}
+                          />
+
+                          <button
+                            onClick={handleManualOverride}
+                            className="btn-warning w-full mt-3"
+                            type="button"
+                            disabled={
+                              !manualOverrideReason.trim() ||
+                              verificationState.isVerifying
+                            }
+                          >
+                            {verificationState.isVerifying ? (
+                              <>
+                                <Loader2 size={18} className="animate-spin" />
+                                Processing Manual Approval...
+                              </>
+                            ) : (
+                              <>
+                                <CheckCircle size={18} />
+                                Accept and Proceed to Investigation
+                              </>
+                            )}
+                          </button>
+                        </div>
+
+                        {/* Option 2: End Session */}
+                        <div className="border-2 border-red-200 rounded-lg p-4 bg-red-50">
+                          <h4 className="font-semibold text-red-800 mb-2 flex items-center gap-2">
+                            <XCircle size={18} />
+                            Option 2: End This Session
+                          </h4>
+                          <p className="text-sm text-gray-700 mb-3">
+                            If you cannot verify the identity or believe the
+                            verification has failed legitimately, you can end
+                            this session. All data will be reset.
+                          </p>
+
+                          <button
+                            onClick={handleEndSession}
+                            className="btn-danger w-full"
+                            type="button"
+                            disabled={verificationState.isVerifying}
+                          >
+                            <XCircle size={18} />
+                            End Session and Start Over
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Verification Button */}
-          <button
-            onClick={handleCompleteVerification}
-            className="btn-success"
-            disabled={isVerificationDisabled}
-            type="button"
-          >
-            {verificationState.isVerifying ? (
-              <>
-                <Loader2 size={18} className="animate-spin" />
-                Verifying Identity...
-              </>
-            ) : (
-              <>
-                Complete Identity Verification
-                <ArrowRight size={18} />
-              </>
-            )}
-          </button>
+          {!identityData.isVerified && (
+            <button
+              onClick={handleCompleteVerification}
+              className="btn-success"
+              disabled={isVerificationDisabled}
+              type="button"
+            >
+              {verificationState.isVerifying ? (
+                <>
+                  <Loader2 size={18} className="animate-spin" />
+                  Verifying Identity...
+                </>
+              ) : verificationAttempts >= MAX_VERIFICATION_ATTEMPTS ? (
+                <>
+                  <AlertCircle size={18} />
+                  Maximum Attempts Reached
+                </>
+              ) : (
+                <>
+                  Complete Identity Verification
+                  <ArrowRight size={18} />
+                </>
+              )}
+            </button>
+          )}
+
+          {/* Start Investigation Button */}
+          {identityData.isVerified && (
+            <button
+              onClick={onStartInvestigation}
+              className="btn-primary"
+              type="button"
+            >
+              Proceed to Investigation
+              <ArrowRight size={18} />
+            </button>
+          )}
         </div>
       </div>
     </div>

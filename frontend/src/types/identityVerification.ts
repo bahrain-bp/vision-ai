@@ -5,7 +5,7 @@
 export type PersonType = "witness" | "accused" | "victim";
 export type DocumentType = "cpr" | "passport";
 export type VerificationStatus = "VERIFIED" | "NOT_VERIFIED";
-export type ConfidenceLevel = "HIGH" | "MEDIUM" | "LOW";
+export type ConfidenceLevel = "HIGH" | "MEDIUM" | "LOW" | "MANUAL_OVERRIDE";
 
 // ==========================================
 // DATA STRUCTURES
@@ -58,6 +58,9 @@ export interface VerificationRequest {
   personPhotoKey: string;
   personType: PersonType;
   personName?: string;
+  attemptNumber?: number;
+  manualOverride?: boolean;
+  overrideReason?: string;
 }
 
 export interface VerificationResponse {
@@ -76,6 +79,10 @@ export interface VerificationResponse {
   sessionMetadataKey: string;
   verificationSummaryKey: string;
   verificationResultKey: string;
+  attemptNumber?: number;
+  manualOverride?: boolean;
+  overrideReason?: string;
+  referencePhotoUrl?: string;
 }
 
 export interface ApiError {
@@ -154,3 +161,5 @@ export const DEFAULT_CONFIG: ServiceConfig = {
   maxRetries: 3,
   retryDelay: 1000,
 };
+
+export const MAX_VERIFICATION_ATTEMPTS = 3;

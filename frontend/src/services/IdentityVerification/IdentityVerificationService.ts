@@ -328,6 +328,8 @@ export const verifyIdentity = async (
       sessionId: request.sessionId,
       personType: request.personType,
       personName: request.personName || "Will be extracted",
+      attemptNumber: request.attemptNumber || 1,
+      manualOverride: request.manualOverride || false,
     });
 
     const response = await axios.post<VerificationResponse>(
@@ -349,6 +351,8 @@ export const verifyIdentity = async (
       extractedName: response.data.extractedName,
       cprNumber: response.data.cprNumber,
       nationality: response.data.nationality,
+      attemptNumber: response.data.attemptNumber,
+      manualOverride: response.data.manualOverride,
     });
 
     return response.data;
@@ -368,7 +372,8 @@ export const completeIdentityVerification = async (
   personType: PersonType,
   personName?: string,
   onDocumentProgress?: ProgressCallback,
-  onPhotoProgress?: ProgressCallback
+  onPhotoProgress?: ProgressCallback,
+  attemptNumber: number = 1
 ): Promise<VerificationResponse> => {
   try {
     console.log("Starting complete identity verification workflow", {
@@ -377,6 +382,7 @@ export const completeIdentityVerification = async (
       personType,
       documentFile: documentFile.name,
       personPhotoFile: personPhotoFile.name,
+      attemptNumber,
     });
 
     validateProgressCallback(onDocumentProgress);
@@ -411,6 +417,7 @@ export const completeIdentityVerification = async (
       documentKey,
       personPhotoKey,
       personType,
+      attemptNumber,
       ...(personName && { personName }),
     });
 
@@ -418,12 +425,49 @@ export const completeIdentityVerification = async (
       status: verificationResult.status,
       match: verificationResult.match,
       similarity: verificationResult.similarity,
+      attemptNumber: verificationResult.attemptNumber,
     });
 
     return verificationResult;
   } catch (error) {
     console.error("Complete identity verification workflow failed:", error);
     throw error;
+  }
+};
+
+/**
+ * Delete previous verification files when retrying
+ */
+export const deletePreviousVerificationFiles = async (
+  caseId: string,
+  sessionId: string,
+  personType: PersonType,
+  attemptNumber: number
+): Promise<void> => {
+  try {
+    console.log(
+      `Deleting previous verification files for attempt ${attemptNumber}`
+    );
+
+    const deleteRequest = {
+      caseId,
+      sessionId,
+      personType,
+      attemptNumber,
+    };
+
+    await axios.delete(`${API_BASE_URL}/identity/cleanup`, {
+      data: deleteRequest,
+      ...REQUEST_CONFIG,
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    console.log("Previous verification files deleted successfully");
+  } catch (error) {
+    console.error("Error deleting previous verification files:", error);
+    // Don't throw error - allow retry to continue even if cleanup fails
   }
 };
 
@@ -521,6 +565,7 @@ const IdentityVerificationService = {
   validateFile,
   generateSessionId,
   generateCaseId,
+  deletePreviousVerificationFiles,
 };
 
 export default IdentityVerificationService;

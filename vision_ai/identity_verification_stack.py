@@ -4,16 +4,14 @@ from aws_cdk import (
     aws_lambda as _lambda,
     aws_apigateway as apigateway,
     aws_iam as iam,
-    aws_logs as logs,
     Duration,
     CfnOutput,
-    RemovalPolicy,
 )
 from constructs import Construct
 
 class IdentityVerificationStack(Stack):
     """
-    Identity Verification Stack - Simplified with only 2 Lambda functions
+    Identity Verification Stack - Now with 2 Lambda functions (orchestrator handles everything)
     """
     
     def __init__(
@@ -59,15 +57,13 @@ class IdentityVerificationStack(Stack):
                 "s3:PutObject",
                 "s3:DeleteObject",
                 "s3:HeadObject",
-                "s3:CopyObject"
+                "s3:CopyObject",
+                "s3:ListBucket" 
             ],
-            resources=[f"{investigation_bucket.bucket_arn}/*"]
-        ))
-        
-        lambda_role.add_to_policy(iam.PolicyStatement(
-            effect=iam.Effect.ALLOW,
-            actions=["s3:ListBucket"],
-            resources=[investigation_bucket.bucket_arn]
+            resources=[
+                f"{investigation_bucket.bucket_arn}/*",
+                investigation_bucket.bucket_arn  
+            ]
         ))
         
         # Textract permissions
@@ -91,39 +87,11 @@ class IdentityVerificationStack(Stack):
             resources=["*"]
         ))
         
-        # CloudWatch Logs permissions 
-        lambda_role.add_to_policy(iam.PolicyStatement(
-            effect=iam.Effect.ALLOW,
-            actions=[
-                "logs:CreateLogGroup",
-                "logs:CreateLogStream",
-                "logs:PutLogEvents"
-            ],
-            resources=["arn:aws:logs:*:*:*"]
-        ))
-        
         # ==========================================
-        # CLOUDWATCH LOG GROUPS
-        # ==========================================
-        upload_url_log_group = logs.LogGroup(
-            self, "GetUploadUrlLogGroup",
-            log_group_name="/aws/lambda/vision-ai-identity-upload-url",
-            retention=logs.RetentionDays.ONE_MONTH,
-            removal_policy=RemovalPolicy.DESTROY
-        )
-        
-        orchestrator_log_group = logs.LogGroup(
-            self, "OrchestratorLogGroup",
-            log_group_name="/aws/lambda/vision-ai-identity-orchestrator",
-            retention=logs.RetentionDays.ONE_MONTH,
-            removal_policy=RemovalPolicy.DESTROY
-        )
-        
-        # ==========================================
-        # LAMBDA FUNCTIONS
+        # LAMBDA FUNCTIONS (NO EXPLICIT LOG GROUPS)
         # ==========================================
         
-        # 1. Get Upload URL Function (Separate)
+        # 1. Get Upload URL Function
         get_upload_url_lambda = _lambda.Function(
             self, "GetUploadUrlFunction",
             function_name="vision-ai-get-upload-url",
@@ -140,9 +108,6 @@ class IdentityVerificationStack(Stack):
             description="Generate presigned URL for document and photo uploads"
         )
         
-        # Grant log group permissions
-        upload_url_log_group.grant_write(get_upload_url_lambda)
-        
         # 2. Identity Verification Orchestrator 
         orchestrator_lambda = _lambda.Function(
             self, "IdentityVerificationOrchestratorFunction",
@@ -157,11 +122,8 @@ class IdentityVerificationStack(Stack):
                 "BUCKET_NAME": investigation_bucket.bucket_name,
                 "LOG_LEVEL": "INFO"
             },
-            description="All-in-one identity verification: CPR extraction, name extraction, reference check, and face comparison"
+            description="All-in-one identity verification: verification, cleanup, and reference photo handling"
         )
-        
-        # Grant log group permissions
-        orchestrator_log_group.grant_write(orchestrator_lambda)
         
         # ==========================================
         #  ROUTES TO SHARED API GATEWAY
@@ -170,9 +132,8 @@ class IdentityVerificationStack(Stack):
         # /identity resource on SHARED API
         identity_resource = self.shared_api.root.add_resource("identity")
         
-        # POST /identity/verify (Main orchestrator endpoint)
+        # POST /identity/verify (Main orchestrator endpoint - verification workflow)
         verify_resource = identity_resource.add_resource("verify")
-        # ADD CORS preflight for verify endpoint
         verify_resource.add_cors_preflight(
             allow_origins=apigateway.Cors.ALL_ORIGINS, 
             allow_methods=["POST", "OPTIONS"],
@@ -195,13 +156,35 @@ class IdentityVerificationStack(Stack):
                 proxy=True  
             ),
             authorization_type=apigateway.AuthorizationType.NONE
-         
+        )
+        
+        cleanup_resource = identity_resource.add_resource("cleanup")
+        cleanup_resource.add_cors_preflight(
+            allow_origins=apigateway.Cors.ALL_ORIGINS,
+            allow_methods=["DELETE", "OPTIONS"],
+            allow_headers=[
+                "Content-Type",
+                "X-Amz-Date",
+                "Authorization",
+                "X-Api-Key",
+                "X-Amz-Security-Token",
+                "Content-Length"
+            ],
+            allow_credentials=False,
+            max_age=Duration.days(1)
+        )
+        
+        cleanup_resource.add_method(
+            "DELETE",
+            apigateway.LambdaIntegration(
+                orchestrator_lambda, 
+                proxy=True
+            ),
+            authorization_type=apigateway.AuthorizationType.NONE
         )
         
         # POST /identity/upload-url (Upload URL generator)
         upload_url_resource = identity_resource.add_resource("upload-url")
-
-        # CORS preflight for OPTIONS requests
         upload_url_resource.add_cors_preflight(
             allow_origins=apigateway.Cors.ALL_ORIGINS, 
             allow_methods=["POST", "OPTIONS"],
@@ -214,7 +197,7 @@ class IdentityVerificationStack(Stack):
                 "Content-Length"
             ],
             allow_credentials=False, 
-            max_age= Duration.days(1)
+            max_age=Duration.days(1)
         )
 
         upload_url_resource.add_method(
@@ -244,6 +227,13 @@ class IdentityVerificationStack(Stack):
         )
         
         CfnOutput(
+            self, "CleanupEndpoint", 
+            value="DELETE /identity/cleanup",
+            description="Endpoint for cleaning up previous verification files",
+            export_name="CleanupEndpoint"
+        )
+        
+        CfnOutput(
             self, "OrchestratorFunctionArn",
             value=orchestrator_lambda.function_arn,
             description="ARN of the identity verification orchestrator function",
@@ -251,15 +241,8 @@ class IdentityVerificationStack(Stack):
         )
         
         CfnOutput(
-            self, "OrchestratorLogGroupOutput",
-            value=orchestrator_log_group.log_group_name,
-            description="CloudWatch Log Group for Identity Verification Orchestrator",
-            export_name="IdentityOrchestratorLogGroup"
-        )
-        
-        CfnOutput(
-            self, "UploadUrlLogGroupOutput",
-            value=upload_url_log_group.log_group_name,
-            description="CloudWatch Log Group for Upload URL Generator",
-            export_name="UploadUrlLogGroup"
+            self, "UploadUrlFunctionArn",
+            value=get_upload_url_lambda.function_arn,
+            description="ARN of the upload URL function",
+            export_name="UploadUrlFunctionArn"
         )
