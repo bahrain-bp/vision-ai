@@ -1,3 +1,8 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+
 /* CSS Variables for Consistent Colors */
 :root {
   --primary-color: #214080;

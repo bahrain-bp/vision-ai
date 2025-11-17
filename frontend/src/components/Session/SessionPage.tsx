@@ -92,7 +92,7 @@ const SessionPage: React.FC<SessionPageProps> = ({
  
   const handleEndSession = () => {
     stopRecording(setSessionState);
-    //setShowSummaryModal(true);
+    setShowSummaryModal(true);
   };
  
   const handleCloseSummary = () => {
