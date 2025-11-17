@@ -7,7 +7,7 @@ class StreamManager {
 
   private static instance: StreamManager;
 
-  constructor(){}
+  constructor() {}
 
   static getInstance(): StreamManager {
     if (!StreamManager.instance) {
@@ -21,19 +21,19 @@ class StreamManager {
     displayStream: MediaStream | null;
   }> {
     if (this.displayStream === null) {
-        try {
-            this.displayStream = await navigator.mediaDevices.getDisplayMedia({
-            video: true,
-            audio: {
-                echoCancellation: false,
-                noiseSuppression: false,
-                sampleRate: this.sampleRate,
-            },
-            });
-        } catch (error) {
-            console.error("Display recording error:", error);
-            return { success: false, displayStream: null };
-        }
+      try {
+        this.displayStream = await navigator.mediaDevices.getDisplayMedia({
+          video: true,
+          audio: {
+            echoCancellation: false,
+            noiseSuppression: false,
+            sampleRate: this.sampleRate,
+          },
+        });
+      } catch (error) {
+        console.error("Display recording error:", error);
+        return { success: false, displayStream: null };
+      }
     }
     return { success: true, displayStream: this.displayStream };
   }
@@ -43,31 +43,98 @@ class StreamManager {
     audioStream: MediaStream | null;
   }> {
     if (this.audioStream === null) {
-        try {
+      try {
         this.audioStream = await navigator.mediaDevices.getUserMedia({
-            audio: true,
+          audio: true,
         });
-        } catch (error) {
-            console.error("Microphone recording error:", error);
-            return { success: false, audioStream: null };
-        }
+      } catch (error) {
+        console.error("Microphone recording error:", error);
+        return { success: false, audioStream: null };
+      }
     }
     return { success: true, audioStream: this.audioStream };
   }
 
-  getSampleRate(){
+  getSampleRate() {
     return this.sampleRate;
   }
 
-  stopStreams(){
+  getAudioStreamStatus(): {
+    isActive: boolean;
+    hasAudioTracks: boolean;
+    message: string;
+  } {
+    if (!this.audioStream) {
+      return {
+        isActive: false,
+        hasAudioTracks: false,
+        message: "Audio stream not initialized",
+      };
+    }
+
+    const audioTracks = this.audioStream.getAudioTracks();
+    const isActive = this.audioStream.active;
+    const hasAudioTracks = audioTracks.length > 0;
+    const allTracksEnabled = audioTracks.every(
+      (track) => track.enabled && track.readyState === "live"
+    );
+    return {
+      isActive,
+      hasAudioTracks,
+      message:
+        isActive && hasAudioTracks && allTracksEnabled
+          ? "Audio stream active and ready"
+          : !isActive
+          ? "Audio stream inactive"
+          : !hasAudioTracks
+          ? "No audio tracks available"
+          : "Audio tracks present but not all enabled/live",
+    };
+  }
+  
+  getDisplayStreamStatus(): {
+    isActive: boolean;
+    hasVideoTracks: boolean;
+    message: string;
+  } {
+    if (!this.displayStream) {
+      return {
+        isActive: false,
+        hasVideoTracks: false,
+        message: "Display stream not initialized",
+      };
+    }
+
+    const videoTracks = this.displayStream.getVideoTracks();
+    const isActive = this.displayStream.active;
+    const hasVideoTracks = videoTracks.length > 0;
+    const allTracksLive = videoTracks.every(
+      (track) => track.enabled && track.readyState === "live"
+    );
+
+    return {
+      isActive,
+      hasVideoTracks,
+      message:
+        isActive && hasVideoTracks && allTracksLive
+          ? "Display stream active and capturing"
+          : !isActive
+          ? "Display stream inactive"
+          : !hasVideoTracks
+          ? "No video tracks available"
+          : "Video tracks present but not all enabled/live",
+    };
+  }
+
+  stopStreams() {
     if (this.displayStream) {
-       this.displayStream.getTracks().forEach((track) => track.stop());
-       this.displayStream = null;
+      this.displayStream.getTracks().forEach((track) => track.stop());
+      this.displayStream = null;
     }
 
     if (this.audioStream) {
-        this.audioStream.getTracks().forEach((track) => track.stop());
-        this.audioStream = null;
+      this.audioStream.getTracks().forEach((track) => track.stop());
+      this.audioStream = null;
     }
   }
 }

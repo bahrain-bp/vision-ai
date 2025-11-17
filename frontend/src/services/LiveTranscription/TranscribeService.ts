@@ -130,10 +130,22 @@ class TranscribeService {
     sampleRate: number,
     selectedLanguage?: String
   ): Promise<{ success: boolean; message: String }> {
-    
-    const microphoneStream:MicrophoneStream = new MicrophoneStream();
+   const microphoneStream: MicrophoneStream = new MicrophoneStream();
 
-    microphoneStream.setStream(stream);
+   try {
+     microphoneStream.setStream(stream);
+   } catch (error) {
+     console.error(
+       `${source} transcription error: Failed to initialize microphone stream`,
+       error
+     );
+     return {
+       success: false,
+       message:
+         "Unable to initialize audio capture stream. Please check microphone permissions and try again.",
+     };
+   }
+ 
 
 const command: StartStreamTranscriptionCommand =
   new StartStreamTranscriptionCommand({
