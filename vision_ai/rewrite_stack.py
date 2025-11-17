@@ -22,10 +22,12 @@ class RewriteStack(Stack):
     ) -> None:
         super().__init__(scope, construct_id, env=env, **kwargs)
         
+        bucket_name = f"vision-investigation-system-{self.account}"
+        
         # Use existing S3 bucket
         rewrite_bucket = s3.Bucket.from_bucket_name(
             self, "RewriteBucket",
-            bucket_name="vision-investigation-system-052804446370"
+            bucket_name=bucket_name
         )
         
         # Lambda Function
@@ -37,19 +39,19 @@ class RewriteStack(Stack):
             timeout=Duration.seconds(300),
             memory_size=512,
             environment={
-                'BUCKET_NAME': 'vision-investigation-system-052804446370'
+                'BUCKET_NAME': bucket_name
             }
         )
         
         # Grant permissions to existing bucket
         rewrite_lambda.add_to_role_policy(iam.PolicyStatement(
             actions=['s3:PutObject', 's3:GetObject'],
-            resources=[f'arn:aws:s3:::vision-investigation-system-052804446370/rewritten/*']
+            resources=[f'arn:aws:s3:::{bucket_name}/rewritten/*']
         ))
         
         rewrite_lambda.add_to_role_policy(iam.PolicyStatement(
             actions=['bedrock:InvokeModel'],
-            resources=[f'arn:aws:bedrock:{env.region}::foundation-model/amazon.nova-lite-v1:0']
+            resources=[f'arn:aws:bedrock:{self.region}::foundation-model/amazon.nova-lite-v1:0']
         ))
         
         # Import shared API
