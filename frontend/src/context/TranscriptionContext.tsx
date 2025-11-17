@@ -6,7 +6,7 @@ import React, {
   useRef,
 } from "react";
 import { RecordingStatus } from "../types/";
-import { TranscriptionResult,StreamStatus } from "../types";
+import { TranscriptionResult } from "../types";
 import TranscribeService from "../services/LiveTranscription/TranscribeService";
 
 export interface TranscriptionContextType {
@@ -17,7 +17,6 @@ export interface TranscriptionContextType {
     onTranscriptUpdate?: (text: TranscriptionResult) => void,
     selectedLanguage?: string
   ) => Promise<boolean>;
-    audioStreamStatus?: ()=>StreamStatus; 
   stopRecording: (setSessionState?: (state: RecordingStatus) => void) => void;
 }
 
