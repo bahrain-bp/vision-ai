@@ -1,13 +1,11 @@
 import React, { useRef, useState } from "react";
-// Custom Hooks
-//import { useVideoUpload } from "../../../hooks/useVideoUpload";
-//import { useVideoAnalysisOperations } from "../../../hooks/useVideoAnalysisOperations";
-
 import "../../../ProcessingView.css";
+import { SessionData } from "../ProcessingView";
 
-// note: currently using local state and logic instead of hooks/context/services to simulate ui/workflow
-// Local interfaces for mock data
-// add session data
+interface CameraFootageProps {
+  sessionData: SessionData;
+}
+
 interface Event {
   id: string;
   timestamp: number;
@@ -24,72 +22,148 @@ interface AnalysisResult {
   processedAt: Date;
 }
 
-const CameraFootage: React.FC = () => {
-  // Local state instead of hooks/context
+const CameraFootage: React.FC<CameraFootageProps> = ({
+  sessionData: _sessionData,
+}) => {
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
+  const [isUploading, setIsUploading] = useState<boolean>(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(
     null
   );
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+  const [videoS3Key, setVideoS3Key] = useState<string>("");
 
   const videoRef = useRef<HTMLVideoElement>(null);
 
+  const sanitizeSessionId = (sessionId: string): string => {
+    // Remove any invalid characters (e.g., #)
+    return sessionId.replace(/[^a-zA-Z0-9-]/g, ""); // Keep only alphanumeric characters and dashes
+  };
+  const isValidSessionId = (sessionId: string): boolean => {
+    const pattern = /^\d{4}-INV-\d{4}$/;
+    return pattern.test(sessionId);
+  };
+
+  // Handle video upload
   const handleFileUpload = async (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
     const file = event.target.files?.[0];
-    if (file) {
+    if (!file) return;
+
+    let sessionId = _sessionData?.sessionId || "unknown";
+
+    // Sanitize the sessionId
+    sessionId = sanitizeSessionId(sessionId);
+    // Validate sessionId
+    if (!isValidSessionId(sessionId)) {
+      console.error("Invalid sessionId format");
+      alert(
+        `Invalid sessionId format: ${sessionId}. Expected format: YYYY-INV-XXXX`
+      );
+      return;
+    }
+
+    setIsUploading(true);
+    setUploadError(null);
+
+    try {
+      // Step 1: Get presigned URL from Lambda
+      const uploadUrlResponse = await fetch(
+        `${process.env.REACT_APP_API_ENDPOINT}/footage/upload-url`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sessionId,
+            fileName: file.name,
+          }),
+        }
+      );
+
+      console.log("Session Data:", _sessionData);
+
+      if (!uploadUrlResponse.ok) {
+        const error = await uploadUrlResponse.json();
+        throw new Error(error.error || "Failed to get upload URL");
+      }
+
+      const uploadData = await uploadUrlResponse.json();
+      console.log("Presigned URL received:", uploadData);
+
+      // Step 2: Upload file to S3 using presigned URL
+      const s3UploadResponse = await fetch(uploadData.uploadUrl, {
+        method: "PUT",
+        body: file,
+        headers: {
+          "Content-Type": "video/mp4",
+        },
+      });
+
+      if (!s3UploadResponse.ok) {
+        throw new Error("Failed to upload video to S3");
+      }
+
+      // Step 3: Success - update state
       setVideoFile(file);
-      // Create a local URL for the video
+      setVideoS3Key(uploadData.s3Key);
       const url = URL.createObjectURL(file);
       setVideoUrl(url);
+      console.log("Video uploaded successfully");
+    } catch (error: any) {
+      console.error("Upload error:", error);
+      setUploadError(error.message || "Upload failed");
+    } finally {
+      setIsUploading(false);
     }
   };
 
   const startAnalysis = async () => {
     setIsAnalyzing(true);
+    setAnalysisResult(null);
 
-    // Mock analysis delay
-    await new Promise((resolve) => setTimeout(resolve, 3000));
+    try {
+      const sessionId = sanitizeSessionId(_sessionData?.sessionId || "unknown");
+      const bucket = process.env.REACT_APP_S3_BUCKET_NAME;
 
-    // Mock analysis result
-    const mockResult: AnalysisResult = {
-      events: [
+      const response = await fetch(
+        `${process.env.REACT_APP_API_ENDPOINT}/footage/analyze`,
         {
-          id: "1",
-          timestamp: 10,
-          description: "Person detected entering the frame.",
-          confidence: 0.95,
-          type: "person",
-          bbox: { x: 20, y: 30, width: 15, height: 25 },
-        },
-        {
-          id: "2",
-          timestamp: 30,
-          description: "Vehicle detected moving across the frame.",
-          confidence: 0.89,
-          type: "vehicle",
-          bbox: { x: 45, y: 20, width: 30, height: 20 },
-        },
-        {
-          id: "3",
-          timestamp: 60,
-          description: "Suspicious activity detected in the corner.",
-          confidence: 0.75,
-          type: "activity",
-          bbox: { x: 75, y: 15, width: 20, height: 18 },
-        },
-      ],
-      summary:
-        "Detected 3 events: 1 person, 1 vehicle, and 1 suspicious activity.",
-      duration: 120,
-      processedAt: new Date(),
-    };
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sessionId,
+            s3Key: videoS3Key,
+            bucket,
+          }),
+        }
+      );
 
-    setAnalysisResult(mockResult);
-    setIsAnalyzing(false);
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Analysis request failed");
+      }
+
+      setAnalysisResult({
+        summary: result.message || "Analysis job triggered.",
+        events: result.events || [],
+        duration: result.duration || 0,
+        processedAt: new Date(),
+      });
+    } catch (error: any) {
+      setAnalysisResult({
+        summary: error.message || "Analysis failed",
+        events: [],
+        duration: 0,
+        processedAt: new Date(),
+      });
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
   const selectEvent = (event: Event) => {
@@ -122,6 +196,21 @@ const CameraFootage: React.FC = () => {
         *Upload and analyze surveillance footage for evidence extraction
       </p>
 
+      {/* Error display*/}
+      {uploadError && (
+        <div
+          style={{
+            color: "red",
+            backgroundColor: "#fee",
+            padding: "10px",
+            borderRadius: "4px",
+            marginBottom: "10px",
+          }}
+        >
+          {uploadError}
+        </div>
+      )}
+
       <div className="camera-footage-container">
         {/* Video Upload & Player Section */}
         <div className="tab-section">
@@ -137,6 +226,7 @@ const CameraFootage: React.FC = () => {
                   onChange={handleFileUpload}
                   className="hidden"
                   id="video-upload"
+                  disabled={isUploading}
                 />
 
                 {/* Label for File Input */}
@@ -157,8 +247,16 @@ const CameraFootage: React.FC = () => {
                   onClick={() =>
                     document.getElementById("video-upload")?.click()
                   }
+                  disabled={isUploading}
                 >
-                  Click to browse or drag and drop
+                  {isUploading ? (
+                    <>
+                      <span className="processing-spinner">⟳</span>
+                      Uploading...
+                    </>
+                  ) : (
+                    "Click to browse or drag and drop"
+                  )}
                 </button>
               </div>
             ) : (
