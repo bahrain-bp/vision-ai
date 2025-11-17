@@ -106,31 +106,31 @@ class CameraFootageAnalysisStack(Stack):
         lambda_role.add_to_policy(iam.PolicyStatement(
            effect=iam.Effect.ALLOW,
            actions=[
-             "bedrock:InvokeModel",
-             "bedrock:InvokeModelWithResponseStream",
-             "bedrock:CreateDataAutomationJob",
              "bedrock:GetDataAutomationJob",
-             "bedrock:ListDataAutomationJobs",  
              "bedrock:InvokeDataAutomationAsync"
             ],
             resources=[
                self.node.try_get_context("bedrockProjectArn"),
-               f"arn:aws:bedrock:us-east-1:{self.account}:data-automation-invocation/*", 
-               f"arn:aws:bedrock:*:{self.account}:data-automation-invocation/*"      
+               self.node.try_get_context("bedrockProfileArn"),
+               f"arn:aws:bedrock:us-east-1:{self.account}:data-automation-profile/us.data-automation-v1",
+               f"arn:aws:bedrock:us-east-2:{self.account}:data-automation-profile/us.data-automation-v1",
+               f"arn:aws:bedrock:us-west-1:{self.account}:data-automation-profile/us.data-automation-v1",
+               f"arn:aws:bedrock:us-west-2:{self.account}:data-automation-profile/us.data-automation-v1"
+               f"arn:aws:bedrock:us-east-1:{self.account}:data-automation-invocation/*",
+               f"arn:aws:bedrock:*:{self.account}:data-automation-invocation/*"
+
             ]  
         ))
         
-        # Add PassRole if Bedrock needs to assume a role
-        lambda_role.add_to_policy(iam.PolicyStatement(
-            effect=iam.Effect.ALLOW, 
-            actions=["iam:passRole"], 
-            resources=[f"arn:aws:iam::{self.account}:role/*"],
-            conditions={
-                "StringEquals": {
-                    "iam:PassedToService": "bedrock.amazonaws.com"
-                }
-            }    
-        ))
+        # Create a service role for Bedrock to use
+        bedrock_service_role = iam.Role(
+            self, "BedrockServiceRole",
+            assumed_by=iam.ServicePrincipal("bedrock.amazonaws.com"),
+            description="Service role for Bedrock Data Automation"
+        )
+        
+        # Grant S3 access
+        investigation_bucket.grant_read_write(bedrock_service_role)
         
         # ==========================================
         # LAMBDA FUNCTION: Video Upload URL
@@ -234,5 +234,5 @@ class CameraFootageAnalysisStack(Stack):
             value=f"https://{self.shared_api.rest_api_id}.execute-api.{env.region}.amazonaws.com/prod/footage/analyze",
             description="POST endpoint for triggering video analysis"
         )
-        
-        
+
+
