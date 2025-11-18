@@ -85,7 +85,9 @@ const RealTimeView: React.FC<RealTimeViewProps> = ({
   //onIdentityDataChange,
   //onVerifyIdentity,
 }) => {
-  const [activeTab, setActiveTab] = useState<"identity" | "transcription">("identity");
+  const [activeTab, setActiveTab] = useState<"identity" | "transcription">(
+    "identity"
+  );
   const [aiExpanded, setAiExpanded] = useState(false);
   const [isIdentityVerified, setIsIdentityVerified] = useState(false);
   const [startRecording, setStartRecording] = useState(false);

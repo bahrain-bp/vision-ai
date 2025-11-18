@@ -12,9 +12,7 @@ import {
 } from "../../types/identityVerification";
 
 // API Configuration with defaults
-const API_BASE_URL =
-  process.env.REACT_APP_API_ENDPOINT ||
-  "https://yphcka81y6.execute-api.us-east-1.amazonaws.com/prod";
+const API_BASE_URL = process.env.REACT_APP_API_ENDPOINT;
 
 export class IdentityVerificationError extends Error {
   constructor(

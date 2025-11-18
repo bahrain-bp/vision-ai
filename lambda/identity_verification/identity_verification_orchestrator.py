@@ -878,19 +878,21 @@ def compare_faces(source_photo_key, target_photo_key, case_id, session_id, cpr_n
 
 
 def create_or_update_session_metadata(case_id, session_id, cpr_number, person_name, person_type, verification_result, nationality, attempt_number=1):
-    """Create or update session metadata"""
+    """Update existing session metadata with verification results"""
     try:
         metadata_key = f"cases/{case_id}/sessions/{session_id}/session-metadata.json"
         
-        existing_metadata = None
+        # Get existing session metadata 
         try:
             response = s3.get_object(Bucket=BUCKET_NAME, Key=metadata_key)
             existing_metadata = json.loads(response['Body'].read().decode('utf-8'))
         except s3.exceptions.NoSuchKey:
-            pass
+            logger.error(f"Session metadata not found: {metadata_key}")
+            return None
         
         current_timestamp = datetime.utcnow().isoformat()
         
+        # Create verification entry
         verification_entry = {
             'personType': person_type,
             'personName': person_name,
@@ -906,30 +908,27 @@ def create_or_update_session_metadata(case_id, session_id, cpr_number, person_na
             'overrideReason': verification_result.get('overrideReason')
         }
         
-        if existing_metadata:
-            metadata = existing_metadata
-            metadata['lastUpdated'] = current_timestamp
-            
-            if 'verifications' not in metadata:
-                metadata['verifications'] = []
-            
-            metadata['verifications'].append(verification_entry)
-        else:
-            metadata = {
-                'caseId': case_id,
-                'sessionId': session_id,
-                'sessionStartDate': current_timestamp,
-                'lastUpdated': current_timestamp,
-                'primaryPerson': {
-                    'cprNumber': cpr_number,
-                    'personName': person_name,
-                    'personType': person_type,
-                    'nationality': nationality
-                },
-                'verifications': [verification_entry],
-                'sessionStatus': 'active'
+        # Update the existing metadata
+        metadata = existing_metadata
+        metadata['lastUpdated'] = current_timestamp
+        
+        # Initialize verifications array if it doesn't exist
+        if 'verifications' not in metadata:
+            metadata['verifications'] = []
+        
+        # Add new verification entry
+        metadata['verifications'].append(verification_entry)
+        
+        # Update primary person information with the first successful verification
+        if verification_result['match'] and not metadata['primaryPerson'].get('cprNumber'):
+            metadata['primaryPerson'] = {
+                'cprNumber': cpr_number,
+                'personName': person_name,
+                'personType': person_type,
+                'nationality': nationality
             }
         
+        # Save updated metadata
         s3.put_object(
             Bucket=BUCKET_NAME,
             Key=metadata_key,
@@ -937,13 +936,12 @@ def create_or_update_session_metadata(case_id, session_id, cpr_number, person_na
             ContentType='application/json'
         )
         
+        logger.info(f"✓ Session metadata updated with verification results")
         return metadata
         
     except Exception as e:
-        logger.error(f"Error creating/updating session metadata: {str(e)}", exc_info=True)
+        logger.error(f"Error updating session metadata: {str(e)}", exc_info=True)
         return None
-
-
 def error_response(status_code, message, additional_data=None):
     """Helper function to create error responses"""
     body = {'error': message}
