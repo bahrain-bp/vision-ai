@@ -12,7 +12,7 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 s3 = boto3.client('s3')
-BUCKET_NAME = os.environ.get('BUCKET_NAME', 'vision-investigation-system-052804446370')
+BUCKET_NAME = os.environ.get('BUCKET_NAME')
 # sessionID validation helper function
 def is_valid_session_id(session_id):
     """
@@ -75,7 +75,7 @@ def handler(event, context):
         safe_file_name = f"footage_{timestamp}_{unique_id}{file_extension}"
         
         # S3 key for uploaded video
-        s3_key = f"camera-footage/videos/{session_id}/{safe_file_name}"
+        s3_key = f"camera-footage/videos/{safe_file_name}"
 
         
         logger.info(f"Generated S3 key: {s3_key}")

@@ -7,6 +7,7 @@ import re
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
+
 BEDROCK_PROJECT_ARN = os.environ.get("BEDROCK_PROJECT_ARN")
 BEDROCK_PROFILE_ARN = os.environ.get("BEDROCK_PROFILE_ARN") 
 
@@ -32,7 +33,7 @@ def handler(event, context):
     Expected POST body:
     {
         "sessionId": "2024-INV-0042",
-        "s3Key": "camera-footage/videos/2024-INV-0042/footage_20231115-123456_abcdef123456.mp4"
+        "s3Key": "camera-footage/videos/footage_20231115-123456_abcdef123456.mp4"
     }
     """
     try:
@@ -47,7 +48,9 @@ def handler(event, context):
         body = json.loads(event.get('body', '{}'))
         session_id = body.get('sessionId')
         s3_key = body.get('s3Key')
-        input_bucket = body.get('bucket') or os.environ.get("BUCKET_NAME")  # Use env var if not in body
+        
+        
+        input_bucket = os.environ.get("BUCKET_NAME")  # Use env var if not in body
 
         logger.info(f"Parameters - sessionId: {session_id}, s3Key: {s3_key}, input bucket {input_bucket} ")
 
@@ -73,7 +76,7 @@ def handler(event, context):
 
         # generate Bedrock Data Automation job
         input_s3_uri = f"s3://{input_bucket}/{s3_key}"
-        output_s3_uri = f"s3://{input_bucket}/camera-footage/analysis-results/{session_id}/"
+        output_s3_uri = f"s3://{input_bucket}/camera-footage/output/"
 
         
         logger.info(f"Input S3 URI: {input_s3_uri}")
@@ -97,7 +100,7 @@ def handler(event, context):
             dataAutomationProfileArn=BEDROCK_PROFILE_ARN
         )
 
-        invocation_arn = response.get('invocationArn')
+        invocation_arn =  response['invocationArn']
 
         logger.info(f"Bedrock job started: {invocation_arn}")
         
@@ -108,7 +111,7 @@ def handler(event, context):
         logger.info(f"Bedrock job started successfully: {invocation_arn}")
 
         return {
-            'statusCode': 202, 
+            'statusCode': 200, 
             'headers': {
                 'Access-Control-Allow-Origin': '*', 
                 'Access-Control-Allow-Methods': 'OPTIONS,POST,PUT',

@@ -115,22 +115,13 @@ class CameraFootageAnalysisStack(Stack):
                f"arn:aws:bedrock:us-east-1:{self.account}:data-automation-profile/us.data-automation-v1",
                f"arn:aws:bedrock:us-east-2:{self.account}:data-automation-profile/us.data-automation-v1",
                f"arn:aws:bedrock:us-west-1:{self.account}:data-automation-profile/us.data-automation-v1",
-               f"arn:aws:bedrock:us-west-2:{self.account}:data-automation-profile/us.data-automation-v1"
+               f"arn:aws:bedrock:us-west-2:{self.account}:data-automation-profile/us.data-automation-v1",
                f"arn:aws:bedrock:us-east-1:{self.account}:data-automation-invocation/*",
                f"arn:aws:bedrock:*:{self.account}:data-automation-invocation/*"
 
             ]  
         ))
         
-        # Create a service role for Bedrock to use
-        bedrock_service_role = iam.Role(
-            self, "BedrockServiceRole",
-            assumed_by=iam.ServicePrincipal("bedrock.amazonaws.com"),
-            description="Service role for Bedrock Data Automation"
-        )
-        
-        # Grant S3 access
-        investigation_bucket.grant_read_write(bedrock_service_role)
         
         # ==========================================
         # LAMBDA FUNCTION: Video Upload URL
@@ -138,7 +129,7 @@ class CameraFootageAnalysisStack(Stack):
         video_upload_url_lambda = _lambda.Function(
             self, "VideoUploadUrlFunction",
             function_name=f"vision-ai-video-upload-url-{self.stack_name}",
-            runtime=_lambda.Runtime.PYTHON_3_11,
+            runtime=_lambda.Runtime.PYTHON_3_13,
             handler="video_upload_url.handler",
             code=_lambda.Code.from_asset("lambda/camera_footage_analysis"),
             role=lambda_role,
@@ -157,7 +148,7 @@ class CameraFootageAnalysisStack(Stack):
         video_analysis_lambda = _lambda.Function(
           self, "VideoAnalysisFunction",
           function_name=f"vision-ai-video-analysis-{self.stack_name}",
-          runtime=_lambda.Runtime.PYTHON_3_11,
+          runtime=_lambda.Runtime.PYTHON_3_13,
           handler="video_analysis.handler",
           code=_lambda.Code.from_asset("lambda/camera_footage_analysis"),
           role=lambda_role,

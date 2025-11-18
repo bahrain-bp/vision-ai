@@ -127,7 +127,6 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
 
     try {
       const sessionId = sanitizeSessionId(_sessionData?.sessionId || "unknown");
-      const bucket = process.env.REACT_APP_S3_BUCKET_NAME;
 
       const response = await fetch(
         `${process.env.REACT_APP_API_ENDPOINT}/footage/analyze`,
@@ -137,7 +136,6 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
           body: JSON.stringify({
             sessionId,
             s3Key: videoS3Key,
-            bucket,
           }),
         }
       );
