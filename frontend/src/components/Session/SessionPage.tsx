@@ -116,6 +116,7 @@ const SessionPage: React.FC<SessionPageProps> = ({
   const handleEndSession = async () => {
     stopRecording(setSessionState);
 
+
     if (currentSession && currentCase) {
       try {
         await updateSessionStatus(
@@ -127,6 +128,7 @@ const SessionPage: React.FC<SessionPageProps> = ({
         console.error("Failed to update session status:", error);
       }
     }
+
 
     setShowSummaryModal(true);
   };

@@ -1,7 +1,5 @@
 import React, { useState } from "react";
 import {
-  Play,
-  FileText,
   User,
   MessageSquare,
   ChevronUp,
@@ -12,7 +10,7 @@ import Translation from "./Translation";
 import AIAssistant from "./AIAssistant";
 import SessionInfo from "./SessionInfo";
 import IdentityVerification from "./IdentityVerification/IdentityVerification";
-
+import TranscriptionSessionSetup from "../LiveTranscription/TranscriptionSessionSetup"
 import { RecordingStatus } from "../../types/";
 
 interface SessionData {
@@ -91,6 +89,7 @@ const RealTimeView: React.FC<RealTimeViewProps> = ({
   const [aiExpanded, setAiExpanded] = useState(false);
   const [isIdentityVerified, setIsIdentityVerified] = useState(false);
   const [startRecording, setStartRecording] = useState(false);
+  const [selectedLanguage, setSelectedLanguage] = useState<string>("en-US");
 
   const handleStartInvestigation = (investigationData: InvestigationData) => {
     console.log("Starting investigation with data:", investigationData);
@@ -118,29 +117,15 @@ const RealTimeView: React.FC<RealTimeViewProps> = ({
         )}
 
         {sessionState === "off" && activeTab === "transcription" && (
-          <div className="ready-state">
-            <div className="ready-content">
-              <div className="play-icon-container">
-                <Play className="play-icon" />
-              </div>
-              <h2 className="ready-title">Ready to Start</h2>
-              <p className="ready-description">
-                Click the button below to begin recording the investigation
-                session.
-              </p>
-              <button
-                onClick={() => {
-                  setStartRecording(true);
-                  setSessionState("on");
-                  setActiveTab("transcription");
-                }}
-                className="start-recording-btn"
-              >
-                <Play className="btn-icon" />
-                <span>Start Recording</span>
-              </button>
-            </div>
-          </div>
+          <>
+            <TranscriptionSessionSetup
+              selectedLanguage={selectedLanguage}
+              setSelectedLanguage={setSelectedLanguage}
+              setStartRecording={setStartRecording}
+              setSessionState={setSessionState}
+              setActiveTab={setActiveTab}
+            />
+          </>
         )}
 
         {sessionState === "on" && (
@@ -150,6 +135,7 @@ const RealTimeView: React.FC<RealTimeViewProps> = ({
                 <LiveTranscription
                   startRecordingProp={startRecording}
                   setSessionState={setSessionState}
+                  selectedLanguage={selectedLanguage}
                 />
                 <Translation />
               </>
@@ -173,9 +159,11 @@ const RealTimeView: React.FC<RealTimeViewProps> = ({
 
           <button
             onClick={() => setActiveTab("transcription")}
-            className="sidebar-btn"
+            className={`sidebar-btn ${
+              activeTab === "transcription" ? "active" : ""
+            }`}
           >
-            <FileText className="btn-icon" />
+            <User className="btn-icon" />
             <span>Transcription & Translation</span>
           </button>
         </div>

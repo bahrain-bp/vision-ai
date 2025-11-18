@@ -1,79 +1,97 @@
-import React, { createContext, useState, useCallback, ReactNode } from "react";
-import RecordingService from "../services/LiveTranscription/RecordingService";
+import React, {
+  createContext,
+  useState,
+  useCallback,
+  ReactNode,
+  useRef,
+} from "react";
 import { RecordingStatus } from "../types/";
-import {TranscriptLine} from "../types"
+import { TranscriptionResult } from "../types";
 import TranscribeService from "../services/LiveTranscription/TranscribeService";
+
 export interface TranscriptionContextType {
-  transcript: TranscriptLine[];
   audioStatus: boolean;
   recordingStatus: RecordingStatus;
-  addLine: (line: TranscriptLine) => void;
-  startRecording: (setSessionState?: (state: RecordingStatus) => void) => Promise<boolean>;
-  stopRecording: (setSessionState?: (state: RecordingStatus) => void) => void; 
+  startRecording: (
+    setSessionState?: (state: RecordingStatus) => void,
+    onTranscriptUpdate?: (text: TranscriptionResult) => void,
+    selectedLanguage?: string
+  ) => Promise<boolean>;
+  stopRecording: (setSessionState?: (state: RecordingStatus) => void) => void;
 }
 
 export const TranscriptionContext = createContext<
   TranscriptionContextType | undefined
 >(undefined);
 
-const updateStatuses = (
-  setRecordingStatus: (state: RecordingStatus) => void,
-  setAudioStatus: (state: boolean) => void,
-  setSessionState?: (state: RecordingStatus) => void
-) => {
-  const newStatus = RecordingService.getRecordingStatus();
-  const newAudioStatus = RecordingService.getAudioStatus().hasAudio;
-
-  setRecordingStatus(newStatus);
-  setAudioStatus(newAudioStatus);
-
-  if (setSessionState) {
-    setSessionState(newStatus);
-  }
-};
-
-
 export const TranscriptionProvider: React.FC<{ children: ReactNode }> = ({
   children,
 }) => {
-  const [transcript, setTranscript] = useState<TranscriptLine[]>([]);
   const [audioStatus, setAudioStatus] = useState(false);
-  const [recordingStatus, setRecordingStatus] = useState<RecordingStatus>("off");
+  const [recordingStatus, setRecordingStatus] =
+    useState<RecordingStatus>("off");
+  const isStartingRef = useRef(false);
+
   const startRecording = useCallback(
-    async (setSessionState?: (state: RecordingStatus) => void) => {
-      const result = await RecordingService.startRecording();
-      const client = await TranscribeService.getClient();
-      //debugging
-      console.log("CLIENT: ",client);
-      if (result.success) {
-        updateStatuses(setRecordingStatus, setAudioStatus, setSessionState);
-        return true;
+    async (
+      setSessionState?: (state: RecordingStatus) => void,
+      onTranscriptUpdate?: (text: TranscriptionResult) => void,
+      selectedLanguage?: string
+    ) => {
+      if (isStartingRef.current) {
+        return false;
       }
-      return false;
+
+      isStartingRef.current = true;
+
+      try {
+        const result = await TranscribeService.startRecording(
+          onTranscriptUpdate,
+          selectedLanguage
+        );
+
+        if (result.success) {
+          const newStatus = TranscribeService.getRecordingStatus();
+          const newAudioStatus = TranscribeService.getAudioStatus();
+
+          setRecordingStatus(newStatus);
+          setAudioStatus(newAudioStatus);
+
+          if (setSessionState) {
+            setSessionState(newStatus);
+          }
+          return true;
+        }
+        return false;
+      } finally {
+        isStartingRef.current = false;
+      }
     },
     []
   );
 
   const stopRecording = useCallback(
     (setSessionState?: (state: RecordingStatus) => void) => {
-      RecordingService.stopRecording();
-      updateStatuses(setRecordingStatus, setAudioStatus, setSessionState);
+      TranscribeService.stopRecording();
+
+      const newStatus = TranscribeService.getRecordingStatus();
+      const newAudioStatus = TranscribeService.getAudioStatus();
+
+      setRecordingStatus(newStatus);
+      setAudioStatus(newAudioStatus);
+
+      if (setSessionState) {
+        setSessionState(newStatus);
+      }
     },
     []
   );
 
-  const addLine = useCallback((line: TranscriptLine) => {
-    setTranscript((prev) => [...prev, line]);
-  }, []);
-
-
   return (
     <TranscriptionContext.Provider
       value={{
-        transcript,
         audioStatus,
         recordingStatus,
-        addLine,
         startRecording,
         stopRecording,
       }}
