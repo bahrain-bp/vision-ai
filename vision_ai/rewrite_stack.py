@@ -15,20 +15,13 @@ class RewriteStack(Stack):
         self, 
         scope: Construct, 
         construct_id: str,
+        investigation_bucket: s3.IBucket,
         shared_api_id: str,
         shared_api_root_resource_id: str,
         env,
         **kwargs
     ) -> None:
         super().__init__(scope, construct_id, env=env, **kwargs)
-        
-        bucket_name = f"vision-investigation-system-{self.account}"
-        
-        # Use existing S3 bucket
-        rewrite_bucket = s3.Bucket.from_bucket_name(
-            self, "RewriteBucket",
-            bucket_name=bucket_name
-        )
         
         # Lambda Function
         rewrite_lambda = _lambda.Function(
@@ -39,15 +32,15 @@ class RewriteStack(Stack):
             timeout=Duration.seconds(300),
             memory_size=512,
             environment={
-                'BUCKET_NAME': bucket_name
+                'BUCKET_NAME': investigation_bucket.bucket_name
             }
         )
         
-        # Grant permissions to existing bucket
-        rewrite_lambda.add_to_role_policy(iam.PolicyStatement(
-            actions=['s3:PutObject', 's3:GetObject'],
-            resources=[f'arn:aws:s3:::{bucket_name}/rewritten/*']
-        ))
+        # Grant permissions to S3 bucket
+        # Allow reading from any key (for original/extracted reports)
+        # Allow writing to rewritten/* prefix
+        investigation_bucket.grant_read(rewrite_lambda)
+        investigation_bucket.grant_write(rewrite_lambda, "rewritten/*")
         
         rewrite_lambda.add_to_role_policy(iam.PolicyStatement(
             actions=['bedrock:InvokeModel'],
@@ -64,6 +57,14 @@ class RewriteStack(Stack):
         # Add /rewrite route
         rewrite_resource = shared_api.root.add_resource("rewrite")
         
+        # Add OPTIONS method for CORS preflight
+        rewrite_resource.add_method(
+            "OPTIONS",
+            apigateway.LambdaIntegration(rewrite_lambda),
+            authorization_type=apigateway.AuthorizationType.NONE
+        )
+        
+        # Add POST method for rewrite requests
         rewrite_resource.add_method(
             "POST",
             apigateway.LambdaIntegration(rewrite_lambda),
