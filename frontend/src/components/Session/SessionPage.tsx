@@ -1,12 +1,12 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { ArrowLeft, Clock } from "lucide-react";
 import RealTimeView from "../RealTime/RealTimeView";
 import ProcessingView from "../Processing/ProcessingView";
 import SessionSummaryModal from "../RealTime/SessionSummaryModal";
-import { User,RecordingStatus } from "../../types/";
+import { User, RecordingStatus } from "../../types/";
 import { useTranscription } from "../../hooks/useTranscription";
+import { useCaseContext } from "../../hooks/useCaseContext";
 
- 
 interface WitnessData {
   fullName: string;
   idNumber: string;
@@ -17,18 +17,18 @@ interface IdentityData {
   passport: File | null;
   isVerified: boolean;
 }
- 
+
 interface TranslationSettings {
   sourceLanguage: string;
   targetLanguage: string;
 }
- 
+
 interface SetupData {
   witnessData: WitnessData;
   identityData: IdentityData;
   translationSettings: TranslationSettings;
 }
- 
+
 interface SessionData {
   sessionId: string;
   investigator: string;
@@ -40,61 +40,99 @@ interface SessionData {
   identityData?: IdentityData;
   translationSettings?: TranslationSettings;
 }
- 
+
 interface SessionPageProps {
   user: User;
   onSignOut: () => void;
   sessionData?: SessionData;
   onEndSession?: () => void;
 }
- 
+
 type MainTab = "real-time" | "processing";
- 
+
 const SessionPage: React.FC<SessionPageProps> = ({
-  //user,
+  user,
   onSignOut,
   sessionData,
-  onEndSession
+  onEndSession,
 }) => {
+  const {
+    currentCase,
+    currentSession,
+    createSession,
+    updateSessionStatus,
+    setCurrentSession,
+  } = useCaseContext();
   const [activeMainTab, setActiveMainTab] = useState<MainTab>("real-time");
   const [sessionState, setSessionState] = useState<RecordingStatus>("off");
   const [showSummaryModal, setShowSummaryModal] = useState<boolean>(false);
-    const { stopRecording } = useTranscription();
- const [setupData, setSetupData] = useState<SetupData>({
-   witnessData: {
-     fullName: sessionData?.witnessData?.fullName || "",
-     idNumber: sessionData?.witnessData?.idNumber || "",
-   },
-   identityData: {
-     referencePhoto: sessionData?.identityData?.referencePhoto || null,
-     cpr: sessionData?.identityData?.cpr || null,
-     passport: sessionData?.identityData?.passport || null,
-     isVerified: sessionData?.identityData?.isVerified || false,
-   },
-   translationSettings: {
-     sourceLanguage: sessionData?.translationSettings?.sourceLanguage || "ar",
-     targetLanguage: sessionData?.translationSettings?.targetLanguage || "en",
-   },
- });
- 
-  const currentSessionData: SessionData = sessionData || {
-    sessionId: "#2024-INV-0042",
-    investigator: "M. AlZebari",
-    language: "Arabic",
-    duration: "00:00",
-    witness: "Not set",
-    status: "Active",
+  const { stopRecording } = useTranscription();
+  const [setupData, setSetupData] = useState<SetupData>({
+    witnessData: {
+      fullName: sessionData?.witnessData?.fullName || "",
+      idNumber: sessionData?.witnessData?.idNumber || "",
+    },
+    identityData: {
+      referencePhoto: sessionData?.identityData?.referencePhoto || null,
+      cpr: sessionData?.identityData?.cpr || null,
+      passport: sessionData?.identityData?.passport || null,
+      isVerified: sessionData?.identityData?.isVerified || false,
+    },
+    translationSettings: {
+      sourceLanguage: sessionData?.translationSettings?.sourceLanguage || "ar",
+      targetLanguage: sessionData?.translationSettings?.targetLanguage || "en",
+    },
+  });
+
+  const getInvestigatorName = () => {
+    if (user?.username) return user.username;
+    return "Unknown Investigator";
   };
- 
-  if (setupData.witnessData.fullName) {
-    currentSessionData.witness = setupData.witnessData.fullName;
-  }
- 
-  const handleEndSession = () => {
+
+  const currentSessionData: SessionData = currentSession
+    ? {
+        sessionId: currentSession.sessionId,
+        investigator: currentSession.investigator || getInvestigatorName(),
+        language: "Arabic",
+        duration: currentSession.duration,
+        witness: setupData.witnessData.fullName || "Not set",
+        status: currentSession.status,
+      }
+    : {
+        sessionId: "#2025-INV-0042",
+        investigator: getInvestigatorName(),
+        language: "Arabic",
+        duration: "00:00",
+        witness: "Not set",
+        status: "Active",
+      };
+
+  useEffect(() => {
+    if (setupData.witnessData.fullName) {
+      currentSessionData.witness = setupData.witnessData.fullName;
+    }
+  }, [setupData.witnessData.fullName]);
+
+  const handleEndSession = async () => {
     stopRecording(setSessionState);
+
+
+    if (currentSession && currentCase) {
+      try {
+        await updateSessionStatus(
+          currentCase.caseId,
+          currentSession.sessionId,
+          "completed"
+        );
+      } catch (error) {
+        console.error("Failed to update session status:", error);
+      }
+    }
+
+
     setShowSummaryModal(true);
   };
- 
+
   const handleCloseSummary = () => {
     setShowSummaryModal(false);
     setSessionState("off");
@@ -102,15 +140,17 @@ const SessionPage: React.FC<SessionPageProps> = ({
       onEndSession();
     }
   };
- 
+
   const handleBackToHome = () => {
+    sessionCreationAttempted.current = false;
+    setCurrentSession(null);
     if (onEndSession) {
       onEndSession();
     } else {
       onSignOut();
     }
   };
- 
+
   const updateWitnessData = (field: keyof WitnessData, value: string) => {
     setSetupData((prev) => ({
       ...prev,
@@ -120,7 +160,7 @@ const SessionPage: React.FC<SessionPageProps> = ({
       },
     }));
   };
- 
+
   const updateIdentityData = (field: keyof IdentityData, value: any) => {
     setSetupData((prev) => ({
       ...prev,
@@ -130,8 +170,11 @@ const SessionPage: React.FC<SessionPageProps> = ({
       },
     }));
   };
- 
-  const updateTranslationSettings = (field: keyof TranslationSettings, value: string) => {
+
+  const updateTranslationSettings = (
+    field: keyof TranslationSettings,
+    value: string
+  ) => {
     setSetupData((prev) => ({
       ...prev,
       translationSettings: {
@@ -140,22 +183,45 @@ const SessionPage: React.FC<SessionPageProps> = ({
       },
     }));
   };
- 
+
   const handleVerifyIdentity = () => {
     if (!setupData.witnessData.fullName) {
       alert("Please enter witness full name.");
       return;
     }
- 
+
     if (!setupData.identityData.referencePhoto) {
       alert("Please upload a reference photo.");
       return;
     }
- 
+
     updateIdentityData("isVerified", true);
     alert("Identity verification completed successfully!");
   };
- 
+
+  const sessionCreationAttempted = React.useRef(false);
+
+  useEffect(() => {
+    const initializeSession = async () => {
+      if (sessionCreationAttempted.current) {
+        return;
+      }
+
+      if (currentCase && !currentSession) {
+        try {
+          sessionCreationAttempted.current = true;
+          const investigator = getInvestigatorName();
+          await createSession(currentCase.caseId, investigator, "witness");
+        } catch (error) {
+          console.error("Failed to create session:", error);
+          sessionCreationAttempted.current = false;
+        }
+      }
+    };
+
+    initializeSession();
+  }, [currentCase, currentSession, createSession, user]);
+
   return (
     <div className="session-page-container">
       <nav className="session-nav">
@@ -165,7 +231,7 @@ const SessionPage: React.FC<SessionPageProps> = ({
               <ArrowLeft className="icon" />
               <span>Back to Home</span>
             </button>
- 
+
             <div className="nav-center">
               <h1 className="app-logo-text">VISION-AI</h1>
               <div className="session-info-header">
@@ -183,8 +249,13 @@ const SessionPage: React.FC<SessionPageProps> = ({
               <p className="investigator-info">
                 Investigator: {currentSessionData.investigator}
               </p>
+              {currentCase && (
+                <p className="case-info">
+                  Case: {currentCase.caseTitle} ({currentCase.caseId})
+                </p>
+              )}
             </div>
- 
+
             <div className="nav-controls">
               <div className="language-controls">
                 <span className="language-label">Language:</span>
@@ -204,7 +275,7 @@ const SessionPage: React.FC<SessionPageProps> = ({
           </div>
         </div>
       </nav>
- 
+
       <div className="main-tabs-container">
         <div className="main-tabs">
           <button
@@ -225,7 +296,7 @@ const SessionPage: React.FC<SessionPageProps> = ({
           </button>
         </div>
       </div>
- 
+
       <div className="session-main-content">
         {activeMainTab === "real-time" ? (
           <RealTimeView
@@ -242,7 +313,7 @@ const SessionPage: React.FC<SessionPageProps> = ({
           <ProcessingView sessionData={currentSessionData} />
         )}
       </div>
- 
+
       {showSummaryModal && (
         <SessionSummaryModal
           sessionData={currentSessionData}
@@ -252,5 +323,5 @@ const SessionPage: React.FC<SessionPageProps> = ({
     </div>
   );
 };
- 
+
 export default SessionPage;
