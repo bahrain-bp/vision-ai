@@ -59,6 +59,7 @@ export interface VerificationRequest {
   personType: PersonType;
   participantName?: string;
   participantCPR?: string;
+  participantNationality?: string;
   attemptNumber?: number;
   manualOverride?: boolean;
   overrideReason?: string;

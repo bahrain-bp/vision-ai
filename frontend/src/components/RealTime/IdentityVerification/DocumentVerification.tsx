@@ -34,6 +34,8 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
   const [manualOverrideReason, setManualOverrideReason] = useState<string>("");
   const [manualParticipantName, setManualParticipantName] =
     useState<string>("");
+  const [manualParticipantNationality, setManualParticipantNationality] =
+    useState<string>("");
   const [manualParticipantCPR, setManualParticipantCPR] = useState<string>("");
   const [showManualOverride, setShowManualOverride] = useState<boolean>(false);
   const [uploadedPhotoPreview, setUploadedPhotoPreview] = useState<
@@ -319,6 +321,14 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
       return;
     }
 
+    if (!manualParticipantNationality.trim()) {
+      setVerificationState((prev) => ({
+        ...prev,
+        error: "Please enter the participant's nationality.",
+      }));
+      return;
+    }
+
     //  Validate CPR format (Bahrain CPR is 9 digits)
     const cprRegex = /^\d{9}$/;
     if (!cprRegex.test(manualParticipantCPR.trim())) {
@@ -394,6 +404,7 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
         overrideReason: manualOverrideReason,
         participantName: manualParticipantName.trim(),
         participantCPR: manualParticipantCPR.trim(),
+        participantNationality: manualParticipantNationality.trim(),
         attemptNumber: verificationAttempts || MAX_VERIFICATION_ATTEMPTS,
       });
 
@@ -511,6 +522,7 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
       setManualOverrideReason("");
       setManualParticipantName("");
       setManualParticipantCPR("");
+      setManualParticipantNationality("");
       setUploadedPhotoPreview(null);
       setComparisonPhotoPreview(null);
       setPreviousDocumentKey(null);
@@ -923,14 +935,14 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
                   {/* Show Manual Override section after 3 attempts */}
                   {showManualOverride && (
                     <div className="manual-override-section">
-                      <div className="override-warning">
-                        <AlertCircle size={20} />
-                        <div>
-                          <p className="font-semibold mb-2">
+                      <div className="override-warning-box">
+                        <AlertCircle size={20} className="warning-icon" />
+                        <div className="warning-content">
+                          <p className="warning-title">
                             Maximum verification attempts (
                             {MAX_VERIFICATION_ATTEMPTS}) reached.
                           </p>
-                          <p className="text-sm">
+                          <p className="warning-description">
                             {verificationState.verificationResult
                               ? "The automated verification has failed. Choose one of the following options to proceed:"
                               : "An error occurred during verification. Choose one of the following options to proceed:"}
@@ -938,21 +950,22 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
                         </div>
                       </div>
 
-                      <div className="mt-4 space-y-4">
-                        <div className="border-2 border-orange-200 rounded-lg p-4 bg-orange-50">
-                          <h4 className="font-semibold text-orange-800 mb-2 flex items-center gap-2">
+                      <div className="override-options-container">
+                        {/* Option 1: Accept with Manual Entry */}
+                        <div className="override-option-card option-accept">
+                          <h4 className="option-title">
                             <CheckCircle size={18} />
                             Option 1: Accept Verification with Manual Entry
                           </h4>
-                          <p className="text-sm text-gray-700 mb-4">
+                          <p className="option-description">
                             If you believe the identity is correct despite the
                             failed automated verification, manually enter the
                             participant's details and provide a detailed reason
                             for approval.
                           </p>
 
-                          <div className="mb-4">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                          <div className="form-field">
+                            <label className="field-label">
                               Participant Full Name *
                             </label>
                             <input
@@ -962,20 +975,17 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
                                 setManualParticipantName(e.target.value)
                               }
                               placeholder="Enter full name as shown on document"
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                              className="field-input"
                               disabled={verificationState.isVerifying}
                             />
                           </div>
 
-                          <div className="mb-4">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                              CPR Number *
-                            </label>
+                          <div className="form-field">
+                            <label className="field-label">CPR Number *</label>
                             <input
                               type="text"
                               value={manualParticipantCPR}
                               onChange={(e) => {
-                                // Only allow digits and limit to 9 characters
                                 const value = e.target.value
                                   .replace(/\D/g, "")
                                   .slice(0, 9);
@@ -983,16 +993,28 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
                               }}
                               placeholder="Enter 9-digit CPR number"
                               maxLength={9}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                              className="field-input"
                               disabled={verificationState.isVerifying}
                             />
-                            <p className="text-xs text-gray-500 mt-1">
-                              9 digits only
-                            </p>
+                            <p className="field-hint">9 digits only</p>
                           </div>
 
-                          <div className="mb-4">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                          <div className="form-field">
+                            <label className="field-label">Nationality *</label>
+                            <input
+                              type="text"
+                              value={manualParticipantNationality}
+                              onChange={(e) =>
+                                setManualParticipantNationality(e.target.value)
+                              }
+                              placeholder="Enter nationality (e.g., Bahraini, Indian, etc.)"
+                              className="field-input"
+                              disabled={verificationState.isVerifying}
+                            />
+                          </div>
+
+                          <div className="form-field">
+                            <label className="field-label">
                               Reason for Manual Override *
                             </label>
                             <textarea
@@ -1001,7 +1023,7 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
                                 setManualOverrideReason(e.target.value)
                               }
                               placeholder="Enter detailed reason for manual approval (e.g., 'Photo quality issues due to lighting but identity confirmed through additional documentation', 'Technical difficulties with facial recognition but documents are authentic and verified manually')..."
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                              className="field-textarea"
                               rows={4}
                               disabled={verificationState.isVerifying}
                             />
@@ -1009,18 +1031,19 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
 
                           <button
                             onClick={handleManualOverride}
-                            className="btn-warning w-full mt-3"
+                            className="btn-accept-override"
                             type="button"
                             disabled={
                               !manualOverrideReason.trim() ||
                               !manualParticipantName.trim() ||
                               !manualParticipantCPR.trim() ||
+                              !manualParticipantNationality.trim() ||
                               verificationState.isVerifying
                             }
                           >
                             {verificationState.isVerifying ? (
                               <>
-                                <Loader2 size={18} className="animate-spin" />
+                                <Loader2 size={18} className="spinner-icon" />
                                 Processing Manual Approval...
                               </>
                             ) : (
@@ -1031,13 +1054,14 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
                             )}
                           </button>
                         </div>
+
                         {/* Option 2: End Session */}
-                        <div className="border-2 border-red-200 rounded-lg p-4 bg-red-50">
-                          <h4 className="font-semibold text-red-800 mb-2 flex items-center gap-2">
+                        <div className="override-option-card option-end">
+                          <h4 className="option-title">
                             <XCircle size={18} />
                             Option 2: End This Session
                           </h4>
-                          <p className="text-sm text-gray-700 mb-3">
+                          <p className="option-description">
                             If you cannot verify the identity or believe the
                             verification has failed legitimately, you can end
                             this session. All data will be reset.
@@ -1045,7 +1069,7 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
 
                           <button
                             onClick={handleEndSession}
-                            className="btn-danger w-full"
+                            className="btn-end-session"
                             type="button"
                             disabled={verificationState.isVerifying}
                           >
