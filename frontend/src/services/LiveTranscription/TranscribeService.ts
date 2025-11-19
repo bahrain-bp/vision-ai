@@ -98,7 +98,7 @@ class TranscribeService {
 
   private getAudioStream = async function* (
     microphoneStream: MicrophoneStream,
-    sampleRate: Number
+    sampleRate: number
   ) {
     const encodePCMChunk = (chunk: any) => {
       const input = MicrophoneStream.toRaw(chunk);
