@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from "react";
 import { FileText, Copy, Loader } from "lucide-react";
 import { useTranscription } from "../../hooks/useTranscription";
-import { RecordingStatus, TranscriptionResult } from "../../types/";
+import { RecordingStatus } from "../../types/";
 import PDFExporter from "./PDFExporter";
 import { useState } from "react";
 
@@ -16,12 +16,9 @@ const LiveTranscription: React.FC<LiveTranscriptionProps> = ({
   setSessionState,
   selectedLanguage,
 }) => {
-  const { audioStatus, recordingStatus, startRecording } =
+  const { audioStatus, recordingStatus, startRecording, getFullTranscript } =
     useTranscription();
 
-  const [liveTranscript, setLiveTranscript] =
-    useState<TranscriptionResult | null>(null);
-  const [fullTranscript, setFullTranscript] = useState<string>("");
   const [isStarting, setIsStarting] = useState(false);
   const hasStarted = useRef(false);
 
@@ -39,9 +36,6 @@ const LiveTranscription: React.FC<LiveTranscriptionProps> = ({
         try {
           const success = await startRecording(
             setSessionState,
-            (text: TranscriptionResult) => {
-              setLiveTranscript(text);
-            },
             selectedLanguage
           );
 
@@ -61,11 +55,6 @@ const LiveTranscription: React.FC<LiveTranscriptionProps> = ({
     }
   }, [startRecordingProp, recordingStatus, selectedLanguage]);
 
-  useEffect(() => {
-    if (liveTranscript?.formattedTranscript) {
-      setFullTranscript((prev) => prev + liveTranscript.formattedTranscript);
-    }
-  }, [liveTranscript]);
 
 if (isStarting) {
   return (
@@ -100,7 +89,7 @@ if (isStarting) {
         </div>
       </div>
       <textarea
-        value={fullTranscript}
+        value={getFullTranscript}
         readOnly
         placeholder="Transcript will appear here..."
         style={{
@@ -113,20 +102,16 @@ if (isStarting) {
           borderRadius: "4px",
           resize: "vertical",
           whiteSpace: "pre-wrap",
+          overflow: "auto",
         }}
       />
 
       <div className="action-buttons">
-        <button
-          className="action-btn"
-          //onClick={() => stopRecording(setSessionState)}
-        >
-          <PDFExporter
-            transcript={fullTranscript}
-            title={"Investigation Transcript"}
-            fileName={"Transcript"}
-          />
-        </button>
+        <PDFExporter
+          transcript={getFullTranscript}
+          title={"Investigation Transcript"}
+          fileName={"Transcript"}
+        />
         <button className="action-btn">
           <Copy className="btn-icon" />
           <span>Copy All</span>
