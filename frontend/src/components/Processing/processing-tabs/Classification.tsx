@@ -20,29 +20,31 @@ const Classification: React.FC = () => {
       alert("Please choose a document first!");
       return;
     }
-
-    // 1. request for presigned URL
-    const uploedRes = await get_upload_url(file);
-    const uploadUrl = uploedRes.uploadUrl;
-
-    // 2. Upload file to S3
-    uploadToS3(uploadUrl, file);
-    
-    setText(`document stored in s3`);
-    const detectedCategory = "Violation"; // sample
-    setCategory(detectedCategory);
-  };
-
-  const get_upload_url = async (file : File):Promise<{ uploadUrl: any; key: any }> => {
-
     //get upload url
     const apiEndpoint =
       process.env.REACT_APP_API_ENDPOINT ||
       `${window.location.origin.replace("localhost", "localhost").split(":")[0]}://${window.location.hostname}:3000`;
     
+    // 1. Request for presigned URL
+    const uploadRes = await get_upload_url(file, apiEndpoint);
+    const uploadUrl = uploadRes.uploadUrl;
+    const key = uploadRes.key;
+
+    // 2. Upload file to S3
+    uploadToS3(uploadUrl, file);
+
+    //3. Extract the text
+    const extractedText= await extract(key, apiEndpoint);
+    setText(extractedText);
+    const detectedCategory = "Violation"; // sample
+    setCategory(detectedCategory);
+  };
+
+  const get_upload_url = async (file : File, apiEndpoint : string) => {
+
+    
     //send a POST request
     const res = await fetch(
-          
       `${apiEndpoint}"/classification/uploads"`,
       {
       method: "POST",
@@ -65,19 +67,37 @@ const Classification: React.FC = () => {
     return response;
   }
 
-const uploadToS3 = async (uploadUrl: string, file: File) => {
-  const res = await fetch(uploadUrl, {
-    method: "PUT",
-    headers: {
-      "Content-Type": file.type
-    },
-    body: file
-  });
+  const uploadToS3 = async (uploadUrl: string, file: File) => {
+    const res = await fetch(uploadUrl, {
+      method: "PUT",
+      headers: {
+        "Content-Type": file.type
+      },
+      body: file
+    });
 
-  if (!res.ok) {
-    throw new Error("S3 upload failed");
+    if (!res.ok) {
+      throw new Error("S3 upload failed");
+    }
+  };
+
+  const extract = async (key : string, apiEndpoint : string) => {
+      const extract_res = await fetch(`${apiEndpoint}/extract`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ key }), //must match body["key"] in Lambda
+    });
+
+    if (!extract_res.ok) {
+      const errorText = await extract_res.text();
+      throw new Error(`Extract failed: ${extract_res.status} - ${errorText}`);
+    }
+
+    const data = await extract_res.json() as { extracted_text: string };
+    return data.extracted_text;
   }
-};
 
 
   const handleSave = () => {

@@ -41,10 +41,19 @@ class classificationStack(Stack):
         lambda_role.add_to_policy(iam.PolicyStatement(
             actions=[
                 "s3:GetObject",
-                "s3:PutObject"
+                "s3:PutObject",
             ],
             resources=[f"{investigation_bucket.bucket_arn}/*"]
         ))
+
+        lambda_role.add_to_policy(iam.PolicyStatement(
+            effect=iam.Effect.ALLOW,
+            actions=[
+            "bedrock:Converse",
+        ],
+        resources=["*"],  
+    )
+        )
 
         get_upload_url_lambda = _lambda.Function(
             self, "GetUploadUrlFunction",
@@ -52,21 +61,60 @@ class classificationStack(Stack):
             handler="classification_upload_url.handler",
             code=_lambda.Code.from_asset("lambda/classification"),
             role=lambda_role,
-            timeout=Duration.seconds(30),
+            timeout=Duration.seconds(60),
             environment={"BUCKET_NAME": investigation_bucket.bucket_name},
             description="Generate presigned URL for document uploads"
         )
+
+        #Lambda #2: extract text using Bedrock Nova Lite
+        extract_text_lambda = _lambda.Function(
+            self,
+            "ExtractTextLambda",
+            runtime=_lambda.Runtime.PYTHON_3_12,
+            handler="extract_text.handler",       
+            code=_lambda.Code.from_asset("lambda/classification"),
+            role=lambda_role, 
+            timeout=Duration.seconds(60),
+            environment={
+                "BUCKET_NAME": investigation_bucket.bucket_name,
+                "BEDROCK_REGION": "us-east-1",             
+                "NOVA_MODEL_ID": "amazon.nova-lite-v1:0",  
+            },
+        )
+
+        # Allow lambda to read uploaded files from S3
+        investigation_bucket.grant_read(extract_text_lambda)
+
+        # Allow lambda to call Bedrock Nova Lite
+        extract_text_lambda.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "bedrock:Converse",
+                ],
+                resources=["*"],  
+            )
+        )
+
 
         # === Add routes to shaed API ===
         # /classification
         classification_resource = shared_api.root.add_resource("classification")
 
-        #1- /classification/uploads
-        upload_resource= classification_resource.add_resource("uploads")
+        #1- /classification/upload
+        upload_resource= classification_resource.add_resource("upload")
 
         upload_resource.add_method(
             "POST",
             apigateway.LambdaIntegration(get_upload_url_lambda)
+        )
+
+        #2- for text extraction /classification/exreact
+        extract_resource= classification_resource.add_resource("extract")
+
+        extract_resource.add_method(
+            "POST",
+            apigateway.LambdaIntegration(extract_text_lambda),
         )
 
         

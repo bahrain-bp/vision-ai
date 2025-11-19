@@ -10,6 +10,7 @@ from vision_ai.identity_verification_stack import IdentityVerificationStack
 from vision_ai.advanced_analysis_stack import AdvancedAnalysisStack
 from vision_ai.rewrite_stack import RewriteStack
 from vision_ai.api_deployment_stack import APIDeploymentStack
+from vision_ai.classification_stack import classificationStack
 
 load_dotenv()
 app = cdk.App()
@@ -114,7 +115,21 @@ rewrite_stack = RewriteStack(
 rewrite_stack.add_dependency(shared_stack)
 
 # ==========================================
-# 6. API DEPLOYMENT STACK
+# 6. Classification STACK
+# extract text from document and classify the case
+# ==========================================
+classification_stack = classificationStack(
+    app, f"{app_name}-classification-stack", env=env,
+    investigation_bucket=shared_stack.investigation_bucket,
+    shared_api_id=shared_stack.shared_api.rest_api_id,
+    shared_api_root_resource_id=shared_stack.shared_api.rest_api_root_resource_id,
+    description="Classification Stack: Document upload to extract text and classifi"
+)
+# Ensure classification stack depends on shared stack
+classification_stack.add_dependency(shared_stack)
+
+# ==========================================
+# 7. API DEPLOYMENT STACK
 # Deploys API after all routes are added
 # ==========================================
 deployment_stack = APIDeploymentStack(
