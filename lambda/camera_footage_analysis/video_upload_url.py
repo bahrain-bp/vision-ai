@@ -16,15 +16,12 @@ BUCKET_NAME = os.environ.get('BUCKET_NAME')
 # sessionID validation helper function
 def is_valid_session_id(session_id):
     """
-    Valid sessionId example: 2024-INV-0042
-    Format: YYYY-INV-XXXX
+    Valid sessionId example: session-20251119134654-450ca997
+    Format: session-YYYYMMDDHHMMSS-XXXXXXXX
     """
-    pattern = r'^\d{4}-INV-\d{4}$'
+    pattern = r'^session-\d{14}-[a-fA-F0-9]{8}$'
     return bool(re.match(pattern, session_id))
 
-def sanitize_session_id(session_id):
-    # remove any invalid characters (e.g., #)
-    return re.sub(r"[^a-zA-Z0-9-]", "", session_id)
 
 def handler(event, context):
     """
@@ -32,7 +29,7 @@ def handler(event, context):
     
     POST /footage/upload-url
     Body: {
-        "sessionId": "2024-INV-0042",
+        "sessionId": "session-20251119134654-450ca997",
         "fileName": "surveillance_video.mp4"
     }
     """
@@ -49,9 +46,7 @@ def handler(event, context):
         # validate field inputs
         if not session_id or not file_name:
             return error_response(400, 'sessionId and fileName are required')
-        
-        # sanitize sessionId
-        session_id = sanitize_session_id(session_id)
+    
         
         # validate sessionId format 
         if not is_valid_session_id(session_id):

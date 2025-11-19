@@ -9,17 +9,37 @@ interface CameraFootageProps {
 interface Event {
   id: string;
   timestamp: number;
+  start_millis?: number;
+  end_millis?: number;
+  duration_seconds?: number;
   description: string;
-  confidence: number;
-  type: "person" | "vehicle" | "object" | "activity";
-  bbox?: { x: number; y: number; width: number; height: number };
+  confidence?: number;
+  type: string;
+}
+
+interface OCRLine {
+  text: string;
+  confidence?: number;
+  bounding_box?: any;
+}
+
+interface OCREntry {
+  frame_index?: number;
+  timestamp: number;
+  timecode_smpte?: string;
+  lines: OCRLine[];
 }
 
 interface AnalysisResult {
   events: Event[];
   summary: string;
-  duration: number;
-  processedAt: Date;
+  ocr?: OCREntry[];
+  metadata?: {
+    duration_seconds: number;
+    frame_rate?: number;
+    format?: string;
+  };
+  processedAt?: Date;
 }
 
 const CameraFootage: React.FC<CameraFootageProps> = ({
@@ -35,6 +55,8 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
   );
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [videoS3Key, setVideoS3Key] = useState<string>("");
+  const [jobId, setJobId] = useState<string>("");
+  const [pollingStatus, setPollingStatus] = useState<string>("");
 
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -52,11 +74,10 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
 
     let sessionId = _sessionData?.sessionId || "unknown";
 
-    // Validate sessionId
     if (!isValidSessionId(sessionId)) {
       console.error("Invalid sessionId format");
       alert(
-        `Invalid sessionId format: ${sessionId}. Expected format:  session-YYYYMMDDHHMMSS-XXXXXXXX`
+        `Invalid sessionId format: ${sessionId}. Expected format: session-YYYYMMDDHHMMSS-XXXXXXXX`
       );
       return;
     }
@@ -65,7 +86,7 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
     setUploadError(null);
 
     try {
-      // Step 1: Get presigned URL from Lambda
+      // Step 1: Get presigned URL
       const uploadUrlResponse = await fetch(
         `${process.env.REACT_APP_API_ENDPOINT}/footage/upload-url`,
         {
@@ -78,8 +99,6 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
         }
       );
 
-      console.log("Session Data:", _sessionData);
-
       if (!uploadUrlResponse.ok) {
         const error = await uploadUrlResponse.json();
         throw new Error(error.error || "Failed to get upload URL");
@@ -88,7 +107,7 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
       const uploadData = await uploadUrlResponse.json();
       console.log("Presigned URL received:", uploadData);
 
-      // Step 2: Upload file to S3 using presigned URL
+      // Step 2: Upload to S3
       const s3UploadResponse = await fetch(uploadData.uploadUrl, {
         method: "PUT",
         body: file,
@@ -101,7 +120,7 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
         throw new Error("Failed to upload video to S3");
       }
 
-      // Step 3: Success - update state
+      // Step 3: Success
       setVideoFile(file);
       setVideoS3Key(uploadData.s3Key);
       const url = URL.createObjectURL(file);
@@ -115,9 +134,70 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
     }
   };
 
+  // Poll for analysis results
+  const pollForResults = async (jobId: string, maxAttempts: number = 30) => {
+    let attempts = 0;
+
+    const poll = async () => {
+      attempts++;
+      setPollingStatus(`Checking results... (${attempts}/${maxAttempts})`);
+
+      try {
+        const response = await fetch(
+          `${process.env.REACT_APP_API_ENDPOINT}/footage/results?jobId=${jobId}`,
+          {
+            method: "GET",
+            headers: { "Content-Type": "application/json" },
+          }
+        );
+
+        if (response.ok) {
+          const result = await response.json();
+          console.log("Analysis results received:", result);
+
+          setAnalysisResult({
+            summary: result.summary || "No summary available",
+            events: result.events || [],
+            ocr: result.ocr || [],
+            metadata: result.metadata,
+            processedAt: new Date(),
+          });
+          setIsAnalyzing(false);
+          setPollingStatus("Analysis complete!");
+          return;
+        } else if (response.status === 404) {
+          // Results not ready yet
+          if (attempts < maxAttempts) {
+            setTimeout(poll, 10000); // Poll every 10 seconds
+          } else {
+            throw new Error("Analysis timeout - results not available");
+          }
+        } else {
+          throw new Error("Failed to fetch results");
+        }
+      } catch (error: any) {
+        console.error("Polling error:", error);
+        if (attempts < maxAttempts) {
+          setTimeout(poll, 10000);
+        } else {
+          setIsAnalyzing(false);
+          setPollingStatus("Failed to get results");
+          setAnalysisResult({
+            summary: error.message || "Analysis failed",
+            events: [],
+            processedAt: new Date(),
+          });
+        }
+      }
+    };
+
+    poll();
+  };
+
   const startAnalysis = async () => {
     setIsAnalyzing(true);
     setAnalysisResult(null);
+    setPollingStatus("Starting analysis...");
 
     try {
       const sessionId = _sessionData?.sessionId || "unknown";
@@ -140,21 +220,28 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
         throw new Error(result.error || "Analysis request failed");
       }
 
-      setAnalysisResult({
-        summary: result.message || "Analysis job triggered.",
-        events: result.events || [],
-        duration: result.duration || 0,
-        processedAt: new Date(),
-      });
+      console.log("Analysis job started:", result);
+      const extractedJobId =
+        result.jobId || result.invocationArn?.split("/").pop();
+      setJobId(extractedJobId);
+      console.log("Job ID set:", jobId);
+
+      // Start polling for results
+      if (extractedJobId) {
+        setPollingStatus("Analysis in progress...");
+        pollForResults(extractedJobId);
+      } else {
+        throw new Error("No job ID returned from analysis");
+      }
     } catch (error: any) {
+      console.error("Analysis error:", error);
+      setIsAnalyzing(false);
+      setPollingStatus("");
       setAnalysisResult({
         summary: error.message || "Analysis failed",
         events: [],
-        duration: 0,
         processedAt: new Date(),
       });
-    } finally {
-      setIsAnalyzing(false);
     }
   };
 
@@ -176,9 +263,12 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
       .padStart(2, "0")}`;
   };
 
-  // Get video duration from the video element or use mock data
   const getVideoDuration = (): number => {
-    return videoRef.current?.duration || 0;
+    return (
+      analysisResult?.metadata?.duration_seconds ||
+      videoRef.current?.duration ||
+      0
+    );
   };
 
   return (
@@ -188,7 +278,6 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
         *Upload and analyze surveillance footage for evidence extraction
       </p>
 
-      {/* Error display*/}
       {uploadError && (
         <div
           style={{
@@ -203,6 +292,20 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
         </div>
       )}
 
+      {pollingStatus && isAnalyzing && (
+        <div
+          style={{
+            color: "#0066cc",
+            backgroundColor: "#e6f2ff",
+            padding: "10px",
+            borderRadius: "4px",
+            marginBottom: "10px",
+          }}
+        >
+          {pollingStatus}
+        </div>
+      )}
+
       <div className="camera-footage-container">
         {/* Video Upload & Player Section */}
         <div className="tab-section">
@@ -211,7 +314,6 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
             {!videoUrl ? (
               /* Upload Section */
               <div className="video-upload-area">
-                {/* Hidden File Input */}
                 <input
                   type="file"
                   accept="video/*"
@@ -220,7 +322,6 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
                   id="video-upload"
                   disabled={isUploading}
                 />
-
                 {/* Label for File Input */}
                 <label htmlFor="video-upload" className="upload-label">
                   <div className="upload-content">
@@ -231,7 +332,6 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
                     </div>
                   </div>
                 </label>
-
                 {/* Upload Button */}
                 <button
                   type="button"
@@ -264,7 +364,6 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
                     Your browser does not support the video tag.
                   </video>
                 </div>
-
                 {/* Video Controls */}
                 <div className="video-controls">
                   <div className="video-info">
@@ -290,7 +389,6 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
           </div>
         </div>
 
-        {/* Analysis Results Section */}
         <div className="tab-section">
           <div className="tab-section-title">Analysis Results</div>
           <div className="tab-section-content">
@@ -301,7 +399,6 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
                   <h4 className="summary-title">Summary</h4>
                   <p className="summary-text">{analysisResult.summary}</p>
                 </div>
-
                 {/* Events Timeline */}
                 <div className="events-timeline">
                   <h4 className="events-title">
@@ -328,15 +425,16 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
                           </span>
                         </div>
                         <p className="event-description">{event.description}</p>
-                        <div className="event-confidence">
-                          Confidence: {Math.round(event.confidence * 100)}%
-                        </div>
+                        {event.confidence && (
+                          <div className="event-confidence">
+                            Confidence: {Math.round(event.confidence * 100)}%
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
                 </div>
 
-                {/* Export Actions */}
                 <div className="export-actions">
                   <button className="continue-btn">Export Report</button>
                   <button className="continue-btn secondary">

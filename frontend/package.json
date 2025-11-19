@@ -7,10 +7,8 @@
     "@aws-sdk/credential-providers": "^3.922.0",
     "aws-amplify": "^6.15.7",
     "axios": "^1.13.2",
-
     "buffer": "^6.0.3",
     "jspdf": "^3.0.3",
-
     "lucide-react": "^0.548.0",
     "microphone-stream": "^6.0.1",
     "process": "^0.11.10",
@@ -25,6 +23,7 @@
     "@testing-library/jest-dom": "^5.17.0",
     "@testing-library/react": "^13.4.0",
     "@testing-library/user-event": "^14.5.1",
+    "@types/axios": "^0.9.36",
     "@types/jest": "^27.5.2",
     "@types/node": "^20.0.0",
     "@types/react": "^18.3.26",
