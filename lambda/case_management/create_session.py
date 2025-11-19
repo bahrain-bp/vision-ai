@@ -50,7 +50,7 @@ def handler(event, context):
             'primaryPerson': {
                 'cprNumber': '',
                 'personName': '',
-                'personType': person_type,
+                'personType': '',
                 'nationality': ''
             },
             'verifications': []
