@@ -6,8 +6,8 @@ import "../../ProcessingView.css";
 import Classification from "./processing-tabs/Classification";
 import Rewrite from "./processing-tabs/Rewrite";
 import CameraFootage from "./processing-tabs/CameraFootage";
-import AISuggestions from "./processing-tabs/AISuggestions";
-import Contradictions from "./processing-tabs/Contradictions";
+import AISuggestions from "./processing-tabs/AISuggestions/AISuggestions";
+import Contradictions from "./processing-tabs/Contradiction/Contradictions";
 import Outcome from "./processing-tabs/Outcome";
 
 export interface SessionData {
@@ -25,9 +25,9 @@ interface ProcessingViewProps {
 }
 
 interface Tab {
-  id: string; 
+  id: string;
   label: string;
-  component: React.ComponentType<{ sessionData: SessionData}>;
+  render: () => JSX.Element;
 }
 
 
@@ -37,15 +37,37 @@ const ProcessingView: React.FC<ProcessingViewProps> = ({ sessionData }) => {
 
 
   const tabs: Tab[] = [
-    {id: "Classification", label:"Classification", component:Classification},
-    {id: "Rewrite", label:"Rewrite", component:Rewrite}, 
-    {id: "CameraFootage", label:"Camera Footage", component:CameraFootage},
-    {id: "AISuggestions", label:"AI Suggestions", component:AISuggestions},
-    {id: "Contradictions", label:"Contradictions", component:Contradictions},
-    {id: "Outcome", label:"Outcome", component:Outcome }
-
-
-  ]; 
+    {
+      id: "Classification",
+      label: "Classification",
+      render: () => <Classification />,
+    },
+    {
+      id: "Rewrite",
+      label: "Rewrite",
+      render: () => <Rewrite sessionData={sessionData} />,
+    },
+    {
+      id: "CameraFootage",
+      label: "Camera Footage",
+      render: () => <CameraFootage />,
+    },
+    {
+      id: "AISuggestions",
+      label: "AI Suggestions",
+      render: () => <AISuggestions sessionData={sessionData} />,
+    },
+    {
+      id: "Contradictions",
+      label: "Contradictions",
+      render: () => <Contradictions />,
+    },
+    {
+      id: "Outcome",
+      label: "Outcome",
+      render: () => <Outcome />,
+    },
+  ];
    
   // logic of the cont button could be changed later when theres actual backend processing  
   const handleContinue = (): void => {
@@ -74,10 +96,12 @@ const ProcessingView: React.FC<ProcessingViewProps> = ({ sessionData }) => {
       );
     }
     
-    const ActiveComponent = tabs.find(tab => tab.id === activeTab)?.component;
-    return ActiveComponent ? <ActiveComponent sessionData={sessionData} /> : null;
+    const activeTabConfig = tabs.find((tab) => tab.id === activeTab);
+    return activeTabConfig ? activeTabConfig.render() : null;
   };
   
+  const isAISuggestionsActive = !isProcessing && activeTab === "AISuggestions";
+
   // dynamic tab render 
   return (
     <div className="processing-view">
@@ -95,7 +119,7 @@ const ProcessingView: React.FC<ProcessingViewProps> = ({ sessionData }) => {
         ))}
       </div>
 
-      <div className="tab-content">
+      <div className={`tab-content ${isAISuggestionsActive ? "ai-tab-content" : ""}`}>
         {renderTabContent()}
       </div>
     </div>

@@ -3,14 +3,13 @@ from aws_cdk import (
     aws_s3 as s3,
     aws_apigateway as apigateway,
     RemovalPolicy,
-    Duration,
     CfnOutput,
 )
 from constructs import Construct
 
 class SharedInfrastructureStack(Stack):
     """
-    Shared Infrastructure Stack - Contains ONLY truly shared resources
+    Shared Infrastructure Stack - Contains ONLY shared resources
     """
     
     def __init__(self, scope: Construct, construct_id: str, env, **kwargs) -> None: 
@@ -21,18 +20,10 @@ class SharedInfrastructureStack(Stack):
         # ==========================================
         self.investigation_bucket = s3.Bucket(
             self, "InvestigationBucket",
-            bucket_name="vision-rt-investigation-system",  
+            bucket_name=f"vision-investigation-system-{self.account}",  
             versioned=True,
             encryption=s3.BucketEncryption.S3_MANAGED,
             removal_policy=RemovalPolicy.RETAIN,
-            lifecycle_rules=[
-                s3.LifecycleRule(
-                    id="DeleteUnprocessedUploads",
-                    prefix="*/uploaded/",
-                    expiration=Duration.days(7),
-                    enabled=True
-                )
-            ],
             cors=[s3.CorsRule(
                 allowed_methods=[
                     s3.HttpMethods.GET,
@@ -55,7 +46,7 @@ class SharedInfrastructureStack(Stack):
             rest_api_name="Vision AI Shared API",
             description="Shared API Gateway for ALL Vision AI features",
             binary_media_types=['image/jpeg', 'image/png', 'application/octet-stream'],
-            deploy=False,  
+            deploy=False,  # Deployed separately in APIDeploymentStack
             default_cors_preflight_options=apigateway.CorsOptions(
                 allow_origins=apigateway.Cors.ALL_ORIGINS,
                 allow_methods=apigateway.Cors.ALL_METHODS,
@@ -81,8 +72,22 @@ class SharedInfrastructureStack(Stack):
         )
         
         CfnOutput(
+            self, "BucketArn",
+            value=self.investigation_bucket.bucket_arn,
+            description="Investigation system S3 bucket ARN",
+            export_name="InvestigationBucketArn"
+        )
+        
+        CfnOutput(
             self, "SharedAPIId",
             value=self.shared_api.rest_api_id,
             description="Shared API Gateway ID for ALL teams",
             export_name="VisionAISharedAPIId"
+        )
+        
+        CfnOutput(
+            self, "SharedAPIRootResourceId",
+            value=self.shared_api.rest_api_root_resource_id,
+            description="Shared API Gateway root resource ID",
+            export_name="VisionAISharedAPIRootResourceId"
         )

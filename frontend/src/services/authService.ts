@@ -10,6 +10,13 @@ import {
   confirmResetPassword,
 } from "aws-amplify/auth";
 
+interface AWSCredentials {
+  accessKeyId: string;
+  secretAccessKey: string;
+  sessionToken?: string;
+  expiration?: Date;
+}
+
 interface AuthResult {
   success: boolean;
   message?: string;
@@ -17,6 +24,8 @@ interface AuthResult {
   isSignedIn?: boolean;
   userId?: string;
   nextStep?: any;
+  idToken?: string;
+  credentials?: AWSCredentials;
   user?: any;
   session?: any;
   requiresConfirmation?: boolean;
@@ -117,15 +126,59 @@ export async function signInUser(
       };
     }
 
+    if (isSignedIn) {
+      try {
+        const session = await fetchAuthSession();
+        const idToken = session.tokens?.idToken?.toString();
+        const credentials = session.credentials;
+
+        return {
+          success: true,
+          isSignedIn,
+          nextStep,
+          idToken,
+          credentials,
+          message: "Sign in successful!",
+        };
+      } catch (sessionError) {
+        console.error("Error fetching session:", sessionError);
+        return {
+          success: true,
+          isSignedIn,
+          nextStep,
+          message: "Sign in successful!",
+        };
+      }
+    }
+
     return {
-      success: true,
-      isSignedIn,
-      nextStep,
-      message: "Sign in successful!",
+      success: false,
+      message: "Incorrect username or password.",
     };
+
   } catch (error: any) {
     console.error("Sign in error:", error);
     throw handleAuthError(error);
+  }
+}
+
+/**
+ * get user credentials
+ */
+export async function getUserCredentials(){
+  try {
+    const session = await fetchAuthSession();
+
+    return {
+      credentials: session.credentials,
+      // Tokens from User Pool
+      secretAccessKey: session.credentials?.secretAccessKey,
+      idToken: session.tokens?.idToken?.toString(),
+      accessToken: session.tokens?.accessToken?.toString(),
+    };
+  } catch (error) {
+    console.error("Error fetching credentials:", error);
+    throw error;
   }
 }
 
