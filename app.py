@@ -5,6 +5,8 @@ import aws_cdk as cdk
 from vision_ai.cognito_stack import CognitoStack
 from vision_ai.shared_infrastructure_stack import SharedInfrastructureStack
 from vision_ai.identity_verification_stack import IdentityVerificationStack
+from vision_ai.advanced_analysis_stack import AdvancedAnalysisStack
+from vision_ai.rewrite_stack import RewriteStack
 from vision_ai.api_deployment_stack import APIDeploymentStack
 
 load_dotenv()
@@ -52,7 +54,37 @@ identity_stack = IdentityVerificationStack(
 identity_stack.add_dependency(shared_stack)
 
 # ==========================================
-# 4. API DEPLOYMENT STACK
+# 4. ADVANCED ANALYSIS STACK
+# AI Suggested Questions feature
+# ==========================================
+advanced_analysis_stack = AdvancedAnalysisStack(
+    app, f"{app_name}-advanced-analysis-stack", env=env,
+    investigation_bucket=shared_stack.investigation_bucket,
+    shared_api_id=shared_stack.shared_api.rest_api_id,
+    shared_api_root_resource_id=shared_stack.shared_api.rest_api_root_resource_id,
+    description="Advanced Analysis: AI suggested questions and analysis"
+)
+
+# Ensure advanced analysis stack depends on shared stack
+advanced_analysis_stack.add_dependency(shared_stack)
+
+# ==========================================
+# 5. REWRITE STACK
+# Document rewriting with AWS Bedrock
+# ==========================================
+rewrite_stack = RewriteStack(
+    app, f"{app_name}-rewrite-stack", env=env,
+    investigation_bucket=shared_stack.investigation_bucket,
+    shared_api_id=shared_stack.shared_api.rest_api_id,
+    shared_api_root_resource_id=shared_stack.shared_api.rest_api_root_resource_id,
+    description="Rewrite Stack: Document rewriting using AWS Bedrock Nova Lite"
+)
+
+# Ensure rewrite stack depends on shared stack
+rewrite_stack.add_dependency(shared_stack)
+
+# ==========================================
+# 6. API DEPLOYMENT STACK
 # Deploys API after all routes are added
 # ==========================================
 deployment_stack = APIDeploymentStack(
@@ -62,8 +94,10 @@ deployment_stack = APIDeploymentStack(
     description="API Gateway deployment with CloudWatch logging enabled"
 )
 
-# Ensure deployment happens after identity stack
+# Ensure deployment happens after all feature stacks
 deployment_stack.add_dependency(identity_stack)
+deployment_stack.add_dependency(advanced_analysis_stack)
+deployment_stack.add_dependency(rewrite_stack)
 
 # Add tags
 cdk.Tags.of(app).add("Project", "VisionAI")
