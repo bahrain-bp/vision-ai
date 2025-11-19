@@ -1,3 +1,4 @@
+import datetime
 import json
 import uuid
 import boto3
@@ -16,7 +17,8 @@ def handler(event, context):
         
         #Generate unique s3 key
         unique_id = str(uuid.uuid4())
-        unique_key = f"classification/uploads/{unique_id}_{file_name}"
+        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        unique_key = f"classification/upload/{unique_id}_{timestamp}_{file_name}"
 
         url = s3.generate_presigned_url(
             'put_object',
@@ -25,7 +27,7 @@ def handler(event, context):
                 'Key': unique_key,
                 'ContentType': file_type
             },
-            ExpiresIn=900
+            ExpiresIn=900 #30 minuts
         )
 
         return {
@@ -34,7 +36,9 @@ def handler(event, context):
             "body": json.dumps({
                 "uploadUrl": url,
                 "key": unique_key,
-                })
+                "sucess": True,
+                "expireIn": 900
+            })
         }
 
     except Exception as e:
@@ -42,3 +46,4 @@ def handler(event, context):
             "statusCode": 500,
             "body": json.dumps({"error": str(e)})
         }
+

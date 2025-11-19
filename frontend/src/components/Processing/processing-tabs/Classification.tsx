@@ -14,15 +14,71 @@ const Classification: React.FC = () => {
     }
   };
 
-  const handleExtract = () => {
+
+  const handleExtract = async () => {
     if (!file) {
       alert("Please choose a document first!");
       return;
     }
-    setText(`✅ Text successfully extracted from: ${file.name}`);
+
+    // 1. request for presigned URL
+    const uploedRes = await get_upload_url(file);
+    const uploadUrl = uploedRes.uploadUrl;
+
+    // 2. Upload file to S3
+    uploadToS3(uploadUrl, file);
+    
+    setText(`document stored in s3`);
     const detectedCategory = "Violation"; // sample
     setCategory(detectedCategory);
   };
+
+  const get_upload_url = async (file : File):Promise<{ uploadUrl: any; key: any }> => {
+
+    //get upload url
+    const apiEndpoint =
+      process.env.REACT_APP_API_ENDPOINT ||
+      `${window.location.origin.replace("localhost", "localhost").split(":")[0]}://${window.location.hostname}:3000`;
+    
+    //send a POST request
+    const res = await fetch(
+          
+      `${apiEndpoint}"/classification/uploads"`,
+      {
+      method: "POST",
+        headers: {
+        "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+        fileName: file.name,
+        contentType: file.type
+        })
+      }
+    );
+    
+    if (!res.ok) {
+      throw new Error("Failed to get upload URL");
+    }
+    
+    //Parse respone
+    const response = await res.json();
+    return response;
+  }
+
+const uploadToS3 = async (uploadUrl: string, file: File) => {
+  const res = await fetch(uploadUrl, {
+    method: "PUT",
+    headers: {
+      "Content-Type": file.type
+    },
+    body: file
+  });
+
+  if (!res.ok) {
+    throw new Error("S3 upload failed");
+  }
+};
+
 
   const handleSave = () => {
     if (!text) {
