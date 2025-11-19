@@ -4,13 +4,7 @@ import React, {
   useRef,
   useState,
 } from "react";
-import {
-  Sparkles,
-  AlertCircle,
-  MessageSquare,
-  Radar,
-  ChevronDown,
-} from "lucide-react";
+import { Sparkles, AlertCircle, ChevronDown, Plus } from "lucide-react";
 import { createPortal } from "react-dom";
 import { SessionData } from "../../ProcessingView";
 
@@ -59,6 +53,21 @@ const normalizePriorityValue = (value?: string): Question["priority"] => {
     default:
       return "Medium";
   }
+};
+
+const isArabicLanguage = (value?: string | null): boolean => {
+  if (!value) {
+    return false;
+  }
+  const normalized = value.trim().toLowerCase();
+  return (
+    normalized === "ar" ||
+    normalized.startsWith("ar") ||
+    normalized.includes("arab") ||
+    normalized.includes("عرب") ||
+    normalized.includes("عربي") ||
+    normalized.includes("العربية")
+  );
 };
 
 const AISuggestions: React.FC<AISuggestionsProps> = ({
@@ -125,11 +134,16 @@ const AISuggestions: React.FC<AISuggestionsProps> = ({
     top: number;
     left: number;
     minWidth: number;
+    arrowLeft: number;
   }>({
     top: 0,
     left: 0,
     minWidth: 160,
+    arrowLeft: 24,
   });
+  const [isQuestionGenerating, setIsQuestionGenerating] =
+    useState<boolean>(false);
+  const [isFocusGenerating, setIsFocusGenerating] = useState<boolean>(false);
   const priorityMenuRef = useRef<HTMLDivElement | null>(null);
   const priorityTriggerRef = useRef<HTMLButtonElement | null>(null);
   const priorityOptionRefs = useRef<Array<HTMLButtonElement | null>>([]);
@@ -179,10 +193,11 @@ const AISuggestions: React.FC<AISuggestionsProps> = ({
       const triggerRect = trigger.getBoundingClientRect();
       const menuRect = menu.getBoundingClientRect();
       const margin = 12;
+      const verticalOffset = 2;
 
-      let top = triggerRect.bottom + 8;
+      let top = triggerRect.bottom + verticalOffset;
       if (top + menuRect.height > window.innerHeight - margin) {
-        top = triggerRect.top - menuRect.height - 8;
+        top = triggerRect.top - menuRect.height - verticalOffset;
         if (top < margin) {
           top = Math.max(margin, window.innerHeight - menuRect.height - margin);
         }
@@ -202,10 +217,18 @@ const AISuggestions: React.FC<AISuggestionsProps> = ({
         );
       }
 
+      const minWidth = Math.max(triggerRect.width, 160);
+      const triggerCenter = triggerRect.left + triggerRect.width / 2;
+      const arrowLeft = Math.min(
+        Math.max(triggerCenter - left - 6, 12),
+        minWidth - 18
+      );
+
       setPriorityMenuStyles({
         top,
         left,
-        minWidth: Math.max(triggerRect.width, 160),
+        minWidth,
+        arrowLeft,
       });
     };
 
@@ -296,31 +319,33 @@ const AISuggestions: React.FC<AISuggestionsProps> = ({
     successMessage?: string,
     errorMessageText?: string
   ): Promise<void> => {
+    if (isQuestionGenerating) {
+      return;
+    }
+    setIsQuestionGenerating(true);
     setStatusMessage(message || "Generating AI questions...");
-    console.log('Calling API with:', sessionData);
-    
+
     try {
-      const response = await fetch('https://hvjlr6aa2m.execute-api.us-east-1.amazonaws.com/prod/advanced-analysis/questions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sessionId: 'test-session-001',  // Use your S3 sessionId
-          witness: sessionData.witness || 'سارة محمود',
-          language: 'ar'
-          
-        })
-      });
-      
-      console.log('Response status:', response.status);
-      
+      const response = await fetch(
+        "https://hvjlr6aa2m.execute-api.us-east-1.amazonaws.com/prod/advanced-analysis/questions",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sessionId: "test-session-001",
+            witness: sessionData.witness || "سارة محمود",
+            language: "ar",
+          }),
+        }
+      );
+
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('API error:', errorText);
-        throw new Error('Failed to generate questions');
+        console.error("API error:", errorText);
+        throw new Error("Failed to generate questions");
       }
-      
+
       const data = await response.json();
-      console.log('Received questions:', data);
       const normalizedQuestions: Question[] = (data.questions || []).map(
         (question: Question) => ({
           ...question,
@@ -330,8 +355,49 @@ const AISuggestions: React.FC<AISuggestionsProps> = ({
       setQuestions(normalizedQuestions);
       setStatusMessage(successMessage || "AI questions generated!");
     } catch (error) {
-      console.error('Error generating questions:', error);
+      console.error("Error generating questions:", error);
       setStatusMessage(errorMessageText || "Failed to generate questions");
+    } finally {
+      setIsQuestionGenerating(false);
+    }
+  };
+
+  const handleGenerateFocusAreas = async (): Promise<void> => {
+    if (isFocusGenerating) {
+      return;
+    }
+    setIsFocusGenerating(true);
+    setStatusMessage("Generating Key Focus Areas...");
+    try {
+      const response = await fetch(
+        "https://hvjlr6aa2m.execute-api.us-east-1.amazonaws.com/prod/advanced-analysis/focus-areas",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sessionId: "test-session-001",
+            language: "ar",
+          }),
+        }
+      );
+      if (!response.ok) {
+        throw new Error("Failed to generate focus areas");
+      }
+      const data = await response.json();
+      const mappedGaps = data.focusAreas.map((area: any, index: number) => ({
+        id: `gap-${Date.now()}-${index}`,
+        title: area.title,
+        description: area.description,
+        severity: area.priority.toLowerCase() as "high" | "medium" | "low",
+        resolved: false,
+      }));
+      setGaps(mappedGaps);
+      setStatusMessage("Key Focus Areas generated!");
+    } catch (error) {
+      console.error("Error:", error);
+      setStatusMessage("Failed to generate Key Focus Areas");
+    } finally {
+      setIsFocusGenerating(false);
     }
   };
 
@@ -389,6 +455,11 @@ const AISuggestions: React.FC<AISuggestionsProps> = ({
   const sortedGaps = [...gaps].sort(
     (a, b) => severityRank[a.severity] - severityRank[b.severity]
   );
+  const activeGaps = sortedGaps.filter((gap) => !gap.resolved);
+  const resolvedGaps = sortedGaps.filter((gap) => gap.resolved);
+
+  const contentLanguage = sessionData.language || "";
+  const isRTLContent = isArabicLanguage(contentLanguage);
 
   return (
     <div className="ai-suggestions-view">
@@ -404,226 +475,239 @@ const AISuggestions: React.FC<AISuggestionsProps> = ({
         </div>
       )}
 
-      <div className="ai-sections-grid">
-        <div className="tab-section ai-section-card">
-          <div className="ai-section-header">
-            <div className="ai-section-heading">
-              <MessageSquare size={20} />
-              <div>
-                <h3 className="tab-section-title">Suggested Questions</h3>
-                <p className="ai-section-caption">
-                  Generate AI targeted follow-up questions derived from the rewritten report analysis to help clarify, confirm, or expand on critical details.
-                </p>
-              </div>
-            </div>
-            <button
-              type="button"
-              className="ai-cta"
-              onClick={() => handleGenerateQuestions()}
-              disabled={isLoading}
-            >
-              <Sparkles size={16} />
-              Generate
-            </button>
-          </div>
-          <div className="tab-section-content">
-            <div className="ai-question-grid">
-              {sortedQuestions.map((question) => (
-                <div key={question.id} className="ai-question-card">
-                  <div className="ai-question-header">
-                    <span
-                      className={`ai-priority-chip priority-${question.priority.toLowerCase()}`}
-                    >
-                      {question.priority}
-                    </span>
-                    <button
-                      type="button"
-                      className="ai-focus-add"
-                      onClick={() => handleAddFocusArea(question.context)}
-                    >
-                      Add focus
-                    </button>
-                  </div>
-                  <p className="ai-question-text">{question.text}</p>
-                  <p className="ai-question-context">{question.context}</p>
-                </div>
-              ))}
-            </div>
-            <div className="ai-question-input-row">
-              <input
-                type="text"
-                value={customQuestion}
-                onChange={(event) => setCustomQuestion(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    event.preventDefault();
-                    handleAddCustomQuestion();
-                  }
-                }}
-                placeholder="Add a custom question"
-                className="ai-question-input"
-              />
-              <div className="ai-priority-selector">
-                <button
-                  type="button"
-                  ref={priorityTriggerRef}
-                  className={`ai-priority-trigger ${
-                    prioritySelected
-                      ? `priority-${customPriority.toLowerCase()}`
-                      : "priority-neutral"
-                  }`}
-                  aria-haspopup="listbox"
-                  aria-expanded={priorityMenuOpen}
-                  aria-label="Priority"
-                  onClick={() =>
-                    priorityMenuOpen ? closePriorityMenu(true) : openPriorityMenu()
-                  }
-                  onKeyDown={handlePriorityTriggerKeyDown}
-                >
-                  <span>{prioritySelected ? customPriority : "Priority"}</span>
-                  <ChevronDown size={14} />
-                </button>
-              </div>
-              <button
-                type="button"
-                className="ai-cta"
-                onClick={handleAddCustomQuestion}
-              >
-                <Sparkles size={16} />
-                Add
-              </button>
-            </div>
-            {focusAreas.length > 0 && (
-              <div className="ai-focus-chips">
-                {focusAreas.map((focus) => (
-                  <span key={focus} className="ai-focus-chip">
-                    {focus}
-                  </span>
-                ))}
-              </div>
-            )}
-            {priorityMenuOpen &&
-              createPortal(
-                <div
-                  ref={priorityMenuRef}
-                  className="ai-priority-overlay"
-                  role="listbox"
-                  aria-label="Select priority"
-                  aria-activedescendant={
-                    priorityActiveIndex >= 0
-                      ? `priority-option-${priorityActiveIndex}`
-                      : undefined
-                  }
-                  tabIndex={-1}
-                  style={{
-                    top: `${priorityMenuStyles.top}px`,
-                    left: `${priorityMenuStyles.left}px`,
-                    minWidth: `${priorityMenuStyles.minWidth}px`,
-                  }}
-                >
-                  {priorityOptions.map((option, index) => (
-                    <button
-                      key={option}
-                      id={`priority-option-${index}`}
-                      ref={(el) => {
-                        priorityOptionRefs.current[index] = el;
-                      }}
-                      type="button"
-                      className={`ai-priority-chip priority-${option.toLowerCase()}`}
-                      role="option"
-                      tabIndex={-1}
-                      aria-selected={customPriority === option}
-                      onKeyDown={(event) =>
-                        handlePriorityOptionKeyDown(event, index)
-                      }
-                      onClick={() => selectPriority(option)}
-                    >
-                      {option}
-                    </button>
-                  ))}
-                </div>,
-                document.body
-              )}
+      <div className="ai-suggestions-card">
+        <div className="ai-suggestions-header">
+          <div>
+            
+            <h3 className="ai-main-title">AI Suggestions</h3>
+            <p className="ai-main-subtitle">
+              Generate AI targeted follow-up questions derived from the rewritten report analysis to help clarify, confirm, or expand on critical details.
+            </p>
           </div>
         </div>
 
-        <div className="tab-section ai-section-card">
-          <div className="ai-section-header">
-            <div className="ai-section-heading">
-              <Radar size={20} />
-              <div>
-                <h3 className="tab-section-title">Key Focus Areas</h3>
-                <p className="ai-section-caption">
-                  Identify the most important or unclear areas that require additional attention or context.
-                </p>
-              </div>
+        <div className="ai-suggestions-grid">
+          <section className="ai-suggestions-panel">
+            <div className="ai-panel-header">
+              <h4 className="ai-panel-title">Suggested Questions</h4>
+              <button
+                type="button"
+                className={`ai-cta ai-cta-compact ${isQuestionGenerating ? "loading" : ""}`}
+                onClick={() => handleGenerateQuestions()}
+                disabled={isLoading || isQuestionGenerating}
+              >
+                <Sparkles size={16} />
+                {isQuestionGenerating ? "Generating..." : "Generate"}
+              </button>
             </div>
-            <button
-              type="button"
-              className="ai-cta"
-              onClick={async () => {
-                setStatusMessage("Generating Key Focus Areas...");
-                try {
-                  const response = await fetch('https://hvjlr6aa2m.execute-api.us-east-1.amazonaws.com/prod/advanced-analysis/focus-areas', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      sessionId: 'test-session-001',
-                      language: 'ar'
-                    })
-                  });
-                  if (!response.ok) throw new Error('Failed to generate focus areas');
-                  const data = await response.json();
-                  const mappedGaps = data.focusAreas.map((area: any, index: number) => ({
-                    id: `gap-${Date.now()}-${index}`,
-                    title: area.title,
-                    description: area.description,
-                    severity: area.priority.toLowerCase() as 'high' | 'medium' | 'low',
-                    resolved: false
-                  }));
-                  setGaps(mappedGaps);
-                  setStatusMessage("Key Focus Areas generated!");
-                } catch (error) {
-                  console.error('Error:', error);
-                  setStatusMessage("Failed to generate Key Focus Areas");
-                }
-              }}
-              disabled={isLoading}
-            >
-              <Sparkles size={16} />
-              Generate
-            </button>
-          </div>
-          <div className="tab-section-content">
-            <div className="ai-gap-grid">
-              {sortedGaps.map((gap) => (
-                <div
-                  key={gap.id}
-                  className={`ai-gap-card ${gap.resolved ? "ai-gap-resolved" : ""}`}
-                >
-                  <div className="ai-gap-top">
-                    <div className="ai-gap-title-row">
-                      <h4>{gap.title}</h4>
+            <div className="ai-panel-body">
+              <div className="ai-question-grid">
+                {sortedQuestions.map((question) => (
+                  <div
+                    key={question.id}
+                    className={`ai-question-card priority-${question.priority.toLowerCase()} ${
+                      isRTLContent ? "rtl" : ""
+                    }`}
+                  >
+                    <div className="ai-question-header">
                       <span
-                        className={`ai-gap-severity severity-${gap.severity}`}
+                        className={`ai-priority-chip priority-${question.priority.toLowerCase()}`}
                       >
-                        <AlertCircle size={14} />
-                        {gap.severity.toUpperCase()}
+                        {question.priority}
                       </span>
+                      <button
+                        type="button"
+                        className="ai-focus-add"
+                        onClick={() => handleAddFocusArea(question.context)}
+                      >
+                        Add focus
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      className="ai-cta subtle"
-                      onClick={() => handleToggleGapResolved(gap.id)}
-                    >
-                      {gap.resolved ? "Mark unresolved" : "Mark resolved"}
-                    </button>
+                    <p className="ai-question-text">{question.text}</p>
+                    <p className="ai-question-context">{question.context}</p>
                   </div>
-                  <p className="ai-gap-description">{gap.description}</p>
+                ))}
+              </div>
+              <div className="ai-question-input-row">
+                <input
+                  type="text"
+                  value={customQuestion}
+                  onChange={(event) => setCustomQuestion(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      handleAddCustomQuestion();
+                    }
+                  }}
+                  placeholder="Add a custom question"
+                  className="ai-question-input"
+                />
+                <div className="ai-priority-selector">
+                  <button
+                    type="button"
+                    ref={priorityTriggerRef}
+                    className={`ai-priority-trigger ${
+                      prioritySelected
+                        ? `priority-${customPriority.toLowerCase()}`
+                        : "priority-neutral"
+                    }`}
+                    aria-haspopup="listbox"
+                    aria-expanded={priorityMenuOpen}
+                    aria-label="Priority"
+                    onClick={() =>
+                      priorityMenuOpen ? closePriorityMenu(true) : openPriorityMenu()
+                    }
+                    onKeyDown={handlePriorityTriggerKeyDown}
+                  >
+                    <span>{prioritySelected ? customPriority : "Priority"}</span>
+                    <ChevronDown size={14} />
+                  </button>
                 </div>
-              ))}
+                <button
+                  type="button"
+                  className="ai-cta"
+                  onClick={handleAddCustomQuestion}
+                >
+                  <Plus size={16} />
+                  Add
+                </button>
+              </div>
+              {focusAreas.length > 0 && (
+                <div className="ai-focus-chips">
+                  {focusAreas.map((focus) => (
+                    <span key={focus} className="ai-focus-chip">
+                      {focus}
+                    </span>
+                  ))}
+                </div>
+              )}
+              {priorityMenuOpen &&
+                createPortal(
+                  <div
+                    ref={priorityMenuRef}
+                    className="ai-priority-overlay"
+                    role="listbox"
+                    aria-label="Select priority"
+                    aria-activedescendant={
+                      priorityActiveIndex >= 0
+                        ? `priority-option-${priorityActiveIndex}`
+                        : undefined
+                    }
+                    tabIndex={-1}
+                    style={{
+                      top: `${priorityMenuStyles.top}px`,
+                      left: `${priorityMenuStyles.left}px`,
+                      minWidth: `${priorityMenuStyles.minWidth}px`,
+                      "--ai-priority-arrow-left": `${priorityMenuStyles.arrowLeft}px`,
+                    } as React.CSSProperties}
+                  >
+                    {priorityOptions.map((option, index) => (
+                      <button
+                        key={option}
+                        id={`priority-option-${index}`}
+                        ref={(el) => {
+                          priorityOptionRefs.current[index] = el;
+                        }}
+                        type="button"
+                        className={`ai-priority-chip priority-${option.toLowerCase()}`}
+                        role="option"
+                        tabIndex={-1}
+                        aria-selected={customPriority === option}
+                        onKeyDown={(event) =>
+                          handlePriorityOptionKeyDown(event, index)
+                        }
+                        onClick={() => selectPriority(option)}
+                      >
+                        {option}
+                      </button>
+                    ))}
+                  </div>,
+                  document.body
+                )}
             </div>
-          </div>
+          </section>
+
+          <section className="ai-suggestions-panel">
+            <div className="ai-panel-header">
+              <h4 className="ai-panel-title">Key Focus Areas</h4>
+              <button
+                type="button"
+                className={`ai-cta ai-cta-compact ${isFocusGenerating ? "loading" : ""}`}
+                onClick={handleGenerateFocusAreas}
+                disabled={isLoading || isFocusGenerating}
+              >
+                <Sparkles size={16} />
+                {isFocusGenerating ? "Generating..." : "Generate"}
+              </button>
+            </div>
+            <div className="ai-panel-body">
+              {activeGaps.length > 0 && (
+                <div className="ai-gap-grid">
+                  {activeGaps.map((gap) => (
+                    <div
+                      key={gap.id}
+                      className={`ai-gap-card ${gap.resolved ? "ai-gap-resolved" : ""} severity-${gap.severity}`}
+                    >
+                      <div className="ai-gap-top">
+                        <div className="ai-gap-title-row">
+                          <h4>{gap.title}</h4>
+                          <span
+                            className={`ai-gap-severity severity-${gap.severity}`}
+                          >
+                            <AlertCircle size={14} />
+                            {gap.severity.toUpperCase()}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          className="ai-cta subtle"
+                          onClick={() => handleToggleGapResolved(gap.id)}
+                        >
+                          Mark resolved
+                        </button>
+                      </div>
+                      <p className="ai-gap-description">{gap.description}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {resolvedGaps.length > 0 && (
+                <div className="ai-gap-resolved-section">
+                  <div className="ai-gap-resolved-header">
+                    <div>
+                      <p className="ai-gap-resolved-label">Resolved</p>
+                      <p className="ai-gap-resolved-subtext">
+                        Completed focus areas appear here for quick reference.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="ai-gap-grid">
+                    {resolvedGaps.map((gap) => (
+                      <div
+                        key={gap.id}
+                        className="ai-gap-card ai-gap-resolved"
+                      >
+                        <div className="ai-gap-top">
+                          <div className="ai-gap-title-row">
+                            <h4>{gap.title}</h4>
+                          </div>
+                          <button
+                            type="button"
+                            className="ai-cta subtle"
+                            onClick={() => handleToggleGapResolved(gap.id)}
+                          >
+                            Mark unresolved
+                          </button>
+                        </div>
+                        <p className="ai-gap-description">{gap.description}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </section>
         </div>
       </div>
     </div>
