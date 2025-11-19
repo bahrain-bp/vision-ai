@@ -1,121 +1,91 @@
-import React, { useState } from "react";
-import WitnessInfo from "./WitnessInfo";
+import React, { useState, useCallback } from "react";
 import DocumentVerification from "./DocumentVerification";
-
-interface WitnessData {
-  fullName: string;
-  idNumber: string;
-}
-
-interface IdentityData {
-  referencePhoto: File | null;
-  cpr: File | null;
-  passport: File | null;
-  isVerified: boolean;
-}
-
-interface VerificationData {
-  witnessData: WitnessData;
-  identityData: IdentityData;
-}
-
-interface InvestigationData {
-  witness: string;
-  idNumber: string;
-  identityData: IdentityData;
-  investigator: string;
-  duration: string;
-  status: string;
-}
-
-interface IdentityVerificationProps {
-  onBackToDashboard: () => void;
-  onStartInvestigation: (data: InvestigationData) => void;
-}
+import {
+  IdentityVerificationProps,
+  IdentityData,
+  InvestigationData,
+  PersonType,
+} from "../../../types/identityVerification";
+import { useCaseContext } from "../../../hooks/useCaseContext";
 
 const IdentityVerification: React.FC<IdentityVerificationProps> = ({
   onStartInvestigation,
 }) => {
-  const [verificationData, setVerificationData] = useState<VerificationData>({
-    witnessData: {
-      fullName: "",
-      idNumber: "",
-    },
-    identityData: {
-      referencePhoto: null,
-      cpr: null,
-      passport: null,
-      isVerified: false,
-    },
+  const { currentCase, currentSession } = useCaseContext();
+  const [personType, setPersonType] = useState<PersonType>("witness");
+
+  const [identityData, setIdentityData] = useState<IdentityData>({
+    referencePhoto: null,
+    cpr: null,
+    passport: null,
+    isVerified: false,
   });
 
-  const updateWitnessData = (field: keyof WitnessData, value: string) => {
-    setVerificationData((prev) => ({
-      ...prev,
-      witnessData: {
-        ...prev.witnessData,
+  const updateIdentityData = useCallback(
+    (field: keyof IdentityData, value: File | boolean | null) => {
+      setIdentityData((prev) => ({
+        ...prev,
         [field]: value,
-      },
-    }));
-  };
+      }));
+    },
+    []
+  );
 
-  const updateIdentityData = (field: keyof IdentityData, value: any) => {
-    setVerificationData((prev) => ({
-      ...prev,
-      identityData: {
-        ...prev.identityData,
-        [field]: value,
-      },
-    }));
-  };
+  const handleStartInvestigation = useCallback(
+    (extractedPersonName?: string) => {
+      if (!identityData.isVerified) {
+        alert("Please complete identity verification first.");
+        return;
+      }
 
-  const handleStartInvestigation = () => {
-    if (!verificationData.witnessData.fullName) {
-      alert("Please enter witness full name.");
-      return;
-    }
+      const investigationData: InvestigationData = {
+        witness: extractedPersonName || "Name to be extracted",
+        idNumber: "To be extracted",
+        identityData: identityData,
+        investigator: "M. AlZebari",
+        duration: "00:00",
+        status: "Ready",
+        caseId: currentCase?.caseId || "",
+        sessionId: currentSession?.sessionId || "",
+      };
 
-    if (!verificationData.identityData.referencePhoto) {
-      alert("Please upload a person photo.");
-      return;
-    }
-
-    if (
-      !verificationData.identityData.cpr &&
-      !verificationData.identityData.passport
-    ) {
-      alert("Please upload either a CPR or Passport document.");
-      return;
-    }
-
-    const investigationData: InvestigationData = {
-      witness: verificationData.witnessData.fullName,
-      idNumber: verificationData.witnessData.idNumber,
-      identityData: verificationData.identityData,
-      investigator: "M. AlZebari",
-      duration: "00:00",
-      status: "Ready",
-    };
-
-    onStartInvestigation(investigationData);
-  };
+      console.log("Starting investigation with data:", investigationData);
+      onStartInvestigation(investigationData);
+    },
+    [identityData, onStartInvestigation, currentCase, currentSession]
+  );
 
   return (
     <div className="identity-verification-container">
       <div className="identity-verification-content">
         <div className="verification-header">
           <h1 className="verification-title">Identity Verification</h1>
+          <div className="session-info-grid">
+            <div className="session-info-card">
+              <div className="session-info-content">
+                <span className="session-label">Person Type</span>
+                <select
+                  value={personType}
+                  onChange={(e) => setPersonType(e.target.value as PersonType)}
+                  className="person-type-select"
+                  disabled={identityData.isVerified}
+                >
+                  <option value="witness">Witness</option>
+                  <option value="accused">Accused</option>
+                  <option value="victim">Victim</option>
+                </select>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <WitnessInfo
-          witnessData={verificationData.witnessData}
-          onWitnessDataChange={updateWitnessData}
-        />
-
         <DocumentVerification
-          identityData={verificationData.identityData}
+          identityData={identityData}
           onIdentityDataChange={updateIdentityData}
-          onStartInvestigation={handleStartInvestigation}
+          onStartInvestigation={() => handleStartInvestigation()}
+          caseId={currentCase?.caseId || ""}
+          sessionId={currentSession?.sessionId || ""}
+          personType={personType}
         />
       </div>
     </div>
