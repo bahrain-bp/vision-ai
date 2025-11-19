@@ -38,12 +38,8 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
 
   const videoRef = useRef<HTMLVideoElement>(null);
 
-  const sanitizeSessionId = (sessionId: string): string => {
-    // Remove any invalid characters (e.g., #)
-    return sessionId.replace(/[^a-zA-Z0-9-]/g, ""); // Keep only alphanumeric characters and dashes
-  };
   const isValidSessionId = (sessionId: string): boolean => {
-    const pattern = /^\d{4}-INV-\d{4}$/;
+    const pattern = /^session-\d{14}-[a-fA-F0-9]{8}$/;
     return pattern.test(sessionId);
   };
 
@@ -56,13 +52,11 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
 
     let sessionId = _sessionData?.sessionId || "unknown";
 
-    // Sanitize the sessionId
-    sessionId = sanitizeSessionId(sessionId);
     // Validate sessionId
     if (!isValidSessionId(sessionId)) {
       console.error("Invalid sessionId format");
       alert(
-        `Invalid sessionId format: ${sessionId}. Expected format: YYYY-INV-XXXX`
+        `Invalid sessionId format: ${sessionId}. Expected format:  session-YYYYMMDDHHMMSS-XXXXXXXX`
       );
       return;
     }
@@ -126,7 +120,7 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
     setAnalysisResult(null);
 
     try {
-      const sessionId = sanitizeSessionId(_sessionData?.sessionId || "unknown");
+      const sessionId = _sessionData?.sessionId || "unknown";
 
       const response = await fetch(
         `${process.env.REACT_APP_API_ENDPOINT}/footage/analyze`,
