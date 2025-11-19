@@ -1,4 +1,5 @@
 import React, { useRef, useState, useCallback, useMemo } from "react";
+import { useCaseContext } from "../../../hooks/useCaseContext";
 import {
   CheckCircle,
   RefreshCw,
@@ -25,11 +26,17 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
   sessionId,
   personType,
 }) => {
+  const { setCurrentPersonName } = useCaseContext();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const documentInputRef = useRef<HTMLInputElement>(null);
   const [documentType, setDocumentType] = useState<DocumentType>("cpr");
   const [verificationAttempts, setVerificationAttempts] = useState<number>(0);
   const [manualOverrideReason, setManualOverrideReason] = useState<string>("");
+  const [manualParticipantName, setManualParticipantName] =
+    useState<string>("");
+  const [manualParticipantNationality, setManualParticipantNationality] =
+    useState<string>("");
+  const [manualParticipantCPR, setManualParticipantCPR] = useState<string>("");
   const [showManualOverride, setShowManualOverride] = useState<boolean>(false);
   const [uploadedPhotoPreview, setUploadedPhotoPreview] = useState<
     string | null
@@ -229,6 +236,10 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
 
       if (result.match) {
         onIdentityDataChange("isVerified", true);
+        if (result.personName) {
+          setCurrentPersonName(result.personName);
+          console.log("Person name stored in context:", result.personName);
+        }
         setShowManualOverride(false);
       } else {
         // Show manual override option immediately after 3rd attempt
@@ -279,13 +290,51 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
     personType,
     onIdentityDataChange,
     verificationAttempts,
+    setCurrentPersonName,
   ]);
 
   const handleManualOverride = useCallback(async () => {
+    // Validate reason
     if (!manualOverrideReason.trim()) {
       setVerificationState((prev) => ({
         ...prev,
         error: "Please provide a reason for manual verification override.",
+      }));
+      return;
+    }
+
+    //  Validate participant name
+    if (!manualParticipantName.trim()) {
+      setVerificationState((prev) => ({
+        ...prev,
+        error: "Please enter the participant's full name.",
+      }));
+      return;
+    }
+
+    // Validate participant CPR
+    if (!manualParticipantCPR.trim()) {
+      setVerificationState((prev) => ({
+        ...prev,
+        error: "Please enter the participant's CPR number.",
+      }));
+      return;
+    }
+
+    if (!manualParticipantNationality.trim()) {
+      setVerificationState((prev) => ({
+        ...prev,
+        error: "Please enter the participant's nationality.",
+      }));
+      return;
+    }
+
+    //  Validate CPR format (Bahrain CPR is 9 digits)
+    const cprRegex = /^\d{9}$/;
+    if (!cprRegex.test(manualParticipantCPR.trim())) {
+      setVerificationState((prev) => ({
+        ...prev,
+        error: "Please enter a valid 9-digit CPR number.",
       }));
       return;
     }
@@ -310,6 +359,8 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
         sessionId,
         personType,
         reason: manualOverrideReason,
+        participantName: manualParticipantName,
+        participantCPR: manualParticipantCPR,
         attempts: verificationAttempts,
       });
 
@@ -342,7 +393,7 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
         );
       }
 
-      // Send verification request with manual override flag
+      // Send verification request with manual override flag AND participant details
       const result = await IdentityVerificationService.verifyIdentity({
         caseId,
         sessionId,
@@ -351,19 +402,32 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
         personType,
         manualOverride: true,
         overrideReason: manualOverrideReason,
+        participantName: manualParticipantName.trim(),
+        participantCPR: manualParticipantCPR.trim(),
+        participantNationality: manualParticipantNationality.trim(),
         attemptNumber: verificationAttempts || MAX_VERIFICATION_ATTEMPTS,
       });
 
       console.log("Manual override completed:", result);
 
+      // Store the manually entered participant name in context
+      setCurrentPersonName(manualParticipantName.trim());
+      console.log(
+        "Manually entered participant name stored:",
+        manualParticipantName
+      );
+
       // Mark as verified
       onIdentityDataChange("isVerified", true);
 
-      // Store override result
       setVerificationState((prev) => ({
         ...prev,
         isVerifying: false,
-        verificationResult: result,
+        verificationResult: {
+          ...result,
+          personName: manualParticipantName.trim(),
+          cprNumber: manualParticipantCPR.trim(),
+        },
       }));
 
       setShowManualOverride(false);
@@ -385,6 +449,8 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
     }
   }, [
     manualOverrideReason,
+    manualParticipantName,
+    manualParticipantCPR,
     caseId,
     sessionId,
     personType,
@@ -395,8 +461,8 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
     currentDocument,
     onIdentityDataChange,
     onStartInvestigation,
+    setCurrentPersonName,
   ]);
-
   const handleRetryVerification = useCallback(async () => {
     // Check if max attempts reached before allowing retry
     if (verificationAttempts >= MAX_VERIFICATION_ATTEMPTS) {
@@ -454,6 +520,9 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
       setVerificationAttempts(0);
       setShowManualOverride(false);
       setManualOverrideReason("");
+      setManualParticipantName("");
+      setManualParticipantCPR("");
+      setManualParticipantNationality("");
       setUploadedPhotoPreview(null);
       setComparisonPhotoPreview(null);
       setPreviousDocumentKey(null);
@@ -475,7 +544,7 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
 
       console.log("Session ended by user");
     }
-  }, [onIdentityDataChange]);
+  }, [onIdentityDataChange, setCurrentPersonName]);
 
   const toggleDocumentType = useCallback(() => {
     setDocumentType((prevType) => (prevType === "cpr" ? "passport" : "cpr"));
@@ -515,7 +584,6 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
     return Math.max(0, MAX_VERIFICATION_ATTEMPTS - verificationAttempts);
   }, [verificationAttempts]);
 
-  // Debug: Log state changes
   React.useEffect(() => {
     console.log("State Update:", {
       verificationAttempts,
@@ -867,14 +935,14 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
                   {/* Show Manual Override section after 3 attempts */}
                   {showManualOverride && (
                     <div className="manual-override-section">
-                      <div className="override-warning">
-                        <AlertCircle size={20} />
-                        <div>
-                          <p className="font-semibold mb-2">
+                      <div className="override-warning-box">
+                        <AlertCircle size={20} className="warning-icon" />
+                        <div className="warning-content">
+                          <p className="warning-title">
                             Maximum verification attempts (
                             {MAX_VERIFICATION_ATTEMPTS}) reached.
                           </p>
-                          <p className="text-sm">
+                          <p className="warning-description">
                             {verificationState.verificationResult
                               ? "The automated verification has failed. Choose one of the following options to proceed:"
                               : "An error occurred during verification. Choose one of the following options to proceed:"}
@@ -882,42 +950,100 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
                         </div>
                       </div>
 
-                      <div className="mt-4 space-y-4">
-                        {/* Option 1: Accept Verification with Reason */}
-                        <div className="border-2 border-orange-200 rounded-lg p-4 bg-orange-50">
-                          <h4 className="font-semibold text-orange-800 mb-2 flex items-center gap-2">
+                      <div className="override-options-container">
+                        {/* Option 1: Accept with Manual Entry */}
+                        <div className="override-option-card option-accept">
+                          <h4 className="option-title">
                             <CheckCircle size={18} />
-                            Option 1: Accept Verification Anyway
+                            Option 1: Accept Verification with Manual Entry
                           </h4>
-                          <p className="text-sm text-gray-700 mb-3">
+                          <p className="option-description">
                             If you believe the identity is correct despite the
-                            failed automated verification, you can manually
-                            approve it by providing a detailed reason.
+                            failed automated verification, manually enter the
+                            participant's details and provide a detailed reason
+                            for approval.
                           </p>
 
-                          <textarea
-                            value={manualOverrideReason}
-                            onChange={(e) =>
-                              setManualOverrideReason(e.target.value)
-                            }
-                            placeholder="Enter detailed reason for manual approval (e.g., 'Photo quality issues due to lighting but identity confirmed through additional documentation', 'Technical difficulties with facial recognition but documents are authentic and verified manually')..."
-                            className="override-reason-input w-full"
-                            rows={4}
-                            disabled={verificationState.isVerifying}
-                          />
+                          <div className="form-field">
+                            <label className="field-label">
+                              Participant Full Name *
+                            </label>
+                            <input
+                              type="text"
+                              value={manualParticipantName}
+                              onChange={(e) =>
+                                setManualParticipantName(e.target.value)
+                              }
+                              placeholder="Enter full name as shown on document"
+                              className="field-input"
+                              disabled={verificationState.isVerifying}
+                            />
+                          </div>
+
+                          <div className="form-field">
+                            <label className="field-label">CPR Number *</label>
+                            <input
+                              type="text"
+                              value={manualParticipantCPR}
+                              onChange={(e) => {
+                                const value = e.target.value
+                                  .replace(/\D/g, "")
+                                  .slice(0, 9);
+                                setManualParticipantCPR(value);
+                              }}
+                              placeholder="Enter 9-digit CPR number"
+                              maxLength={9}
+                              className="field-input"
+                              disabled={verificationState.isVerifying}
+                            />
+                            <p className="field-hint">9 digits only</p>
+                          </div>
+
+                          <div className="form-field">
+                            <label className="field-label">Nationality *</label>
+                            <input
+                              type="text"
+                              value={manualParticipantNationality}
+                              onChange={(e) =>
+                                setManualParticipantNationality(e.target.value)
+                              }
+                              placeholder="Enter nationality (e.g., Bahraini, Indian, etc.)"
+                              className="field-input"
+                              disabled={verificationState.isVerifying}
+                            />
+                          </div>
+
+                          <div className="form-field">
+                            <label className="field-label">
+                              Reason for Manual Override *
+                            </label>
+                            <textarea
+                              value={manualOverrideReason}
+                              onChange={(e) =>
+                                setManualOverrideReason(e.target.value)
+                              }
+                              placeholder="Enter detailed reason for manual approval (e.g., 'Photo quality issues due to lighting but identity confirmed through additional documentation', 'Technical difficulties with facial recognition but documents are authentic and verified manually')..."
+                              className="field-textarea"
+                              rows={4}
+                              disabled={verificationState.isVerifying}
+                            />
+                          </div>
 
                           <button
                             onClick={handleManualOverride}
-                            className="btn-warning w-full mt-3"
+                            className="btn-accept-override"
                             type="button"
                             disabled={
                               !manualOverrideReason.trim() ||
+                              !manualParticipantName.trim() ||
+                              !manualParticipantCPR.trim() ||
+                              !manualParticipantNationality.trim() ||
                               verificationState.isVerifying
                             }
                           >
                             {verificationState.isVerifying ? (
                               <>
-                                <Loader2 size={18} className="animate-spin" />
+                                <Loader2 size={18} className="spinner-icon" />
                                 Processing Manual Approval...
                               </>
                             ) : (
@@ -930,12 +1056,12 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
                         </div>
 
                         {/* Option 2: End Session */}
-                        <div className="border-2 border-red-200 rounded-lg p-4 bg-red-50">
-                          <h4 className="font-semibold text-red-800 mb-2 flex items-center gap-2">
+                        <div className="override-option-card option-end">
+                          <h4 className="option-title">
                             <XCircle size={18} />
                             Option 2: End This Session
                           </h4>
-                          <p className="text-sm text-gray-700 mb-3">
+                          <p className="option-description">
                             If you cannot verify the identity or believe the
                             verification has failed legitimately, you can end
                             this session. All data will be reset.
@@ -943,7 +1069,7 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
 
                           <button
                             onClick={handleEndSession}
-                            className="btn-danger w-full"
+                            className="btn-end-session"
                             type="button"
                             disabled={verificationState.isVerifying}
                           >
