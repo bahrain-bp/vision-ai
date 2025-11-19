@@ -17,7 +17,7 @@ import { RecordingStatus } from "../../types/";
 
 interface SessionData {
   sessionId: string;
-  witness: string;
+  participant: string;
   language: string;
   duration: string;
   status: string;

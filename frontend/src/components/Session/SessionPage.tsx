@@ -7,7 +7,7 @@ import { User, RecordingStatus } from "../../types/";
 import { useTranscription } from "../../hooks/useTranscription";
 import { useCaseContext } from "../../hooks/useCaseContext";
 
-interface WitnessData {
+interface ParticipantData {
   fullName: string;
   idNumber: string;
 }
@@ -24,7 +24,7 @@ interface TranslationSettings {
 }
 
 interface SetupData {
-  witnessData: WitnessData;
+  witnessData: ParticipantData;
   identityData: IdentityData;
   translationSettings: TranslationSettings;
 }
@@ -34,9 +34,9 @@ interface SessionData {
   investigator: string;
   language: string;
   duration: string;
-  witness: string;
+  participant: string;
   status: string;
-  witnessData?: WitnessData;
+  participantData?: ParticipantData;
   identityData?: IdentityData;
   translationSettings?: TranslationSettings;
 }
@@ -62,6 +62,7 @@ const SessionPage: React.FC<SessionPageProps> = ({
     createSession,
     updateSessionStatus,
     setCurrentSession,
+    setCurrentPersonName,
   } = useCaseContext();
   const [activeMainTab, setActiveMainTab] = useState<MainTab>("real-time");
   const [sessionState, setSessionState] = useState<RecordingStatus>("off");
@@ -69,8 +70,8 @@ const SessionPage: React.FC<SessionPageProps> = ({
   const { stopRecording } = useTranscription();
   const [setupData, setSetupData] = useState<SetupData>({
     witnessData: {
-      fullName: sessionData?.witnessData?.fullName || "",
-      idNumber: sessionData?.witnessData?.idNumber || "",
+      fullName: sessionData?.participantData?.fullName || "",
+      idNumber: sessionData?.participantData?.idNumber || "",
     },
     identityData: {
       referencePhoto: sessionData?.identityData?.referencePhoto || null,
@@ -95,7 +96,7 @@ const SessionPage: React.FC<SessionPageProps> = ({
         investigator: currentSession.investigator || getInvestigatorName(),
         language: "Arabic",
         duration: currentSession.duration,
-        witness: setupData.witnessData.fullName || "Not set",
+        participant: setupData.witnessData.fullName || "Not set",
         status: currentSession.status,
       }
     : {
@@ -103,13 +104,13 @@ const SessionPage: React.FC<SessionPageProps> = ({
         investigator: getInvestigatorName(),
         language: "Arabic",
         duration: "00:00",
-        witness: "Not set",
+        participant: "Not set",
         status: "Active",
       };
 
   useEffect(() => {
     if (setupData.witnessData.fullName) {
-      currentSessionData.witness = setupData.witnessData.fullName;
+      currentSessionData.participant = setupData.witnessData.fullName;
     }
   }, [setupData.witnessData.fullName]);
 
@@ -127,6 +128,8 @@ const SessionPage: React.FC<SessionPageProps> = ({
         console.error("Failed to update session status:", error);
       }
     }
+    setCurrentSession(null);
+    setCurrentPersonName(null);
 
     setShowSummaryModal(true);
   };
@@ -142,6 +145,7 @@ const SessionPage: React.FC<SessionPageProps> = ({
   const handleBackToHome = () => {
     sessionCreationAttempted.current = false;
     setCurrentSession(null);
+    setCurrentPersonName(null);
     if (onEndSession) {
       onEndSession();
     } else {
@@ -149,7 +153,7 @@ const SessionPage: React.FC<SessionPageProps> = ({
     }
   };
 
-  const updateWitnessData = (field: keyof WitnessData, value: string) => {
+  const updateWitnessData = (field: keyof ParticipantData, value: string) => {
     setSetupData((prev) => ({
       ...prev,
       witnessData: {
