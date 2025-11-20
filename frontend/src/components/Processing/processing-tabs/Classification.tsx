@@ -29,7 +29,7 @@ const Classification: React.FC = () => {
     const key = uploadRes.key;
 
     // 2. Upload file to S3
-    uploadToS3(uploadUrl, file);
+    await uploadToS3(uploadUrl, file);
 
     //3. Extract the text
     const extractedText= await extract(key, apiEndpoint);
@@ -80,7 +80,7 @@ const Classification: React.FC = () => {
   };
 
   const extract = async (key : string, apiEndpoint : string) => {
-      const extract_res = await fetch(`${apiEndpoint}/extract`, {
+      const extract_res = await fetch(`${apiEndpoint}/classification/extract`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

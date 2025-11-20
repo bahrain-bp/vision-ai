@@ -18,7 +18,7 @@ def handler(event, context):
         #Generate unique s3 key
         unique_id = str(uuid.uuid4())
         timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-        unique_key = f"classification/upload/{unique_id}_{timestamp}_{file_name}"
+        unique_key = f"classification/upload/{unique_id}-{timestamp}-{file_name}"
 
         url = s3.generate_presigned_url(
             'put_object',
@@ -34,7 +34,7 @@ def handler(event, context):
             "statusCode": 200,
             "headers": {
                 "Content-Type": "application/json",
-                "Access-Control-Allow-Origin": "http://localhost:3000",
+                "Access-Control-Allow-Origin": "*",
                 "Access-Control-Allow-Headers": "Content-Type",
                 "Access-Control-Allow-Methods": "OPTIONS,POST"
             },
@@ -51,7 +51,7 @@ def handler(event, context):
             "statusCode": 500,
             "headers": {
                 "Content-Type": "application/json",
-                "Access-Control-Allow-Origin": "http://localhost:3000",
+                "Access-Control-Allow-Origin": "*",
                 "Access-Control-Allow-Headers": "Content-Type",
                 "Access-Control-Allow-Methods": "OPTIONS,POST"
             },

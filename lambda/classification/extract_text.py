@@ -16,6 +16,31 @@ bedrock = boto3.client(
 BUCKET_NAME = os.environ["BUCKET_NAME"]
 MODEL_ID = os.environ.get("NOVA_MODEL_ID", "amazon.nova-lite-v1:0")
 
+import re
+
+def sanitize_for_bedrock(raw_name: str) -> str:
+    """
+    Bedrock Nova requires:
+    - Only alphanumeric, spaces, hyphens, parentheses, square brackets
+    - No multiple consecutive spaces
+    - No unsupported symbols
+    """
+    if not raw_name:
+        return "document"
+
+    base, _ = os.path.splitext(raw_name)
+
+    # Keep only allowed characters
+    clean = re.sub(r"[^A-Za-z0-9 \-\(\)\[\]]+", " ", base)
+
+    # Collapse multiple spaces → single space
+    clean = re.sub(r"\s+", " ", clean).strip()
+
+    if not clean:
+        return "document"
+    return clean
+
+
 
 def handler(event, context):
     """
@@ -41,16 +66,18 @@ def handler(event, context):
         # 2) Download file bytes from S3
         obj = s3.get_object(Bucket=BUCKET_NAME, Key=s3_key)
         file_bytes = obj["Body"].read()
-        filename = s3_key.split("/")[-1].lower()
+        raw_name = s3_key.split("/")[-1].lower()
+        filename= sanitize_for_bedrock(raw_name)
+        
 
         # 3) Route by extension
-        if filename.endswith(".pdf"):
+        if raw_name.endswith(".pdf"):
             return bedrock_extract(file_bytes, filename, "pdf")
 
-        if filename.endswith(".docx"):
+        if raw_name.endswith(".docx"):
             return bedrock_extract(file_bytes, filename, "docx")
 
-        if filename.endswith(".txt"):
+        if raw_name.endswith(".txt"):
             text = file_bytes.decode("utf-8", errors="ignore")
             return api_response(text)
 
@@ -107,6 +134,12 @@ def bedrock_extract(document_bytes, filename, fmt):
 def api_response(text, status=200):
     return {
         "statusCode": status,
-        "headers": {"Content-Type": "application/json; charset=utf-8"},
+        "headers": {
+            "Content-Type": "application/json;"
+            " charset=utf-8",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Headers": "Content-Type",
+            "Access-Control-Allow-Methods": "OPTIONS,POST"
+        },
         "body": json.dumps({"extracted_text": text}, ensure_ascii=False),
     }
