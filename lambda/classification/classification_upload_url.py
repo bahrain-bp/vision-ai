@@ -1,4 +1,4 @@
-import datetime
+from datetime import datetime 
 import json
 import uuid
 import boto3
@@ -12,7 +12,7 @@ def handler(event, context):
         #Parse the body
         body = json.loads(event.get('body', '{}'))
         file_name = body.get('fileName', 'document.pdf')
-        file_type = body.get('fileType', 'application/pdf')
+        file_type = body.get('contentType', 'application/pdf')
 
         
         #Generate unique s3 key
@@ -32,7 +32,12 @@ def handler(event, context):
 
         return {
             "statusCode": 200,
-            "headers": {"Content-Type": "application/json"},
+            "headers": {
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Origin": "http://localhost:3000",
+                "Access-Control-Allow-Headers": "Content-Type",
+                "Access-Control-Allow-Methods": "OPTIONS,POST"
+            },
             "body": json.dumps({
                 "uploadUrl": url,
                 "key": unique_key,
@@ -44,6 +49,12 @@ def handler(event, context):
     except Exception as e:
         return {
             "statusCode": 500,
+            "headers": {
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Origin": "http://localhost:3000",
+                "Access-Control-Allow-Headers": "Content-Type",
+                "Access-Control-Allow-Methods": "OPTIONS,POST"
+            },
             "body": json.dumps({"error": str(e)})
         }
 

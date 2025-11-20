@@ -30,10 +30,16 @@ class classificationStack(Stack):
             root_resource_id=shared_api_root_resource_id
         )        
 
+
         # === Create IAM Role for Lambda ===
         lambda_role = iam.Role(
             self, "ClassificationLambdaRole",
             assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
+            managed_policies=[
+                iam.ManagedPolicy.from_aws_managed_policy_name(
+                    "service-role/AWSLambdaBasicExecutionRole"
+                )
+            ]
         )
 
 
@@ -100,6 +106,12 @@ class classificationStack(Stack):
         # === Add routes to shaed API ===
         # /classification
         classification_resource = shared_api.root.add_resource("classification")
+
+        classification_resource.add_cors_preflight(
+            allow_origins=["http://localhost:3000"],   
+            allow_methods=["POST", "OPTIONS"],
+            allow_headers=["Content-Type"]
+        )
 
         #1- /classification/upload
         upload_resource= classification_resource.add_resource("upload")

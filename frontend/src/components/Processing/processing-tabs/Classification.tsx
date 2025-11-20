@@ -20,10 +20,8 @@ const Classification: React.FC = () => {
       alert("Please choose a document first!");
       return;
     }
-    //get upload url
-    const apiEndpoint =
-      process.env.REACT_APP_API_ENDPOINT ||
-      `${window.location.origin.replace("localhost", "localhost").split(":")[0]}://${window.location.hostname}:3000`;
+    //get shared API
+    const apiEndpoint = process.env.REACT_APP_API_ENDPOINT || "http://localhost:3000";
     
     // 1. Request for presigned URL
     const uploadRes = await get_upload_url(file, apiEndpoint);
@@ -45,7 +43,7 @@ const Classification: React.FC = () => {
     
     //send a POST request
     const res = await fetch(
-      `${apiEndpoint}"/classification/uploads"`,
+      `${apiEndpoint}/classification/upload`,
       {
       method: "POST",
         headers: {
