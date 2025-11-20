@@ -63,22 +63,22 @@ def handler(event, context):
         s3_key = unquote_plus(body["key"])
         logger.info(f"Extracting from s3://{BUCKET_NAME}/{s3_key}")
 
-        # 2) Download file bytes from S3
-        obj = s3.get_object(Bucket=BUCKET_NAME, Key=s3_key)
-        file_bytes = obj["Body"].read()
+        # 2) s3 link
+        s3_uri = f"s3://{BUCKET_NAME}/{s3_key}"
         raw_name = s3_key.split("/")[-1].lower()
         filename= sanitize_for_bedrock(raw_name)
         
 
         # 3) Route by extension
         if raw_name.endswith(".pdf"):
-            return bedrock_extract(file_bytes, filename, "pdf")
+            return bedrock_extract(s3_uri, filename, "pdf")
 
         if raw_name.endswith(".docx"):
-            return bedrock_extract(file_bytes, filename, "docx")
+            return bedrock_extract(s3_uri, filename, "docx")
 
         if raw_name.endswith(".txt"):
-            text = file_bytes.decode("utf-8", errors="ignore")
+            obj = s3.get_object(Bucket=BUCKET_NAME, Key=s3_key)
+            text = obj["Body"].read().decode("utf-8", errors="ignore")
             return api_response(text)
 
         # 4) Unsupported
@@ -91,7 +91,7 @@ def handler(event, context):
         return api_response(str(e), status=500)
 
 
-def bedrock_extract(document_bytes, filename, fmt):
+def bedrock_extract(s3_uri, filename, fmt):
     """
     Use Amazon Nova Lite on Bedrock to extract text
     from a pdf/docx document.
@@ -111,9 +111,13 @@ def bedrock_extract(document_bytes, filename, fmt):
                     "document": {
                         "format": fmt,  # "pdf" or "docx"
                         "name": filename,
-                        "source": {"bytes": document_bytes},
+                        "source": {
+                            "s3Location": {
+                                "uri": f"{s3_uri}"
+                            },
+                        }
                     }
-                },
+                }
             ],
         }
     ]
