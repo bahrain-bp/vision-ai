@@ -1,9 +1,9 @@
 import React from "react";
 import { FileText } from "lucide-react";
-
+import { useCaseContext } from "../../hooks/useCaseContext";
 interface SessionData {
   sessionId: string;
-  witness: string;
+  participant: string;
   language: string;
   duration: string;
   status: string;
@@ -15,6 +15,9 @@ interface SessionInfoProps {
 }
 
 const SessionInfo: React.FC<SessionInfoProps> = ({ sessionData }) => {
+  const { currentPersonName } = useCaseContext();
+  const participantName =
+    currentPersonName || sessionData.participant || "Not verified yet";
   return (
     <div className="session-info-card">
       <div className="card-header">
@@ -24,8 +27,8 @@ const SessionInfo: React.FC<SessionInfoProps> = ({ sessionData }) => {
 
       <div className="info-content">
         <div className="info-item">
-          <p className="info-label">Witness:</p>
-          <p className="info-value">{sessionData.witness}</p>
+          <p className="info-label">Participant Name:</p>
+          <p className="info-value">{participantName}</p>
         </div>
 
         <div className="info-item">

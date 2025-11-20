@@ -72,7 +72,9 @@ def handle_verification_request(event, context):
     manual_override = body.get('manualOverride', False)
     override_reason = body.get('overrideReason', '')
     attempt_number = body.get('attemptNumber', 1)
-    
+    participant_name = body.get('participantName', '')
+    participant_cpr = body.get('participantCPR', '')
+    participant_nationality = body.get('participantNationality', '')
     logger.info(f"Request Parameters:")
     logger.info(f"  - Case ID: {case_id}")
     logger.info(f"  - Session ID: {session_id}")
@@ -132,8 +134,14 @@ def handle_verification_request(event, context):
     extracted_text = extraction_result['extractedText']
     nationality = extraction_result.get('nationality', 'Unknown')
     
-    # Use provided name or extracted name
-    final_person_name = person_name if person_name else extracted_name
+    if manual_override and participant_name:
+        final_person_name = participant_name
+        final_cpr_number = participant_cpr if participant_cpr else cpr_number
+        final_nationality = participant_nationality if participant_nationality else nationality
+    else:
+        final_person_name = person_name if person_name else extracted_name
+        final_cpr_number = cpr_number
+        final_nationality = nationality
     
     logger.info(f"✓ CPR extracted: {cpr_number}")
     logger.info(f"✓ Name extracted: {extracted_name}")
@@ -232,12 +240,16 @@ def handle_verification_request(event, context):
     session_metadata = create_or_update_session_metadata(
         case_id=case_id,
         session_id=session_id,
-        cpr_number=cpr_number,
+        cpr_number=final_cpr_number,
         person_name=final_person_name,
         person_type=person_type,
         verification_result=comparison_result,
-        nationality=nationality,
-        attempt_number=attempt_number
+        nationality=final_nationality,
+        attempt_number=attempt_number,
+        manual_override=manual_override,
+        participant_name=participant_name if manual_override else None,
+        participant_cpr=participant_cpr if manual_override else None,
+        participant_nationality=participant_nationality if manual_override else None
     )
     
     logger.info(f"Session metadata updated")
@@ -252,12 +264,16 @@ def handle_verification_request(event, context):
     verification_summary = {
         'caseId': case_id,
         'sessionId': session_id,
-        'cprNumber': cpr_number,
+        'cprNumber': final_cpr_number,
         'personType': person_type,
         'personName': final_person_name,
         'extractedName': extracted_name,
         'providedName': person_name,
-        'nationality': nationality,
+        'manuallyEnteredName': participant_name if manual_override else None,
+        'manuallyEnteredCPR': participant_cpr if manual_override else None,
+        'manuallyEnteredNationality': participant_nationality if manual_override else None, 
+        'nationality': final_nationality,  
+
         'verificationTimestamp': datetime.utcnow().isoformat(),
         'attemptNumber': attempt_number,
         'manualOverride': manual_override,
@@ -327,12 +343,12 @@ def handle_verification_request(event, context):
     # ==========================================
     response_data = {
         'success': True,
-        'cprNumber': cpr_number,
+        'cprNumber': final_cpr_number,
         'personType': person_type,
         'personName': final_person_name,
         'extractedName': extracted_name,
         'providedName': person_name,
-        'nationality': nationality,
+        'nationality': final_nationality,
         'photoSource': photo_source,
         'match': comparison_result['match'],
         'similarity': comparison_result.get('similarity', 0),
@@ -877,7 +893,7 @@ def compare_faces(source_photo_key, target_photo_key, case_id, session_id, cpr_n
         }
 
 
-def create_or_update_session_metadata(case_id, session_id, cpr_number, person_name, person_type, verification_result, nationality, attempt_number=1):
+def create_or_update_session_metadata(case_id, session_id, cpr_number, person_name, person_type, verification_result, nationality, attempt_number=1, manual_override=False, participant_name=None, participant_cpr=None,participant_nationality=None):
     """Update existing session metadata with verification results"""
     try:
         metadata_key = f"cases/{case_id}/sessions/{session_id}/session-metadata.json"
@@ -904,10 +920,12 @@ def create_or_update_session_metadata(case_id, session_id, cpr_number, person_na
             'similarity': verification_result.get('similarity', 0),
             'confidence': verification_result['confidence'],
             'status': 'VERIFIED' if verification_result['match'] else 'NOT_VERIFIED',
-            'manualOverride': verification_result.get('manualOverride', False),
-            'overrideReason': verification_result.get('overrideReason')
+            'manualOverride': manual_override,
+            'overrideReason': verification_result.get('overrideReason'),
+            'manuallyEnteredName': participant_name if manual_override else None,
+            'manuallyEnteredCPR': participant_cpr if manual_override else None,
+            'manuallyEnteredNationality': participant_nationality if manual_override else None
         }
-        
         # Update the existing metadata
         metadata = existing_metadata
         metadata['lastUpdated'] = current_timestamp

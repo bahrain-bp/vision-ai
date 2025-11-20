@@ -325,7 +325,7 @@ export const verifyIdentity = async (
       caseId: request.caseId,
       sessionId: request.sessionId,
       personType: request.personType,
-      personName: request.personName || "Will be extracted",
+      personName: request.participantName || "Will be extracted",
       attemptNumber: request.attemptNumber || 1,
       manualOverride: request.manualOverride || false,
     });

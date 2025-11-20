@@ -3,7 +3,7 @@ import { X, Download, Share2 } from "lucide-react";
 
 interface SessionData {
   sessionId: string;
-  witness: string;
+  participant: string;
   language: string;
   duration: string;
   status: string;

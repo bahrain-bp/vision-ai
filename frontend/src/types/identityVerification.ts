@@ -57,7 +57,9 @@ export interface VerificationRequest {
   documentKey: string;
   personPhotoKey: string;
   personType: PersonType;
-  personName?: string;
+  participantName?: string;
+  participantCPR?: string;
+  participantNationality?: string;
   attemptNumber?: number;
   manualOverride?: boolean;
   overrideReason?: string;
