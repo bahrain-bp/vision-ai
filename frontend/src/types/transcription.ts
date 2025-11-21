@@ -12,7 +12,7 @@ export interface TranscriptionResult {
   timeStamp: string;
 }
 
-export type Sources = "display" | "microphone";
+export type Sources = "display" | "microphone"|"both";
 
 export type Speakers = "Investigator" | "Witness";
 
@@ -26,3 +26,34 @@ export interface StreamStatus {
   message: string;
   isEnabled: boolean;
 }
+
+export interface TranscriptionStatus {
+  success: boolean;
+  timestamp?: string;
+  source?: Sources;
+  error?: TranscriptionError;
+}
+
+export interface TranscriptionError {
+  success: boolean;
+  message: string;
+  type?: ErrorType;
+  rawError?: any;
+}
+
+export type ErrorType =
+  | "auth"
+  | "network"
+  | "device"
+  | "permission"
+  | "service"
+  | "unknown";
+
+export const ErrorTypeLabels: Record<ErrorType, string> = {
+  auth: "Authentication Error",
+  network: "Network Connection Issue",
+  device: "Device Problem",
+  permission: "Permission Denied",
+  service: "Service Unavailable",
+  unknown: "Unexpected Error",
+};

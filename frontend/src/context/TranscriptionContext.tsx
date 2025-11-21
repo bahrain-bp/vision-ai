@@ -7,7 +7,7 @@ import React, {
   useEffect,
 } from "react";
 import { RecordingStatus } from "../types/";
-import { TranscriptionResult } from "../types";
+import { TranscriptionResult,TranscriptionStatus } from "../types";
 import TranscribeService from "../services/LiveTranscription/TranscribeService";
 
 export interface TranscriptionContextType {
@@ -16,9 +16,9 @@ export interface TranscriptionContextType {
   startRecording: (
     setSessionState?: (state: RecordingStatus) => void,
     selectedLanguage?: string
-  ) => Promise<boolean>;
+  ) => Promise<TranscriptionStatus>;
   stopRecording: (setSessionState?: (state: RecordingStatus) => void) => void;
-  getFullTranscript : string;
+  getFullTranscript: string;
 }
 
 export const TranscriptionContext = createContext<
@@ -36,14 +36,22 @@ export const TranscriptionProvider: React.FC<{ children: ReactNode }> = ({
     useState<RecordingStatus>("off");
   const isStartingRef = useRef(false);
 
-  const startRecording = useCallback(
+  const startRecording= useCallback(
     async (
       setSessionState?: (state: RecordingStatus) => void,
       selectedLanguage?: string
-    ) => {
-      if (isStartingRef.current) {
-        return false;
-      }
+    ): Promise<TranscriptionStatus>  => {
+        if (isStartingRef.current) {
+          return {
+            success: false,
+            timestamp: new Date().toISOString(),
+            source: "both",
+            error: {
+              success: false,
+              message: "Recording already starting",
+            },
+          };
+        }
 
       isStartingRef.current = true;
 
@@ -63,9 +71,8 @@ export const TranscriptionProvider: React.FC<{ children: ReactNode }> = ({
           if (setSessionState) {
             setSessionState(newStatus);
           }
-          return true;
         }
-        return false;
+        return result;
       } finally {
         isStartingRef.current = false;
       }

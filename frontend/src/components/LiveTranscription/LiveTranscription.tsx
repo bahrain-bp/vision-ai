@@ -1,8 +1,9 @@
 import React, { useEffect, useRef } from "react";
 import { FileText, Copy, Loader } from "lucide-react";
 import { useTranscription } from "../../hooks/useTranscription";
-import { RecordingStatus } from "../../types/";
+import { RecordingStatus, TranscriptionStatus } from "../../types/";
 import PDFExporter from "./PDFExporter";
+import ErrorDisplay from "./ErrorDisplay";
 import { useState } from "react";
 
 interface LiveTranscriptionProps {
@@ -18,9 +19,11 @@ const LiveTranscription: React.FC<LiveTranscriptionProps> = ({
 }) => {
   const { audioStatus, recordingStatus, startRecording, getFullTranscript } =
     useTranscription();
+  const [error, setError] = useState<TranscriptionStatus | null>(null);
 
   const [isStarting, setIsStarting] = useState(false);
   const hasStarted = useRef(false);
+
 
   useEffect(() => {
     if (
@@ -32,17 +35,20 @@ const LiveTranscription: React.FC<LiveTranscriptionProps> = ({
 
       const start = async () => {
         setIsStarting(true);
-
+        setError(null);
         try {
-          const success = await startRecording(
+          const result: TranscriptionStatus = await startRecording(
             setSessionState,
             selectedLanguage
           );
 
-          if (!success) {
-            console.error("Failed to start recording");
+          if (!result.success) {
+            console.error("Failed to start recording: ", result.error);
+            console.error("Error: ",result.error?.rawError);
+            setError(result);
             hasStarted.current = false;
           }
+
         } catch (error) {
           console.error("Error starting recording:", error);
           hasStarted.current = false;
@@ -54,7 +60,20 @@ const LiveTranscription: React.FC<LiveTranscriptionProps> = ({
       start();
     }
   }, [startRecordingProp, recordingStatus, selectedLanguage]);
-
+  
+  if (error) {
+    return (
+      <ErrorDisplay
+        displayMessage={error.error?.message ?? "Failed to start recording"}
+        rawMessage={error.error?.rawError}
+        displayTitle={error.error?.type}
+        onClose={() => {
+          setError(null);
+          hasStarted.current = false;
+        }}
+      />
+    );
+  }
 
 if (isStarting) {
   return (

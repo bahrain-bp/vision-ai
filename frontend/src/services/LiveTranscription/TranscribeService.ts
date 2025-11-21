@@ -10,6 +10,8 @@ import {
   TranscriptionResult,
   getSpeakerFromSource,
   Speakers,
+  TranscriptionStatus,
+  TranscriptionError,
 } from "../../types";
 import { LanguageCode } from "@aws-sdk/client-transcribe-streaming";
 import StreamManager from "./StreamManager";
@@ -23,14 +25,17 @@ class TranscribeService {
   private recordingStatus: RecordingStatus = "off";
 
   private mediaManager = StreamManager;
- 
+
+  private microphoneAttempts: number = 8;
+
+  private displayAttempts: number = 8;
+
   private static instance: TranscribeService;
 
   private transcriptCallback: ((result: TranscriptionResult) => void) | null =
     null;
 
   constructor() {}
-
 
   static getInstance(): TranscribeService {
     if (!TranscribeService.instance) {
@@ -39,61 +44,190 @@ class TranscribeService {
     return TranscribeService.instance;
   }
 
-
-
   private async createTranscribeClient(): Promise<TranscribeStreamingClient> {
-    const session = await getUserCredentials();
+    try {
+      const session = await getUserCredentials();
 
-    return new TranscribeStreamingClient({
-      region: process.env.REACT_APP_AWS_REGION!,
-      credentials: {
-        accessKeyId: session!.credentials!.accessKeyId,
-        secretAccessKey: session.credentials!.secretAccessKey,
-        sessionToken: session!.credentials!.sessionToken,
-      },
-    });
+      if (!session || !session.credentials) {
+        throw new Error("Failed to get user credentials");
+      }
+
+      return new TranscribeStreamingClient({
+        region: process.env.REACT_APP_AWS_REGION!,
+        credentials: {
+          accessKeyId: session.credentials.accessKeyId,
+          secretAccessKey: session.credentials.secretAccessKey,
+          sessionToken: session.credentials.sessionToken,
+        },
+      });
+    } catch (error) {
+      console.error("Failed to create Transcribe client:", error);
+      throw error;
+    }
   }
 
   async startRecording(
     onTranscriptUpdate?: (text: TranscriptionResult) => void,
     selectedLanguage?: string
-  ): Promise<{ success: boolean; message: String }> {
+  ): Promise<TranscriptionStatus> {
     this.transcriptCallback = onTranscriptUpdate || null;
 
     const display = await this.mediaManager.getDisplayStream();
     const audio = await this.mediaManager.getMicStream();
 
     if (display.displayStream === null || display.success === false)
-      return { success: false, message: "Failed to start display stream" };
+      return {
+        success: false,
+        timestamp: new Date().toISOString(),
+        source: "display",
+        error: {
+          success: false,
+          type: "device",
+          message:
+            "Unable to capture your screen. Please try selecting the window again.",
+          rawError: display.error,
+        },
+      };
     if (audio.audioStream === null || audio.success === false)
-      return { success: false, message: "Failed to start audio stream" };
+      return {
+        success: false,
+        timestamp: new Date().toISOString(),
+        source: "microphone",
+        error: {
+          success: false,
+          message: "Microphone not detected. Please check your device settings",
+          rawError: audio.error,
+        },
+      };
+
+    if (!this.mediaManager.getDisplayStreamStatus().hasAudioTracks) {
+      return {
+        success: false,
+        timestamp: new Date().toISOString(),
+        source: "microphone",
+        error: {
+          success: false,
+          type: "device",
+          message:
+            "Please enable 'Share system audio' when selecting your screen.",
+          rawError: audio.error,
+        },
+      };
+    }
 
     this.audioStatus = "on";
     this.displayStatus = "on";
 
-    const transcribeClient: TranscribeStreamingClient =
-      await this.createTranscribeClient();
+    let transcribeClient;
+    try {
+      transcribeClient = await this.createTranscribeClient();
+    } catch (error) {
+      return {
+        success: false,
+        timestamp: new Date().toISOString(),
+        source: "both",
+        error: {
+          success: false,
+          type: "auth",
+          message: "Authentication failed. Please log in again.",
+          rawError: error instanceof Error ? error.message : String(error),
+        },
+      };
+    }
 
-     Promise.all([
-      this.startTranscriptionStream(
-        transcribeClient,
-        audio.audioStream,
-        "microphone",
-        this.mediaManager.getSampleRate(),
-        selectedLanguage
-      ),
+    const micResult = await this.attemptConnection(
+      "microphone",
+      transcribeClient,
+      audio.audioStream,
+      this.microphoneAttempts,
+      selectedLanguage
+    );
 
-      this.startTranscriptionStream(
-        transcribeClient,
-        display.displayStream,
-        "display",
-        this.mediaManager.getSampleRate(),
-        selectedLanguage
-      ),
-    ]);
+    if (!micResult.success) {
+      return {
+        success: false,
+        timestamp: new Date().toISOString(),
+        source: "microphone",
+        error: micResult,
+      };
+    }
+
+    const displayResult = await this.attemptConnection(
+      "display",
+      transcribeClient,
+      display.displayStream,
+      this.displayAttempts,
+      selectedLanguage
+    );
+
+    if (!displayResult.success) {
+      this.mediaManager.stopStreams();
+      return {
+        success: false,
+        timestamp: new Date().toISOString(),
+        source: "display",
+        error: displayResult,
+      };
+    }
 
     this.recordingStatus = "on";
-    return { success: true, message: "Stream is running" };
+    return { success: true };
+  }
+
+  async attemptConnection(
+    source: "display" | "microphone",
+    transcribeClient: TranscribeStreamingClient,
+    stream: MediaStream,
+    maxAttempts: number,
+    selectedLanguage?: string
+  ): Promise<TranscriptionError> {
+    
+    let attempts = maxAttempts;
+    
+    let connected = false;
+
+    let result: TranscriptionError = {
+      success: false,
+      message: "No attempts made",
+    };
+
+    while (attempts > 0 && !connected) {
+      console.log(
+        `${source} attempt ${maxAttempts - attempts + 1}/${maxAttempts}`
+      );
+
+      result = await this.startTranscriptionStream(
+        transcribeClient,
+        stream,
+        source,
+        this.mediaManager.getSampleRate(),
+        selectedLanguage
+      );
+
+      console.log(`📊 Result:`, result);
+
+      connected = result.success;
+
+      if (!connected) {
+        attempts--;
+        if (attempts > 0) {
+          console.log(`Retrying... (${attempts} left)`);
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+        }
+      }
+    }
+    return connected
+      ? { success: true, message: `${source} connected` }
+      : {
+          success: false,
+          type: "network",
+          message:
+            result.message ||
+            (source === "microphone"
+              ? "Unable to connect microphone to transcription service. Please try again."
+              : "Unable to connect screen audio to transcription service. Please try again."),
+          rawError: result.rawError,
+        };
   }
 
   private getAudioStream = async function* (
@@ -123,126 +257,119 @@ class TranscribeService {
     }
   };
 
-  async startTranscriptionStream(
+  private async startTranscriptionStream(
     transcribeClient: TranscribeStreamingClient,
     stream: MediaStream,
     source: "display" | "microphone",
     sampleRate: number,
     selectedLanguage?: String
-  ): Promise<{ success: boolean; message: String }> {
-   const microphoneStream: MicrophoneStream = new MicrophoneStream();
+  ): Promise<TranscriptionError> {
+    const microphoneStream: MicrophoneStream = new MicrophoneStream();
 
-   try {
-     microphoneStream.setStream(stream);
-   } catch (error) {
-     console.error(
-       `${source} transcription error: Failed to initialize microphone stream`,
-       error
-     );
-     return {
-       success: false,
-       message:
-         "Unable to initialize audio capture stream. Please check microphone permissions and try again.",
-     };
-   }
- 
-
-const command: StartStreamTranscriptionCommand =
-  new StartStreamTranscriptionCommand({
-    LanguageCode:
-      selectedLanguage === "auto"
-        ? undefined
-        : (selectedLanguage as LanguageCode),
-    MediaEncoding: "pcm",
-    MediaSampleRateHertz: sampleRate,
-    IdentifyMultipleLanguages: selectedLanguage === "auto",
-    LanguageOptions: selectedLanguage === "auto" ? "ar-SA,en-US" : undefined, 
-    ShowSpeakerLabel: selectedLanguage !== "auto",
-    AudioStream: this.getAudioStream(
-      microphoneStream,
-      this.mediaManager.getSampleRate()
-    ),
-  });
-
-    const data: StartStreamTranscriptionCommandOutput = await transcribeClient.send(command);
-
-    if (!data) {
-        console.error(`${source} transcription: No response from AWS Transcribe`);
-        return {
-            success: false,
-            message: "No response from transcription service",
-        };
-    }
-
-    if (!data.TranscriptResultStream) {
-      console.error(
-        `${source} transcription: TranscriptResultStream is null or undefined`
-      );
+    try {
+      microphoneStream.setStream(stream);
+    } catch (error) {
+      console.error(`${source}: Failed to initialize stream`, error);
       return {
         success: false,
-        message: "Failed to get transcription results stream",
+        type: "device",
+        message:
+          "Failed to process audio stream. Please refresh and try again.",
+        rawError: error instanceof Error ? error.message : String(error),
       };
     }
 
-    for await (const event of data.TranscriptResultStream) {
-      const results = event.TranscriptEvent?.Transcript?.Results;
+    const command: StartStreamTranscriptionCommand =
+      new StartStreamTranscriptionCommand({
+        LanguageCode:
+          selectedLanguage === "auto"
+            ? undefined
+            : (selectedLanguage as LanguageCode),
+        MediaEncoding: "pcm",
+        MediaSampleRateHertz: sampleRate,
+        IdentifyMultipleLanguages: selectedLanguage === "auto",
+        LanguageOptions:
+          selectedLanguage === "auto"
+            ? "ar-SA,en-US,fr-FR,es-ES,de-DE,hi-IN,pt-BR,zh-CN,ja-JP,ko-KR"
+            : undefined,
+        ShowSpeakerLabel: selectedLanguage !== "auto",
+        AudioStream: this.getAudioStream(microphoneStream, sampleRate),
+      });
 
-      if (!results) {
-        continue;
+    try {
+      const data: StartStreamTranscriptionCommandOutput =
+        await transcribeClient.send(command);
+
+      if (!data || !data.TranscriptResultStream) {
+        return {
+          success: false,
+          type: "service",
+          message: "Transcription service unavailable. Please try again later.",
+        };
       }
 
-      for (const result of results) {
-        if (!result || !result.Alternatives) {
-         continue;
-        }
+      this.processStream(data.TranscriptResultStream, source);
 
-        if (
-          !result.IsPartial &&
-          result.Alternatives &&
-          result.Alternatives.length > 0
-        ) {
+      return { success: true, message: `${source} connected` };
+    } catch (error) {
+      console.error(`${source}: Connection failed`, error);
+      return {
+        success: false,
+        type: "network",
+        message:
+          "Connection to transcription service lost. Check your internet connection and try again.",
+        rawError: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }
+
+  private async processStream(stream: any, source: "display" | "microphone") {
+    try {
+      for await (const event of stream) {
+        const results = event.TranscriptEvent?.Transcript?.Results;
+        if (!results) continue;
+
+        for (const result of results) {
+          if (!result?.Alternatives || result.IsPartial) continue;
+
           const Items = result.Alternatives[0]?.Items;
-          if (!Items || Items.length === 0) {
-            continue;
-          }
+          if (!Items || Items.length === 0) continue;
 
           const transcriptWords: TranscribedWord[] = Items.map(
-            (item, index) => ({
+            (item: any, index: any) => ({
               id: index,
               content: item.Content ?? "N/A",
               confidence: item.Confidence ?? 0,
               speaker: item.Speaker ?? "0",
             })
           );
-          
+
           const speaker: Speakers = getSpeakerFromSource(source);
+          const timeStamp = new Date().toLocaleString("en-US", {
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+            hour12: false,
+          });
 
-            const timeStamp = new Date().toLocaleString("en-US", {
-              hour: "2-digit",
-              minute: "2-digit",
-              second: "2-digit",
-              hour12: false,
-            });
-
-            const fullDetailTranscript: TranscriptionResult = {
-              words: transcriptWords,
-              speaker,
-              timeStamp: timeStamp,
-              formattedTranscript:
-                `[${timeStamp}] ${speaker}: ` +
-                transcriptWords.map((item) => item.content).join(" ") +
-                `\n\n`,
-            };
-
+          const fullDetailTranscript: TranscriptionResult = {
+            words: transcriptWords,
+            speaker,
+            timeStamp: timeStamp,
+            formattedTranscript:
+              `[${timeStamp}] ${speaker}: ` +
+              transcriptWords.map((item) => item.content).join(" ") +
+              `\n\n`,
+          };
 
           if (this.transcriptCallback) {
             this.transcriptCallback(fullDetailTranscript);
           }
         }
       }
+    } catch (error) {
+      console.error(`${source}: Stream processing error`, error);
     }
-
-    return { success: true, message: `${source} stream is completed` };
   }
 
   stopRecording(): void {
