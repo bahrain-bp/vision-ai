@@ -15,25 +15,50 @@ interface Event {
   description: string;
   confidence?: number;
   type: string;
+  risk_score?: number;
 }
 
-interface OCRLine {
-  text: string;
-  confidence?: number;
-  bounding_box?: any;
-}
-
-interface OCREntry {
-  frame_index?: number;
+interface ChapterData {
+  id: string;
   timestamp: number;
-  timecode_smpte?: string;
-  lines: OCRLine[];
+  start_seconds: number;
+  end_seconds: number;
+  duration_seconds: number;
+  summary: string;
+  risk_score?: number;
+  confidence?: number;
+  type: string;
+  event?: {
+    id: string;
+    description: string;
+    type: string;
+    confidence: number;
+    timestamp?: number;
+    start_millis?: number;
+    end_millis?: number;
+  };
+  person?: {
+    id: string;
+    description: string;
+    confidence: number;
+    first_seen?: number;
+    last_seen?: number;
+  };
+  object?: {
+    id: string;
+    description: string;
+    suspicious: boolean;
+    risk_relevance: string;
+    confidence: number;
+    first_seen?: number;
+    last_seen?: number;
+  };
 }
 
 interface AnalysisResult {
   events: Event[];
   summary: string;
-  ocr?: OCREntry[];
+  chapters?: ChapterData[];
   metadata?: {
     duration_seconds: number;
     frame_rate?: number;
@@ -53,7 +78,7 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(
     null
   );
-  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+  const [expandedChapter, setExpandedChapter] = useState<string | null>(null);
   const [videoS3Key, setVideoS3Key] = useState<string>("");
   const [jobId, setJobId] = useState<string>("");
   const [pollingStatus, setPollingStatus] = useState<string>("");
@@ -135,7 +160,7 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
   };
 
   // Poll for analysis results
-  const pollForResults = async (jobId: string, maxAttempts: number = 30) => {
+  const pollForResults = async (jobId: string, maxAttempts: number = 60) => {
     let attempts = 0;
 
     const poll = async () => {
@@ -158,7 +183,7 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
           setAnalysisResult({
             summary: result.summary || "No summary available",
             events: result.events || [],
-            ocr: result.ocr || [],
+            chapters: result.chapters || [],
             metadata: result.metadata,
             processedAt: new Date(),
           });
@@ -185,6 +210,7 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
           setAnalysisResult({
             summary: error.message || "Analysis failed",
             events: [],
+            chapters: [],
             processedAt: new Date(),
           });
         }
@@ -240,19 +266,20 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
       setAnalysisResult({
         summary: error.message || "Analysis failed",
         events: [],
+        chapters: [],
         processedAt: new Date(),
       });
     }
-  };
-
-  const selectEvent = (event: Event) => {
-    setSelectedEvent(event);
   };
 
   const handleTimelineClick = (timestamp: number) => {
     if (videoRef.current) {
       videoRef.current.currentTime = timestamp;
     }
+  };
+
+  const toggleChapter = (chapterId: string) => {
+    setExpandedChapter(expandedChapter === chapterId ? null : chapterId);
   };
 
   const formatTime = (seconds: number): string => {
@@ -269,6 +296,13 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
       videoRef.current?.duration ||
       0
     );
+  };
+
+  const getRiskScoreColor = (score?: number): string => {
+    if (!score) return "#666";
+    if (score >= 80) return "#dc3545"; // High risk - red
+    if (score >= 50) return "#ffc107"; // Medium risk - yellow
+    return "#28a745"; // Low risk - green
   };
 
   return (
@@ -394,46 +428,268 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
           <div className="tab-section-content">
             {analysisResult ? (
               <div className="analysis-results">
-                {/* Summary */}
-                <div className="analysis-summary">
-                  <h4 className="summary-title">Summary</h4>
-                  <p className="summary-text">{analysisResult.summary}</p>
-                </div>
-                {/* Events Timeline */}
-                <div className="events-timeline">
-                  <h4 className="events-title">
-                    Detected Events ({analysisResult.events.length})
-                  </h4>
-                  <div className="events-list">
-                    {analysisResult.events.map((event: Event) => (
-                      <div
-                        key={event.id}
-                        onClick={() => {
-                          selectEvent(event);
-                          handleTimelineClick(event.timestamp);
-                        }}
-                        className={`event-item ${
-                          selectedEvent?.id === event.id ? "selected" : ""
-                        }`}
-                      >
-                        <div className="event-header">
-                          <span className={`event-type ${event.type}`}>
-                            {event.type}
-                          </span>
-                          <span className="event-time">
-                            {formatTime(event.timestamp)}
-                          </span>
-                        </div>
-                        <p className="event-description">{event.description}</p>
-                        {event.confidence && (
-                          <div className="event-confidence">
-                            Confidence: {Math.round(event.confidence * 100)}%
-                          </div>
-                        )}
-                      </div>
-                    ))}
+                {/* Video Summary Section */}
+                <div className="video-summary-section">
+                  <h3 className="section-header">Video Summary</h3>
+                  <div className="summary-card">
+                    <p className="summary-text">{analysisResult.summary}</p>
                   </div>
                 </div>
+
+                {/* Video Chapters Section */}
+                {analysisResult.chapters &&
+                  analysisResult.chapters.length > 0 && (
+                    <div className="chapters-section">
+                      <h3 className="section-header">
+                        Video Chapters ({analysisResult.chapters.length})
+                      </h3>
+                      <div className="chapters-list">
+                        {analysisResult.chapters.map((chapter: ChapterData) => (
+                          <div key={chapter.id} className="chapter-card">
+                            {/* Chapter Header - Clickable */}
+                            <div
+                              className="chapter-header"
+                              onClick={() => {
+                                toggleChapter(chapter.id);
+                                handleTimelineClick(chapter.start_seconds);
+                              }}
+                            >
+                              <div className="chapter-header-left">
+                                <span className="chapter-icon">
+                                  {expandedChapter === chapter.id ? "▼" : "▶"}
+                                </span>
+                                <div className="chapter-info">
+                                  <div className="chapter-title">
+                                    Chapter{" "}
+                                    {parseInt(chapter.id.split("-")[1]) + 1}
+                                  </div>
+                                  <div className="chapter-time">
+                                    {formatTime(chapter.start_seconds)} -{" "}
+                                    {formatTime(chapter.end_seconds)} (
+                                    {formatTime(chapter.duration_seconds)}{" "}
+                                    duration)
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="chapter-header-right">
+                                {chapter.risk_score !== undefined && (
+                                  <span
+                                    className="risk-badge"
+                                    style={{
+                                      backgroundColor: getRiskScoreColor(
+                                        chapter.risk_score
+                                      ),
+                                    }}
+                                  >
+                                    Risk: {chapter.risk_score}
+                                  </span>
+                                )}
+                                {chapter.confidence !== undefined && (
+                                  <span className="confidence-badge">
+                                    {Math.round(chapter.confidence)}% confidence
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Chapter Summary */}
+                            <div className="chapter-summary">
+                              <p>{chapter.summary}</p>
+                            </div>
+
+                            {/* Expanded Chapter Details */}
+                            {expandedChapter === chapter.id && (
+                              <div className="chapter-details">
+                                {/* Event Detection */}
+                                {chapter.event && (
+                                  <div
+                                    className="detail-card event-card"
+                                    onClick={() => {
+                                      if (
+                                        chapter.event?.timestamp !== undefined
+                                      ) {
+                                        handleTimelineClick(
+                                          chapter.event.timestamp
+                                        );
+                                      } else if (
+                                        chapter.event?.start_millis !==
+                                        undefined
+                                      ) {
+                                        handleTimelineClick(
+                                          chapter.event.start_millis / 1000
+                                        );
+                                      }
+                                    }}
+                                  >
+                                    <div className="detail-header">
+                                      <span className="detail-title">
+                                        Event Detected
+                                      </span>
+                                      <div className="detail-header-badges">
+                                        <span className="event-type-badge">
+                                          {chapter.event.type}
+                                        </span>
+                                        {chapter.event.confidence && (
+                                          <span className="confidence-badge">
+                                            {Math.round(
+                                              chapter.event.confidence
+                                            )}
+                                            % confidence
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <div className="detail-content">
+                                      <p className="detail-description">
+                                        {chapter.event.description}
+                                      </p>
+                                      <div className="detail-meta">
+                                        {chapter.event.timestamp !==
+                                          undefined && (
+                                          <span>
+                                            {formatTime(
+                                              chapter.event.timestamp
+                                            )}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Person Detection */}
+                                {chapter.person && (
+                                  <div
+                                    className="detail-card person-card"
+                                    onClick={() => {
+                                      if (
+                                        chapter.person?.first_seen !== undefined
+                                      ) {
+                                        handleTimelineClick(
+                                          chapter.person.first_seen
+                                        );
+                                      }
+                                    }}
+                                  >
+                                    <div className="detail-header">
+                                      <span className="detail-title">
+                                        Person Identified
+                                      </span>
+                                      {chapter.person.confidence && (
+                                        <span className="confidence-badge">
+                                          {Math.round(
+                                            chapter.person.confidence
+                                          )}
+                                          % confidence
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="detail-content">
+                                      <p className="detail-description">
+                                        {chapter.person.description}
+                                      </p>
+                                      <div className="detail-meta">
+                                        {chapter.person.first_seen !==
+                                          undefined && (
+                                          <span>
+                                            First seen:{" "}
+                                            {formatTime(
+                                              chapter.person.first_seen
+                                            )}
+                                          </span>
+                                        )}
+                                        {chapter.person.last_seen !==
+                                          undefined && (
+                                          <span>
+                                            Last seen:{" "}
+                                            {formatTime(
+                                              chapter.person.last_seen
+                                            )}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Object Detection */}
+                                {chapter.object && (
+                                  <div
+                                    className={`detail-card object-card ${
+                                      chapter.object.suspicious
+                                        ? "suspicious"
+                                        : ""
+                                    }`}
+                                    onClick={() => {
+                                      if (
+                                        chapter.object?.first_seen !== undefined
+                                      ) {
+                                        handleTimelineClick(
+                                          chapter.object.first_seen
+                                        );
+                                      }
+                                    }}
+                                  >
+                                    <div className="detail-header">
+                                      <span className="detail-title">
+                                        Object Detected
+                                      </span>
+                                      <div className="detail-header-badges">
+                                        {chapter.object.suspicious && (
+                                          <span className="suspicious-badge">
+                                            Suspicious
+                                          </span>
+                                        )}
+                                        {chapter.object.confidence && (
+                                          <span className="confidence-badge">
+                                            {Math.round(
+                                              chapter.object.confidence
+                                            )}
+                                            % confidence
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <div className="detail-content">
+                                      <p className="detail-description">
+                                        {chapter.object.description}
+                                      </p>
+                                      {chapter.object.risk_relevance && (
+                                        <p className="risk-relevance">
+                                          <strong>Risk Assessment:</strong>{" "}
+                                          {chapter.object.risk_relevance}
+                                        </p>
+                                      )}
+                                      <div className="detail-meta">
+                                        {chapter.object.first_seen !==
+                                          undefined && (
+                                          <span>
+                                            First seen:{" "}
+                                            {formatTime(
+                                              chapter.object.first_seen
+                                            )}
+                                          </span>
+                                        )}
+                                        {chapter.object.last_seen !==
+                                          undefined && (
+                                          <span>
+                                            Last seen:{" "}
+                                            {formatTime(
+                                              chapter.object.last_seen
+                                            )}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                 <div className="export-actions">
                   <button className="continue-btn">Export Report</button>
@@ -444,7 +700,6 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
               </div>
             ) : (
               <div className="no-results">
-                <div className="no-results-icon"></div>
                 <p>Upload a video to start analysis</p>
               </div>
             )}
