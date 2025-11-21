@@ -8,6 +8,8 @@ import awsConfig from "./aws-config";
 import { User } from "./types";
 import { TranscriptionProvider } from "./context/TranscriptionContext";
 import { CaseProvider } from "./context/CaseContext"; // ADD THIS IMPORT
+import { QuestionProvider } from "./context/QuestionContext";
+
 
 Amplify.configure(awsConfig);
 
@@ -138,12 +140,14 @@ const App: React.FC = () => {
           {/* ADD THIS WRAPPER */}
           {currentView === "session" && currentUser && sessionData ? (
             <TranscriptionProvider>
+              <QuestionProvider> 
               <SessionPage
                 user={currentUser}
                 onSignOut={handleSignOut}
                 //sessionData={sessionData}
                 onEndSession={handleEndSession}
               />
+              </QuestionProvider>
             </TranscriptionProvider>
           ) : currentUser ? (
             <HomePage
