@@ -27,6 +27,8 @@ const Classification: React.FC<ClassificationProps> = ({ sessionData }) => {
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const apiBase = process.env.REACT_APP_API_ENDPOINT || "";
+  const extractFnUrl = process.env.REACT_APP_EXTRACT_FN_URL ||"https://s2dntz6phbvnsmferrtuirulfe0ziteu.lambda-url.us-east-1.on.aws/";
+
 
   const clearMessages = () => {
     setError(null);
@@ -95,7 +97,7 @@ const Classification: React.FC<ClassificationProps> = ({ sessionData }) => {
       throw new Error("Missing session id.");
     }
 
-    const res = await fetch(`${apiBase}/classification/extract`, {
+    const res = await fetch(extractFnUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

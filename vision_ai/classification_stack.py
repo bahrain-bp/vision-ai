@@ -170,6 +170,29 @@ class classificationStack(Stack):
             "POST",
             apigateway.LambdaIntegration(extract_text_lambda),
         )
+
+        extract_fn_url = extract_text_lambda.add_function_url(
+            auth_type=_lambda.FunctionUrlAuthType.NONE,
+            cors=_lambda.FunctionUrlCorsOptions(
+                allowed_origins=["http://localhost:3000"],
+                allowed_methods=[_lambda.HttpMethod.POST],    
+                allowed_headers=[
+                    "content-type",
+                    "authorization",
+                    "x-amz-date",
+                    "x-api-key",
+                    "x-amz-security-token",
+                   "x-requested-with"
+                ]
+            )
+        )
+
+        CfnOutput(
+            self,
+            "ExtractTextFunctionURL",
+            value=extract_fn_url.url,
+            description="Direct Lambda URL for text extraction"
+        )
         
 
         CfnOutput(

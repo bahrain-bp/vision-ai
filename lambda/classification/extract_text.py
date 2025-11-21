@@ -28,7 +28,6 @@ def error_response(status_code, message):
     return {
         'statusCode': status_code,
         'headers': {
-            'Access-Control-Allow-Origin': '*',
             'Content-Type': 'application/json'
         },
         'body': json.dumps({'error': message})
@@ -111,6 +110,9 @@ def bedrock_extract(s3_uri, filename, fmt):
                         "أرجع النص الخام فقط."
                         "أخرج النص دون تغيير كاملًا"
                         "لا تعدل ولا تحذف ولا تضيف أي شيئ"
+                        "أخرج الاحداث والتفاصيل المملة للقضة وشهادات جميع الاطراف"
+                        "أخرج الاسماء والمعلومات الشخصية للجميع"
+                        "اخرج الادلة وكل ماذكر في الملف مهما كان نوعه"
                     )
                 },
                 {
@@ -147,10 +149,7 @@ def api_response(text, status=200):
         "statusCode": status,
         "headers": {
             "Content-Type": "application/json;"
-            " charset=utf-8",
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Headers": "Content-Type",
-            "Access-Control-Allow-Methods": "OPTIONS,POST"
+            " charset=utf-8"
         },
         "body": json.dumps({"extracted_text": text}, ensure_ascii=False),
     }

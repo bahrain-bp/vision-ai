@@ -29,11 +29,10 @@ def handler(event, context):
             return error_response(400, 'sessionId, fileName and fileType are required')
 
 
-        
         #Generate unique s3 key
         unique_id = str(uuid.uuid4())
         timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-        unique_key = f"classification/upload/{unique_id}-{timestamp}-{file_name}"
+        unique_key = f"classification/upload/{sessionId}/{timestamp}-{unique_id}-{file_name}"
 
         url = s3.generate_presigned_url(
             'put_object',
