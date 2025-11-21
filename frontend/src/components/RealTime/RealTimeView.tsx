@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import {
   User,
-  MessageSquare,
   ChevronUp,
   ChevronDown,
 } from "lucide-react";
@@ -12,6 +11,8 @@ import SessionInfo from "./SessionInfo";
 import IdentityVerification from "./IdentityVerification/IdentityVerification";
 import TranscriptionSessionSetup from "../LiveTranscription/TranscriptionSessionSetup"
 import { RecordingStatus } from "../../types/";
+import MetricsWidget from './AIAssistant/MetricsWidget';
+
 
 interface SessionData {
   sessionId: string;
@@ -168,24 +169,23 @@ const RealTimeView: React.FC<RealTimeViewProps> = ({
           </button>
         </div>
 
-        <div className="ai-assistant-section">
-          <button
-            onClick={() => setAiExpanded(!aiExpanded)}
-            className="ai-toggle-btn"
-          >
-            <div className="ai-toggle-header">
-              <MessageSquare className="btn-icon" />
-              <span>AI Assistant</span>
-            </div>
-            {aiExpanded ? (
-              <ChevronUp className="chevron-icon" />
-            ) : (
-              <ChevronDown className="chevron-icon" />
-            )}
-          </button>
-          {aiExpanded && <AIAssistant sessionState={sessionState} />}
-        </div>
+        <div className="ai-section">
+  <button
+    onClick={() => setAiExpanded(!aiExpanded)}
+    className="ai-toggle-btn"
+  >
+    AI Assistant
+    {aiExpanded ? <ChevronUp /> : <ChevronDown />}
+  </button>
 
+  {aiExpanded && (
+    <div className="space-y-4">
+      {/* MetricsWidget inside expandable */}
+      <MetricsWidget />
+      <AIAssistant sessionState={sessionState} />
+    </div>
+  )}
+</div>
         <SessionInfo sessionData={sessionData} />
       </div>
     </div>
