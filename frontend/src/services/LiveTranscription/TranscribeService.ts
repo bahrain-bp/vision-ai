@@ -8,10 +8,11 @@ import { getUserCredentials } from "../authService";
 import {
   TranscribedWord,
   TranscriptionResult,
-  getSpeakerFromSource,
-  Speakers,
+  //getSpeakerFromSource,
+  //Speakers,
   TranscriptionStatus,
   TranscriptionError,
+  sessionType
 } from "../../types";
 import { LanguageCode } from "@aws-sdk/client-transcribe-streaming";
 import StreamManager from "./StreamManager";
@@ -68,7 +69,8 @@ class TranscribeService {
 
   async startRecording(
     onTranscriptUpdate?: (text: TranscriptionResult) => void,
-    selectedLanguage?: string
+    selectedLanguage?: string,
+    sessionType?: sessionType
   ): Promise<TranscriptionStatus> {
     this.transcriptCallback = onTranscriptUpdate || null;
 
@@ -140,7 +142,8 @@ class TranscribeService {
       transcribeClient,
       audio.audioStream,
       this.microphoneAttempts,
-      selectedLanguage
+      selectedLanguage,
+      "standard"
     );
 
     if (!micResult.success) {
@@ -157,7 +160,8 @@ class TranscribeService {
       transcribeClient,
       display.displayStream,
       this.displayAttempts,
-      selectedLanguage
+      selectedLanguage,
+      sessionType,
     );
 
     if (!displayResult.success) {
@@ -179,11 +183,11 @@ class TranscribeService {
     transcribeClient: TranscribeStreamingClient,
     stream: MediaStream,
     maxAttempts: number,
-    selectedLanguage?: string
+    selectedLanguage?: string,
+    speakerMode?: sessionType
   ): Promise<TranscriptionError> {
-    
     let attempts = maxAttempts;
-    
+
     let connected = false;
 
     let result: TranscriptionError = {
@@ -201,7 +205,8 @@ class TranscribeService {
         stream,
         source,
         this.mediaManager.getSampleRate(),
-        selectedLanguage
+        selectedLanguage,
+        speakerMode
       );
 
       console.log(`📊 Result:`, result);
@@ -262,7 +267,8 @@ class TranscribeService {
     stream: MediaStream,
     source: "display" | "microphone",
     sampleRate: number,
-    selectedLanguage?: String
+    selectedLanguage?: String,
+    speakerMode?: sessionType
   ): Promise<TranscriptionError> {
     const microphoneStream: MicrophoneStream = new MicrophoneStream();
 
@@ -292,7 +298,9 @@ class TranscribeService {
           selectedLanguage === "auto"
             ? "ar-SA,en-US,fr-FR,es-ES,de-DE,hi-IN,pt-BR,zh-CN,ja-JP,ko-KR"
             : undefined,
-        ShowSpeakerLabel: selectedLanguage !== "auto",
+        ShowSpeakerLabel:
+          source === "display" &&
+          speakerMode === "multi",
         AudioStream: this.getAudioStream(microphoneStream, sampleRate),
       });
 
@@ -308,7 +316,7 @@ class TranscribeService {
         };
       }
 
-      this.processStream(data.TranscriptResultStream, source);
+      this.processStream(data.TranscriptResultStream, source, speakerMode);
 
       return { success: true, message: `${source} connected` };
     } catch (error) {
@@ -323,7 +331,11 @@ class TranscribeService {
     }
   }
 
-  private async processStream(stream: any, source: "display" | "microphone") {
+  private async processStream(
+    stream: any,
+    source: "display" | "microphone",
+    speakerMode?: sessionType
+  ) {
     try {
       for await (const event of stream) {
         const results = event.TranscriptEvent?.Transcript?.Results;
@@ -331,7 +343,7 @@ class TranscribeService {
 
         for (const result of results) {
           if (!result?.Alternatives || result.IsPartial) continue;
-
+          console.log("Partial ", result);
           const Items = result.Alternatives[0]?.Items;
           if (!Items || Items.length === 0) continue;
 
@@ -343,8 +355,25 @@ class TranscribeService {
               speaker: item.Speaker ?? "0",
             })
           );
+          // Determine speaker label based on mode
+          let speaker: string;
 
-          const speaker: Speakers = getSpeakerFromSource(source);
+          if (source === "microphone") {
+            // Microphone is ALWAYS Investigator
+            speaker = "Investigator";
+          } else {
+            // Display audio
+            if (speakerMode === "standard") {
+              // 1-on-1: Just one fixed label
+              speaker = "Witness";
+            } else {
+              // Multiple: Use AWS speaker detection
+              const awsSpeakerLabel = transcriptWords[0]?.speaker || "0";
+              speaker = `Speaker ${awsSpeakerLabel}`;
+            }
+          }
+
+          //const speaker: Speakers = getSpeakerFromSource(source);
           const timeStamp = new Date().toLocaleString("en-US", {
             hour: "2-digit",
             minute: "2-digit",

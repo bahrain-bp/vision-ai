@@ -6,7 +6,7 @@ import React, {
   useRef,
   useEffect,
 } from "react";
-import { RecordingStatus } from "../types/";
+import { RecordingStatus, sessionType } from "../types/";
 import { TranscriptionResult,TranscriptionStatus } from "../types";
 import TranscribeService from "../services/LiveTranscription/TranscribeService";
 
@@ -15,7 +15,8 @@ export interface TranscriptionContextType {
   recordingStatus: RecordingStatus;
   startRecording: (
     setSessionState?: (state: RecordingStatus) => void,
-    selectedLanguage?: string
+    selectedLanguage?: string,
+    sessionType?:sessionType,
   ) => Promise<TranscriptionStatus>;
   stopRecording: (setSessionState?: (state: RecordingStatus) => void) => void;
   getFullTranscript: string;
@@ -36,29 +37,31 @@ export const TranscriptionProvider: React.FC<{ children: ReactNode }> = ({
     useState<RecordingStatus>("off");
   const isStartingRef = useRef(false);
 
-  const startRecording= useCallback(
+  const startRecording = useCallback(
     async (
       setSessionState?: (state: RecordingStatus) => void,
-      selectedLanguage?: string
-    ): Promise<TranscriptionStatus>  => {
-        if (isStartingRef.current) {
-          return {
+      selectedLanguage?: string,
+      sessionType?:sessionType,
+    ): Promise<TranscriptionStatus> => {
+      if (isStartingRef.current) {
+        return {
+          success: false,
+          timestamp: new Date().toISOString(),
+          source: "both",
+          error: {
             success: false,
-            timestamp: new Date().toISOString(),
-            source: "both",
-            error: {
-              success: false,
-              message: "Recording already starting",
-            },
-          };
-        }
+            message: "Recording already starting",
+          },
+        };
+      }
 
       isStartingRef.current = true;
 
       try {
         const result = await TranscribeService.startRecording(
           setTranscriptUpdate,
-          selectedLanguage
+          selectedLanguage,
+          sessionType,
         );
 
         if (result.success) {

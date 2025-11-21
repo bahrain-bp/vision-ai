@@ -16,6 +16,8 @@ export type Sources = "display" | "microphone"|"both";
 
 export type Speakers = "Investigator" | "Witness";
 
+export type sessionType = "standard" | "multi";
+
 export const getSpeakerFromSource = (source: Sources): Speakers => {
   return source === "microphone" ? "Investigator" : "Witness";
 };
@@ -57,3 +59,5 @@ export const ErrorTypeLabels: Record<ErrorType, string> = {
   service: "Service Unavailable",
   unknown: "Unexpected Error",
 };
+
+
