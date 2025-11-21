@@ -40,7 +40,7 @@ const ProcessingView: React.FC<ProcessingViewProps> = ({ sessionData }) => {
     {
       id: "Classification",
       label: "Classification",
-      render: () => <Classification />,
+      render: () => <Classification sessionData={sessionData} />,
     },
     {
       id: "Rewrite",

@@ -80,9 +80,9 @@ class classificationStack(Stack):
             runtime=_lambda.Runtime.PYTHON_3_12,
             handler="extract_text.handler",       
             code=_lambda.Code.from_asset("lambda/classification"),
-            role=lambda_role, 
-            timeout=Duration.seconds(300),
-            memory_size=3008,  
+            role=lambda_role,
+            memory_size=512,
+            timeout = Duration.seconds(600),  
             environment={
                 "BUCKET_NAME": investigation_bucket.bucket_name,
                 "BEDROCK_REGION": "us-east-1",             
@@ -99,7 +99,7 @@ class classificationStack(Stack):
                 effect=iam.Effect.ALLOW,
                 actions=[
                     "bedrock:InvokeModel",
-                    "bedrock:InvokeModelWithResponseStream",  # optional but good to have
+                    "bedrock:InvokeModelWithResponseStream", 
                 ],
                 resources=[
                     "arn:aws:bedrock:us-east-1::foundation-model/amazon.nova-lite-v1:0"

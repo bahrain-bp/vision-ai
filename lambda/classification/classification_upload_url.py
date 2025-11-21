@@ -7,12 +7,27 @@ import os
 s3 = boto3.client('s3')
 BUCKET_NAME = os.environ['BUCKET_NAME']
 
+def error_response(status_code, message):
+    return {
+        'statusCode': status_code,
+        'headers': {
+            'Access-Control-Allow-Origin': '*',
+            'Content-Type': 'application/json'
+        },
+        'body': json.dumps({'error': message})
+    }
+
 def handler(event, context):
     try:
         #Parse the body
         body = json.loads(event.get('body', '{}'))
-        file_name = body.get('fileName', 'document.pdf')
-        file_type = body.get('contentType', 'application/pdf')
+        sessionId = body.get('sessionId')
+        file_name = body.get('fileName')
+        file_type = body.get('fileType')
+
+        if not sessionId or not file_name or not file_type:
+            return error_response(400, 'sessionId, fileName and fileType are required')
+
 
         
         #Generate unique s3 key

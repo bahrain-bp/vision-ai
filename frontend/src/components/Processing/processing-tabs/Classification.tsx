@@ -1,10 +1,15 @@
 import React, { useState, useRef } from "react";
 import { Upload } from "lucide-react";
 import "./Classification.css";
+import { SessionData } from "../ProcessingView";
+
+interface ClassificationProps {
+  sessionData: SessionData;
+}
 
 type LoadingState = "idle" | "upload" | "extract" | "save";
 
-const MAX_FILE_SIZE_MB = 25;
+const MAX_FILE_SIZE_MB = 3;
 const ALLOWED_TYPES = [
   "application/pdf",
   "application/msword",
@@ -12,7 +17,7 @@ const ALLOWED_TYPES = [
   "text/plain",
 ];
 
-const Classification: React.FC = () => {
+const Classification: React.FC<ClassificationProps> = ({ sessionData }) => {
   const [file, setFile] = useState<File | null>(null);
   const [text, setText] = useState<string>("");
   const [category, setCategory] = useState<string>("");
@@ -57,12 +62,17 @@ const Classification: React.FC = () => {
   };
 
   const getUploadUrl = async (file: File) => {
+    if (!sessionData.sessionId) {
+      throw new Error("Missing session id.");
+    }
+
     const res = await fetch(`${apiBase}/classification/upload`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         fileName: file.name,
         fileType: file.type,
+        sessionId: sessionData.sessionId,
       }),
     });
 
@@ -81,10 +91,17 @@ const Classification: React.FC = () => {
   };
 
   const extractText = async (key: string) => {
+    if (!sessionData.sessionId) {
+      throw new Error("Missing session id.");
+    }
+
     const res = await fetch(`${apiBase}/classification/extract`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ key }),
+      body: JSON.stringify({
+        key,
+        sessionId: sessionData.sessionId,
+      }),
     });
 
     if (!res.ok) throw new Error("Extraction failed.");
