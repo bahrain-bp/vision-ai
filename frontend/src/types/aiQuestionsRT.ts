@@ -53,14 +53,14 @@ export interface QuestionAttempt {
  * Context data needed to generate questions
  */
 export interface QuestionGenerationContext {
-  caseId: string;                      // From currentCase.caseId
-  sessionId: string;                   // From currentSession.sessionId 
-  personType: "witness" | "accused" | "victim";    // From currentSession.personType
+  caseId: string;                      // From CaseContext.currentCase.caseId
+  sessionId: string;                   // From CaseContext.currentSession.sessionId 
+  personType: "witness" | "accused" | "victim";    // From CaseContext.currentSession.personType
   caseSummary: string;                 // Case background from police documents
   currentTranscript: string;           // From getFullTranscript
   victimTestimony?: string;            // Optional: victim's testimony if available
   language: Language;                  // Investigator's preferred language
-  questionCount: number;               // How many questions to generate (ISN'T questionCount ENOUGH ?? )
+  questionCount: number;               // How many questions to generate
   previousQuestions?: Question[];      // For duplicate prevention
 }
 
@@ -75,7 +75,7 @@ export interface QuestionGenerationContextBuilder {
   caseSummary: string;                 // Fetch from backend/S3
   victimTestimony?: string;            // Fetch from backend/S3 if available
   investigatorLanguage: Language;      // From UI selection
-  requestedQuestionCount: number;      // From UI selection
+  questionCount: number;      // From UI selection
   existingQuestions: Question[];       // From my context state
 }
 
@@ -97,6 +97,18 @@ export interface QuestionMetrics {
   rejectedCount: number;               // Total rejected questions in session
   retryCount: number;                  // Number of retry attempts made
 }
+/**
+ * Props for the main AI Question Panel component
+ * This is the container that holds everything
+ */
+export interface AIQuestionPanelProps {
+  caseId: string;                      // From CaseContext.currentSession.caseId
+  sessionId: string;                   // From CaseContext.currentSession.sessionId
+  language: Language;                  // Investigator's language preference
+  onQuestionsConfirmed?: (attempt: QuestionAttempt) => void;  // Callback when questions confirmed
+  className?: string;                  // Optional CSS class
+}
+
 
 /**
  * Props for Question Card component
@@ -119,3 +131,63 @@ export interface QuestionListProps {
   onConfirm: () => void;               // Confirm button handler
   onRetry: () => void;                 // Retry button handler
 }
+
+/**
+ * Props for Metrics Widget component
+ */
+export interface MetricsWidgetProps {
+  metrics: QuestionMetrics;
+  className?: string;
+}
+
+/**
+ * Props for Question Generator Controls component
+ * (The UI for selecting count and language)
+ */
+export interface QuestionGeneratorControlsProps {
+  onGenerate: (questionCount: number, language: Language) => void;
+  isLoading: boolean;
+  disabled?: boolean;
+}
+
+/**
+ * Props for Attempt Navigation component
+ * (Back/Forward buttons)
+ */
+export interface AttemptNavigationProps {
+  currentIndex: number;
+  totalAttempts: number;
+  onNavigate: (index: number) => void;
+  disabled?: boolean;
+}
+
+
+
+/**
+ * Request to save questions to S3
+ * Used when confirming attempts
+ */
+
+export interface SaveQuestionsRequest {
+  caseId: string;                      // From CaseContext.currentSession.caseId
+  sessionId: string;                    // From CaseContext.currentSession.sessionId
+  attempts: QuestionAttempt[];         // Confirmed attempts from QuestionContext
+  metadata?: {
+    investigator?: string;             // From CaseContext.currentSession.investigator
+    personType?: "witness" | "accused" | "victim"; // Exact type from Session
+    personName?: string;               // From CaseContext.currentSession.personName
+    sessionDate?: string;              // From CaseContext.currentSession.sessionDate
+    savedAt?: string;                // From CaseContext.currentSession.createdAt
+  };
+}
+
+/**
+ * Response from saving questions to S3
+ */
+export interface SaveQuestionsResponse {
+  success: boolean;                    // Whether save succeeded
+  s3Path?: string;                     // S3 location where data was saved
+  savedAttempts?: number;              // Number of attempts saved
+  error?: string;                      // Error message if failed
+}
+
