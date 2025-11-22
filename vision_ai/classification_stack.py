@@ -104,6 +104,21 @@ class classificationStack(Stack):
             description="Store extracted text into S3"
         )
 
+        classify_lambda = _lambda.Function(
+            self,
+            "ClassificationRequestLambda",
+            runtime=_lambda.Runtime.PYTHON_3_12,
+            handler="classification_request.handler",
+            code=_lambda.Code.from_asset("lambda/classification"),
+            role=lambda_role,
+            timeout=Duration.seconds(120),
+            environment={
+                "BUCKET_NAME": investigation_bucket.bucket_name,
+                "NOVA_MODEL_ID": "amazon.nova-lite-v1:0",
+            },
+            description="Classify extracted text into violation, misdemeanor, or felony",
+        )
+
         #Lambda #2: extract text using Bedrock Nova Lite
         extract_text_lambda = _lambda.Function(
             self,
@@ -243,6 +258,27 @@ class classificationStack(Stack):
             authorizer=authorizer,
         )
 
+        classify_resource = classification_resource.add_resource("categorize")
+        classify_resource.add_cors_preflight(
+            allow_origins=apigateway.Cors.ALL_ORIGINS,
+            allow_methods=["OPTIONS", "POST"],
+            allow_headers=[
+                "Content-Type",
+                "Authorization",
+                "X-Amz-Date",
+                "X-Api-Key",
+                "X-Amz-Security-Token",
+                "X-Requested-With"
+            ]
+        )
+
+        classify_resource.add_method(
+            "POST",
+            apigateway.LambdaIntegration(classify_lambda),
+            authorization_type=apigateway.AuthorizationType.COGNITO,
+            authorizer=authorizer,
+        )
+
 
         CfnOutput(
             self,
@@ -270,6 +306,13 @@ class classificationStack(Stack):
             "StoreExtractedTextEndpoint",
             value=f"https://{shared_api.rest_api_id}.execute-api.{env.region}.amazonaws.com/prod/classification/store",
             description="POST endpoint for storing extracted text",
+        )
+
+        CfnOutput(
+            self,
+            "ClassificationCategorizeEndpoint",
+            value=f"https://{shared_api.rest_api_id}.execute-api.{env.region}.amazonaws.com/prod/classification/categorize",
+            description="POST endpoint for classifying extracted text",
         )
 
         

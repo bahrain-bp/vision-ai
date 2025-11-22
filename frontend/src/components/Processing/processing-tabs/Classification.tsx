@@ -9,7 +9,7 @@ interface ClassificationProps {
   onExtractedKey?: (key: string) => void;
 }
 
-type LoadingState = "idle" | "upload" | "extract" | "save";
+type LoadingState = "idle" | "upload" | "extract" | "classify" | "save";
 
 const MAX_FILE_SIZE_MB = 3;
 const ALLOWED_TYPES = [
@@ -23,6 +23,7 @@ const Classification: React.FC<ClassificationProps> = ({ sessionData, onExtracte
   const [file, setFile] = useState<File | null>(null);
   const [text, setText] = useState<string>("");
   const [category, setCategory] = useState<string>("");
+  const [confidence, setConfidence] = useState<number | null>(null);
   const [loading, setLoading] = useState<LoadingState>("idle");
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
@@ -32,6 +33,7 @@ const Classification: React.FC<ClassificationProps> = ({ sessionData, onExtracte
   const uploadUrl = `${apiBase}/classification/upload`;
   const extractUrl = `${apiBase}/classification/extract`;
   const storeUrl = `${apiBase}/classification/store`;
+  const classifyUrl = `${apiBase}/classification/categorize`;
   const extractFnUrl =
     process.env.REACT_APP_EXTRACT_FN_URL && process.env.REACT_APP_EXTRACT_FN_URL !== ""
       ? process.env.REACT_APP_EXTRACT_FN_URL
@@ -63,12 +65,14 @@ const Classification: React.FC<ClassificationProps> = ({ sessionData, onExtracte
       setFile(null);
       setText("");
       setCategory("");
+      setConfidence(null);
       return;
     }
 
     setFile(selected);
     setText("");
     setCategory("");
+    setConfidence(null);
   };
 
   const getTokens = async () => {
@@ -186,7 +190,28 @@ const Classification: React.FC<ClassificationProps> = ({ sessionData, onExtracte
 
       setText(result.extracted_text || "");
       setCategory(result.category || "");
+      setConfidence(null);
       setInfo("Text extracted successfully.");
+
+      setLoading("classify");
+      const saveResult = await storeExtractedText(result.extracted_text || "");
+      if (saveResult?.key) {
+        onExtractedKey?.(saveResult.key);
+        const classification = await classifyExtractedText(saveResult.key);
+        setCategory(classification.category || "");
+        setConfidence(
+          typeof classification.confidence === "number"
+            ? classification.confidence
+            : null
+        );
+        if (classification.reason) {
+          setInfo(`Classified. ${classification.reason}`);
+        } else {
+          setInfo("Classified successfully.");
+        }
+      } else {
+        setInfo("Text stored, but no key returned for classification.");
+      }
     } catch (e: any) {
       setError(e.message || "Something went wrong.");
     } finally {
@@ -214,6 +239,22 @@ const Classification: React.FC<ClassificationProps> = ({ sessionData, onExtracte
     } finally {
       setLoading("idle");
     }
+  };
+
+  const classifyExtractedText = async (key: string) => {
+    const { idToken } = await getTokens();
+
+    const res = await fetch(classifyUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
+      body: JSON.stringify({
+        key,
+        sessionId: sessionData.sessionId,
+      }),
+    });
+
+    if (!res.ok) throw new Error("Classification failed.");
+    return res.json() as Promise<{ category: string; confidence?: number; reason?: string }>;
   };
 
   const isBusy = loading !== "idle";
@@ -283,6 +324,8 @@ const Classification: React.FC<ClassificationProps> = ({ sessionData, onExtracte
           <span className="status-chip">
             {loading === "upload" || loading === "extract"
               ? "Processing"
+              : loading === "classify"
+              ? "Classifying"
               : text
               ? "Completed"
               : "Pending"}
@@ -304,6 +347,12 @@ const Classification: React.FC<ClassificationProps> = ({ sessionData, onExtracte
             value={category}
             readOnly
           />
+          <p className="category-label" style={{ marginTop: 8 }}>
+            Confidence
+          </p>
+          <p className="category-textarea" style={{ minHeight: "auto", padding: "10px" }}>
+            {confidence !== null ? `${(confidence * 100).toFixed(1)}%` : "Not classified yet."}
+          </p>
         </div>
 
         <div className="actions">

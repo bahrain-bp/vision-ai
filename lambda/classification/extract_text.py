@@ -14,16 +14,12 @@ cognito_idp = boto3.client("cognito-idp")
 bedrock = boto3.client(
     "bedrock-runtime",
     region_name=os.environ.get("AWS_REGION", "us-east-1"),
-    config = Config(
-        read_timeout=3600,
-        connect_timeout=3600 
-    )
+    config=Config(read_timeout=3600, connect_timeout=3600),
 )
 
 BUCKET_NAME = os.environ["BUCKET_NAME"]
 MODEL_ID = os.environ.get("NOVA_MODEL_ID", "amazon.nova-lite-v1:0")
 
-import re
 
 def get_user_sub(event):
     authorizer = event.get("requestContext", {}).get("authorizer", {}) or {}
@@ -45,14 +41,14 @@ def get_user_sub(event):
             logger.warning("Access token validation failed")
     return None
 
+
 def error_response(status_code, message):
     return {
-        'statusCode': status_code,
-        'headers': {
-            'Content-Type': 'application/json'
-        },
-        'body': json.dumps({'error': message})
+        "statusCode": status_code,
+        "headers": {"Content-Type": "application/json"},
+        "body": json.dumps({"error": message}),
     }
+
 
 def handler(event, context):
     """
@@ -61,25 +57,17 @@ def handler(event, context):
 
     Output:
       { "extracted_text": "..." }
-
-    Supported:
-      - .pdf   -> Bedrock Nova Lite (format=pdf)
-      - .docx  -> Bedrock Nova Lite (format=docx)
-      - .txt   -> read directly from S3
-
     """
-
     try:
         caller_sub = get_user_sub(event)
         if not caller_sub:
-            return error_response(401, 'Unauthorized')
+            return error_response(401, "Unauthorized")
 
-        # 1) Parse request body
-        body = json.loads(event.get('body', '{}'))
+        body = json.loads(event.get("body", "{}"))
         s3_key = unquote_plus(body["key"])
-        sessionId = body.get('sessionId')
+        sessionId = body.get("sessionId")
         if not sessionId or not s3_key:
-            return error_response(400, 'sessionId and s3 key are required')
+            return error_response(400, "sessionId and s3 key are required")
 
         safe_session = str(sessionId).replace("/", "_")
         if ".." in s3_key.split("/"):
@@ -92,26 +80,25 @@ def handler(event, context):
         if f"/{safe_session}/" not in s3_key:
             return error_response(403, "Key does not belong to the provided session")
 
-        logger.info(f"User {caller_sub} extracting from s3://{BUCKET_NAME}/{s3_key}")
+        logger.info("User %s extracting from s3://%s/%s", caller_sub, BUCKET_NAME, s3_key)
 
-        # 2) s3 link
         s3_uri = f"s3://{BUCKET_NAME}/{s3_key}"
         filename = s3_key.split("/")[-1].lower()
-        
+        fmt = filename.split(".")[-1] if "." in filename else "file"
+        fmt_safe = "".join(ch for ch in fmt if ch.isalnum()) or "file"
+        bedrock_name = f"document-{fmt_safe}"
 
-        # 3) Route by extension
         if filename.endswith(".pdf"):
-            return bedrock_extract(s3_uri, "document", "pdf")
+            return bedrock_extract(s3_uri, bedrock_name, "pdf")
 
         if filename.endswith(".docx"):
-            return bedrock_extract(s3_uri, "document", "docx")
+            return bedrock_extract(s3_uri, bedrock_name, "docx")
 
         if filename.endswith(".txt"):
             obj = s3.get_object(Bucket=BUCKET_NAME, Key=s3_key)
             text = obj["Body"].read().decode("utf-8", errors="ignore")
             return api_response(text)
 
-        # 4) Unsupported
         msg = "Unsupported file type. Allowed: .pdf, .docx, .txt"
         logger.warning(msg)
         return api_response(msg, status=400)
@@ -121,58 +108,57 @@ def handler(event, context):
         return api_response(str(e), status=500)
 
 
-def bedrock_extract(s3_uri, filename, fmt):
+def bedrock_extract(s3_uri, document_name, fmt):
     """
-    Use Amazon Nova Lite on Bedrock to extract text
-    from a pdf/docx document.
+    Use Amazon Nova Lite on Bedrock to extract text from a pdf/docx document.
     """
 
     system_list = [
         {
             "text": (
-                "أنت مساعد في التحقيقات الجنائية. "
-                "مهمتك استخراج النصوص من المستندات بدقة شديدة دون تعديل أو حذف أو إضافة."
+                "أنت نموذج متخصص في نسخ المستندات دون تلخيص أو إعادة صياغة. استخرج كل النصوص الواضحة كما هي "
+                "وباللغة الأصلية، مع الحفاظ على ترتيب القراءة صفحة بصفحة وإضافة فواصل صفحات بصيغة [[page 1]], "
+                "[[page 2]]، إلخ. ضمّن البيانات الحساسة والتحقيقية كاملة: الأطراف، الأرقام، التواريخ، الأماكن، "
+                "الوقائع، الأقوال، القرارات، المرفقات، التوقيعات، الأختام، الملاحظات اليدوية والهامشية، الرؤوس "
+                "والتذييل وأرقام الصفحات. امثل الجداول كـ Markdown (صفوف وأعمدة). لا تكرر المقاطع ولا تحذف أي "
+                "جزء. إذا كان هناك نص غير مقروء اكتب [UNCERTAIN: وصف المشكلة]. أعد النص فقط."
             )
         }
     ]
+
     conversation = [
         {
             "role": "user",
             "content": [
                 {
                     "text": (
-                        "اقرأ هذا المستند وأخرج النص كاملًا كما هو، "
-                        "بنفس اللغة الأصلية، بدون ترجمة أو تلخيص أو شرح. "
-                        "أرجع النص الخام فقط."
-                        "أخرج النص دون تغيير كاملًا"
-                        "لا تعدل ولا تحذف ولا تضيف أي شيئ"
-                        "أخرج الاحداث والتفاصيل المملة للقضة وشهادات جميع الاطراف"
-                        "أخرج الاسماء والمعلومات الشخصية للجميع"
-                        "اخرج الادلة وكل ماذكر في الملف مهما كان نوعه"
+                        f"اقرأ المستند المرفق (الصيغة: {fmt}, الاسم: {document_name}) وأعد نصاً حرفياً كاملاً دون "
+                        "حذف أو اختصار، وباللغة الأصلية. حافظ على ترتيب الظهور صفحة بصفحة مع وضع علامات الصفحات "
+                        "[[page 1]], [[page 2]], إلخ. ضمّن كل تفاصيل القضية الحساسة: البيانات الشخصية، أرقام "
+                        "القضايا، التواريخ، الأماكن، الوقائع، الشهادات، الأدلة، التوجيهات، الملاحق، الجداول "
+                        "(Markdown)، القوائم النقطية أو المرقمة، الحواشي، الأختام، والتوقيعات. لا تغيّر اللغة أو "
+                        "الصياغة. إذا تعذّر قراءة جزء، اكتب [UNCERTAIN: وصف المشكلة]. أعد النص فقط."
                     )
                 },
                 {
                     "document": {
-                        "format": fmt,  # "pdf" or "docx"
-                        "name": filename,
-                        "source": {
-                            "s3Location": {
-                                "uri": f"{s3_uri}"
-                            },
-                        }
+                        "format": fmt,
+                        "name": document_name,
+                        "source": {"s3Location": {"uri": f"{s3_uri}"}},
                     }
-                }
+                },
             ],
         }
     ]
 
     response = bedrock.converse(
         modelId=MODEL_ID,
-        system=system_list,   
+        system=system_list,
         messages=conversation,
         inferenceConfig={
             "maxTokens": 10000,
             "temperature": 0.0,
+            "topP": 1.0,
         },
     )
 
@@ -183,9 +169,6 @@ def bedrock_extract(s3_uri, filename, fmt):
 def api_response(text, status=200):
     return {
         "statusCode": status,
-        "headers": {
-            "Content-Type": "application/json;"
-            " charset=utf-8"
-        },
+        "headers": {"Content-Type": "application/json; charset=utf-8"},
         "body": json.dumps({"extracted_text": text}, ensure_ascii=False),
     }
