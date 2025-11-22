@@ -3,9 +3,12 @@ import json
 import uuid
 import boto3
 import os
+import logging
 
 s3 = boto3.client('s3')
 BUCKET_NAME = os.environ['BUCKET_NAME']
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
 
 def error_response(status_code, message):
     return {
@@ -17,8 +20,16 @@ def error_response(status_code, message):
         'body': json.dumps({'error': message})
     }
 
+def get_user_sub(event):
+    authorizer = event.get("requestContext", {}).get("authorizer", {}) or {}
+    claims = authorizer.get("claims") or authorizer.get("jwt", {}).get("claims") or {}
+    return claims.get("sub")
+
 def handler(event, context):
     try:
+        caller_sub = get_user_sub(event)
+        if not caller_sub:
+            return error_response(401, 'Unauthorized')
         #Parse the body
         body = json.loads(event.get('body', '{}'))
         sessionId = body.get('sessionId')
@@ -29,10 +40,13 @@ def handler(event, context):
             return error_response(400, 'sessionId, fileName and fileType are required')
 
 
+        safe_session = str(sessionId).replace("/", "_")
         #Generate unique s3 key
         unique_id = str(uuid.uuid4())
         timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-        unique_key = f"classification/upload/{sessionId}/{timestamp}-{unique_id}-{file_name}"
+        unique_key = f"classification/upload/{caller_sub}/{safe_session}/{timestamp}-{unique_id}-{file_name}"
+
+        logger.info("Generating upload URL for %s", unique_key)
 
         url = s3.generate_presigned_url(
             'put_object',

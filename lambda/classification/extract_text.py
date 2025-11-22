@@ -10,6 +10,7 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 s3 = boto3.client("s3")
+cognito_idp = boto3.client("cognito-idp")
 bedrock = boto3.client(
     "bedrock-runtime",
     region_name=os.environ.get("AWS_REGION", "us-east-1"),
@@ -23,6 +24,26 @@ BUCKET_NAME = os.environ["BUCKET_NAME"]
 MODEL_ID = os.environ.get("NOVA_MODEL_ID", "amazon.nova-lite-v1:0")
 
 import re
+
+def get_user_sub(event):
+    authorizer = event.get("requestContext", {}).get("authorizer", {}) or {}
+    claims = authorizer.get("claims") or authorizer.get("jwt", {}).get("claims") or {}
+    sub = claims.get("sub")
+    if sub:
+        return sub
+
+    headers = event.get("headers") or {}
+    auth_header = headers.get("authorization") or headers.get("Authorization")
+    if auth_header and isinstance(auth_header, str):
+        token = auth_header.split()[-1]
+        try:
+            resp = cognito_idp.get_user(AccessToken=token)
+            for attr in resp.get("UserAttributes", []):
+                if attr.get("Name") == "sub":
+                    return attr.get("Value")
+        except Exception:
+            logger.warning("Access token validation failed")
+    return None
 
 def error_response(status_code, message):
     return {
@@ -49,6 +70,10 @@ def handler(event, context):
     """
 
     try:
+        caller_sub = get_user_sub(event)
+        if not caller_sub:
+            return error_response(401, 'Unauthorized')
+
         # 1) Parse request body
         body = json.loads(event.get('body', '{}'))
         s3_key = unquote_plus(body["key"])
@@ -56,7 +81,18 @@ def handler(event, context):
         if not sessionId or not s3_key:
             return error_response(400, 'sessionId and s3 key are required')
 
-        logger.info(f"Extracting from s3://{BUCKET_NAME}/{s3_key}")
+        safe_session = str(sessionId).replace("/", "_")
+        if ".." in s3_key.split("/"):
+            return error_response(400, "Invalid s3 key")
+
+        allowed_prefix = f"classification/upload/{caller_sub}/"
+        if not s3_key.startswith(allowed_prefix):
+            return error_response(403, "Access to the requested key is not allowed")
+
+        if f"/{safe_session}/" not in s3_key:
+            return error_response(403, "Key does not belong to the provided session")
+
+        logger.info(f"User {caller_sub} extracting from s3://{BUCKET_NAME}/{s3_key}")
 
         # 2) s3 link
         s3_uri = f"s3://{BUCKET_NAME}/{s3_key}"

@@ -4,8 +4,10 @@ from aws_cdk import (
     aws_lambda as _lambda,
     aws_apigateway as apigateway,
     aws_iam as iam,
+    aws_cognito as cognito,
     Duration,
     CfnOutput,
+    Fn,
 )
 from constructs import Construct
 
@@ -30,6 +32,17 @@ class classificationStack(Stack):
             root_resource_id=shared_api_root_resource_id
         )        
 
+        user_pool = cognito.UserPool.from_user_pool_id(
+            self,
+            "ClassificationUserPool",
+            Fn.import_value("vision-aiUserPoolId"),
+        )
+
+        authorizer = apigateway.CognitoUserPoolsAuthorizer(
+            self,
+            "ClassificationAuthorizer",
+            cognito_user_pools=[user_pool],
+        )
 
         # === Create IAM Role for Lambda ===
         lambda_role = iam.Role(
@@ -62,6 +75,12 @@ class classificationStack(Stack):
     )
         )
 
+        lambda_role.add_to_policy(iam.PolicyStatement(
+            effect=iam.Effect.ALLOW,
+            actions=["cognito-idp:GetUser"],
+            resources=["*"],
+        ))
+
         get_upload_url_lambda = _lambda.Function(
             self, "GetUploadUrlFunction",
             runtime=_lambda.Runtime.PYTHON_3_11,
@@ -71,6 +90,18 @@ class classificationStack(Stack):
             timeout=Duration.seconds(60),
             environment={"BUCKET_NAME": investigation_bucket.bucket_name},
             description="Generate presigned URL for document uploads"
+        )
+
+        store_text_lambda = _lambda.Function(
+            self,
+            "StoreExtractedTextLambda",
+            runtime=_lambda.Runtime.PYTHON_3_11,
+            handler="store_extracted_text.handler",
+            code=_lambda.Code.from_asset("lambda/classification"),
+            role=lambda_role,
+            timeout=Duration.seconds(60),
+            environment={"BUCKET_NAME": investigation_bucket.bucket_name},
+            description="Store extracted text into S3"
         )
 
         #Lambda #2: extract text using Bedrock Nova Lite
@@ -133,7 +164,7 @@ class classificationStack(Stack):
         upload_resource= classification_resource.add_resource("upload")
 
         upload_resource.add_cors_preflight(
-            allow_origins=["http://localhost:3000"],
+            allow_origins=apigateway.Cors.ALL_ORIGINS,
             allow_methods=["OPTIONS", "POST"],
             allow_headers=[
                 "Content-Type",
@@ -148,13 +179,15 @@ class classificationStack(Stack):
 
         upload_resource.add_method(
             "POST",
-            apigateway.LambdaIntegration(get_upload_url_lambda)
+            apigateway.LambdaIntegration(get_upload_url_lambda),
+            authorization_type=apigateway.AuthorizationType.COGNITO,
+            authorizer=authorizer,
         )
 
         #2- for text extraction /classification/exreact
         extract_resource= classification_resource.add_resource("extract")
         extract_resource.add_cors_preflight(
-            allow_origins=["http://localhost:3000"],
+            allow_origins=apigateway.Cors.ALL_ORIGINS,
             allow_methods=["OPTIONS", "POST"],
             allow_headers=[
                 "Content-Type",
@@ -169,6 +202,8 @@ class classificationStack(Stack):
         extract_resource.add_method(
             "POST",
             apigateway.LambdaIntegration(extract_text_lambda),
+            authorization_type=apigateway.AuthorizationType.COGNITO,
+            authorizer=authorizer,
         )
 
         extract_fn_url = extract_text_lambda.add_function_url(
@@ -187,13 +222,27 @@ class classificationStack(Stack):
             )
         )
 
-        CfnOutput(
-            self,
-            "ExtractTextFunctionURL",
-            value=extract_fn_url.url,
-            description="Direct Lambda URL for text extraction"
+        store_resource = classification_resource.add_resource("store")
+        store_resource.add_cors_preflight(
+            allow_origins=apigateway.Cors.ALL_ORIGINS,
+            allow_methods=["OPTIONS", "POST"],
+            allow_headers=[
+                "Content-Type",
+                "Authorization",
+                "X-Amz-Date",
+                "X-Api-Key",
+                "X-Amz-Security-Token",
+                "X-Requested-With"
+            ]
         )
-        
+
+        store_resource.add_method(
+            "POST",
+            apigateway.LambdaIntegration(store_text_lambda),
+            authorization_type=apigateway.AuthorizationType.COGNITO,
+            authorizer=authorizer,
+        )
+
 
         CfnOutput(
             self,
@@ -207,6 +256,20 @@ class classificationStack(Stack):
             "TextExtractEndpoint",
             value=f"https://{shared_api.rest_api_id}.execute-api.{env.region}.amazonaws.com/prod/classification/extract",
             description="POST endpoint for text extraction",
+        )
+
+        CfnOutput(
+            self,
+            "ExtractTextFunctionURL",
+            value=extract_fn_url.url,
+            description="Direct Lambda URL for text extraction",
+        )
+
+        CfnOutput(
+            self,
+            "StoreExtractedTextEndpoint",
+            value=f"https://{shared_api.rest_api_id}.execute-api.{env.region}.amazonaws.com/prod/classification/store",
+            description="POST endpoint for storing extracted text",
         )
 
         

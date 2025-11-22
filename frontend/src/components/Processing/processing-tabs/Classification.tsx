@@ -2,9 +2,11 @@ import React, { useState, useRef } from "react";
 import { Upload } from "lucide-react";
 import "./Classification.css";
 import { SessionData } from "../ProcessingView";
+import authService from "../../../services/authService";
 
 interface ClassificationProps {
   sessionData: SessionData;
+  onExtractedKey?: (key: string) => void;
 }
 
 type LoadingState = "idle" | "upload" | "extract" | "save";
@@ -17,7 +19,7 @@ const ALLOWED_TYPES = [
   "text/plain",
 ];
 
-const Classification: React.FC<ClassificationProps> = ({ sessionData }) => {
+const Classification: React.FC<ClassificationProps> = ({ sessionData, onExtractedKey }) => {
   const [file, setFile] = useState<File | null>(null);
   const [text, setText] = useState<string>("");
   const [category, setCategory] = useState<string>("");
@@ -27,7 +29,13 @@ const Classification: React.FC<ClassificationProps> = ({ sessionData }) => {
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const apiBase = process.env.REACT_APP_API_ENDPOINT || "";
-  const extractFnUrl = process.env.REACT_APP_EXTRACT_FN_URL ||"https://s2dntz6phbvnsmferrtuirulfe0ziteu.lambda-url.us-east-1.on.aws/";
+  const uploadUrl = `${apiBase}/classification/upload`;
+  const extractUrl = `${apiBase}/classification/extract`;
+  const storeUrl = `${apiBase}/classification/store`;
+  const extractFnUrl =
+    process.env.REACT_APP_EXTRACT_FN_URL && process.env.REACT_APP_EXTRACT_FN_URL !== ""
+      ? process.env.REACT_APP_EXTRACT_FN_URL
+      : null;
 
 
   const clearMessages = () => {
@@ -63,14 +71,26 @@ const Classification: React.FC<ClassificationProps> = ({ sessionData }) => {
     setCategory("");
   };
 
+  const getTokens = async () => {
+    const sessionResult = await authService.getSession();
+    const idToken = sessionResult.session?.tokens?.idToken?.toString();
+    const accessToken = sessionResult.session?.tokens?.accessToken?.toString();
+    if (!sessionResult.success || !idToken) {
+      throw new Error("Not authenticated. Please sign in again.");
+    }
+    return { idToken, accessToken };
+  };
+
   const getUploadUrl = async (file: File) => {
     if (!sessionData.sessionId) {
       throw new Error("Missing session id.");
     }
 
-    const res = await fetch(`${apiBase}/classification/upload`, {
+    const { idToken } = await getTokens();
+
+    const res = await fetch(uploadUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
       body: JSON.stringify({
         fileName: file.name,
         fileType: file.type,
@@ -97,9 +117,20 @@ const Classification: React.FC<ClassificationProps> = ({ sessionData }) => {
       throw new Error("Missing session id.");
     }
 
-    const res = await fetch(extractFnUrl, {
+    const { idToken, accessToken } = await getTokens();
+
+    const targetUrl = extractFnUrl || extractUrl;
+    const tokenForThisCall = extractFnUrl ? accessToken : idToken;
+    if (!tokenForThisCall) {
+        throw new Error("Missing auth token for extraction.");
+    }
+
+    const res = await fetch(targetUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${tokenForThisCall}`,
+      },
       body: JSON.stringify({
         key,
         sessionId: sessionData.sessionId,
@@ -108,6 +139,25 @@ const Classification: React.FC<ClassificationProps> = ({ sessionData }) => {
 
     if (!res.ok) throw new Error("Extraction failed.");
     return res.json() as Promise<{ extracted_text: string; category?: string }>;
+  };
+
+  const storeExtractedText = async (textToStore: string) => {
+    const { idToken } = await getTokens();
+
+    const res = await fetch(storeUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
+      body: JSON.stringify({
+        sessionId: sessionData.sessionId,
+        extracted_text: textToStore,
+      }),
+    });
+
+    if (!res.ok) {
+      throw new Error("Save failed.");
+    }
+
+    return res.json() as Promise<{ key: string }>;
   };
 
   const handleExtract = async () => {
@@ -144,7 +194,7 @@ const Classification: React.FC<ClassificationProps> = ({ sessionData }) => {
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     clearMessages();
 
     if (!text) {
@@ -152,11 +202,18 @@ const Classification: React.FC<ClassificationProps> = ({ sessionData }) => {
       return;
     }
 
-    setLoading("save");
-    setTimeout(() => {
-      setLoading("idle");
+    try {
+      setLoading("save");
+      const saveResult = await storeExtractedText(text);
+      if (saveResult?.key) {
+        onExtractedKey?.(saveResult.key);
+      }
       setInfo("Saved.");
-    }, 400);
+    } catch (e: any) {
+      setError(e.message || "Save failed.");
+    } finally {
+      setLoading("idle");
+    }
   };
 
   const isBusy = loading !== "idle";

@@ -17,6 +17,7 @@ export interface SessionData {
   duration?: string;
   witness?: string;
   status?: string;
+  extractedKey?: string | null;
   // we can other fields as needed later 
 }
 
@@ -34,18 +35,25 @@ interface Tab {
 const ProcessingView: React.FC<ProcessingViewProps> = ({ sessionData }) => {
   const [activeTab, setActiveTab] = useState<string>("Classification");
   const [isProcessing, setIsProcessing] = useState<boolean>(true); // processing state 
+  const [extractedKey, setExtractedKey] = useState<string | null>(sessionData.extractedKey ?? null);
+  const sessionDataWithKey: SessionData = { ...sessionData, extractedKey };
 
 
   const tabs: Tab[] = [
     {
       id: "Classification",
       label: "Classification",
-      render: () => <Classification sessionData={sessionData} />,
+      render: () => (
+        <Classification
+          sessionData={sessionDataWithKey}
+          onExtractedKey={setExtractedKey}
+        />
+      ),
     },
     {
       id: "Rewrite",
       label: "Rewrite",
-      render: () => <Rewrite sessionData={sessionData} />,
+      render: () => <Rewrite sessionData={sessionDataWithKey} />,
     },
     {
       id: "CameraFootage",
@@ -55,7 +63,7 @@ const ProcessingView: React.FC<ProcessingViewProps> = ({ sessionData }) => {
     {
       id: "AISuggestions",
       label: "AI Suggestions",
-      render: () => <AISuggestions sessionData={sessionData} />,
+      render: () => <AISuggestions sessionData={sessionDataWithKey} />,
     },
     {
       id: "Contradictions",

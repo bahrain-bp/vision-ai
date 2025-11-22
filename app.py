@@ -143,6 +143,7 @@ deployment_stack = APIDeploymentStack(
 deployment_stack.add_dependency(identity_stack)
 deployment_stack.add_dependency(advanced_analysis_stack)
 deployment_stack.add_dependency(rewrite_stack)
+deployment_stack.add_dependency(classification_stack)
 
 # Add tags
 cdk.Tags.of(app).add("Project", "VisionAI")
