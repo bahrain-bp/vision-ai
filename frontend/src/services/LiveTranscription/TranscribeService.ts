@@ -12,7 +12,8 @@ import {
   //Speakers,
   TranscriptionStatus,
   TranscriptionError,
-  sessionType
+  sessionType,
+  SaveTranscriptionRequest,
 } from "../../types";
 import { LanguageCode } from "@aws-sdk/client-transcribe-streaming";
 import StreamManager from "./StreamManager";
@@ -70,7 +71,8 @@ class TranscribeService {
   async startRecording(
     onTranscriptUpdate?: (text: TranscriptionResult) => void,
     selectedLanguage?: string,
-    sessionType?: sessionType
+    sessionType?: sessionType,
+    detectionLanguages?: string
   ): Promise<TranscriptionStatus> {
     this.transcriptCallback = onTranscriptUpdate || null;
 
@@ -143,7 +145,8 @@ class TranscribeService {
       audio.audioStream,
       this.microphoneAttempts,
       selectedLanguage,
-      "standard"
+      "standard",
+      detectionLanguages
     );
 
     if (!micResult.success) {
@@ -162,6 +165,7 @@ class TranscribeService {
       this.displayAttempts,
       selectedLanguage,
       sessionType,
+      detectionLanguages
     );
 
     if (!displayResult.success) {
@@ -184,7 +188,8 @@ class TranscribeService {
     stream: MediaStream,
     maxAttempts: number,
     selectedLanguage?: string,
-    speakerMode?: sessionType
+    speakerMode?: sessionType,
+    detectionLanguages?: string
   ): Promise<TranscriptionError> {
     let attempts = maxAttempts;
 
@@ -206,7 +211,8 @@ class TranscribeService {
         source,
         this.mediaManager.getSampleRate(),
         selectedLanguage,
-        speakerMode
+        speakerMode,
+        detectionLanguages
       );
 
       console.log(`📊 Result:`, result);
@@ -268,7 +274,8 @@ class TranscribeService {
     source: "display" | "microphone",
     sampleRate: number,
     selectedLanguage?: String,
-    speakerMode?: sessionType
+    speakerMode?: sessionType,
+    detectionLanguages?: string
   ): Promise<TranscriptionError> {
     const microphoneStream: MicrophoneStream = new MicrophoneStream();
 
@@ -296,11 +303,10 @@ class TranscribeService {
         IdentifyMultipleLanguages: selectedLanguage === "auto",
         LanguageOptions:
           selectedLanguage === "auto"
-            ? "ar-SA,en-US,fr-FR,es-ES,de-DE,hi-IN,pt-BR,zh-CN,ja-JP,ko-KR"
+            ? detectionLanguages ??
+              "ar-SA,en-US,fr-FR,es-ES,de-DE,hi-IN,pt-BR,zh-CN,ja-JP,ko-KR"
             : undefined,
-        ShowSpeakerLabel:
-          source === "display" &&
-          speakerMode === "multi",
+        ShowSpeakerLabel: source === "display" && speakerMode === "multi",
         AudioStream: this.getAudioStream(microphoneStream, sampleRate),
       });
 
@@ -388,7 +394,7 @@ class TranscribeService {
             formattedTranscript:
               `[${timeStamp}] ${speaker}: ` +
               transcriptWords.map((item) => item.content).join(" ") +
-              `\n\n`,
+              `\n`,
           };
 
           if (this.transcriptCallback) {
@@ -398,6 +404,36 @@ class TranscribeService {
       }
     } catch (error) {
       console.error(`${source}: Stream processing error`, error);
+    }
+  }
+  async saveTranscription(
+    data: SaveTranscriptionRequest,
+  ) {
+    try {
+      const endPoint =
+        process.env.REACT_APP_API_ENDPOINT + "/transcription/save";
+
+            console.log("🔍 Full endpoint URL:", endPoint);
+            console.log("🔍 Sending data:", data);
+    
+      const response = await fetch(endPoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to save transcription: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log("Transcription saved:", result);
+      return result;
+    } catch (error) {
+      console.error("Error saving transcription:", error);
+      throw error;
     }
   }
 

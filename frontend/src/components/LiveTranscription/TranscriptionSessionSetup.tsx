@@ -2,10 +2,13 @@ import React from "react";
 import { Play, Users, Info, Zap, Settings } from "lucide-react";
 import { RecordingStatus, sessionType } from "../../types/";
 import { STREAMING_LANGUAGES } from "./StreamLanguages";
+import Multiselect from "multiselect-react-dropdown";
 
 interface TranscriptionSessionSetupProps {
   selectedLanguage: string;
   setSelectedLanguage: (language: string) => void;
+  detectionLanguages: string[];
+  setDetectionLanguages: (lang: []) => void;
   sessionType: sessionType;
   setSessionType: (type: "standard" | "multi") => void;
   setStartRecording: (value: boolean) => void;
@@ -16,12 +19,24 @@ interface TranscriptionSessionSetupProps {
 const TranscriptionSessionSetup: React.FC<TranscriptionSessionSetupProps> = ({
   selectedLanguage,
   setSelectedLanguage,
+  //detectionLanguages,
+  setDetectionLanguages,
   sessionType,
   setSessionType,
   setStartRecording,
   setSessionState,
   setActiveTab,
 }) => {
+
+const handleLanguageSelect = (selectedList: any) => {
+  setDetectionLanguages(selectedList.map((lang: any) => lang.code));
+
+};
+
+const handleLanguageRemove = (selectedList: any) => {
+  setDetectionLanguages(selectedList.map((lang: any) => lang.code));
+};
+
   const handleStartRecording = () => {
     setStartRecording(true);
     setSessionState("on");
@@ -63,6 +78,53 @@ const TranscriptionSessionSetup: React.FC<TranscriptionSessionSetupProps> = ({
               ))}
             </select>
           </div>
+          {selectedLanguage === "auto" && (
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Select Languages to Detect
+              </label>
+              <Multiselect
+                options={Object.entries(STREAMING_LANGUAGES).map(
+                  ([code, name]) => ({
+                    code: code,
+                    name: name,
+                  })
+                )}
+                displayValue="name"
+                placeholder="Choose languages..."
+                showCheckbox={true}
+                onSelect={handleLanguageSelect}
+                onRemove={handleLanguageRemove}
+                avoidHighlightFirstOption={true}
+                style={{
+                  chips: {
+                    background: "#3b82f6",
+                    fontSize: "14px",
+                  },
+                  searchBox: {
+                    border: "1px solid #d1d5db",
+                    borderRadius: "0.5rem",
+                    padding: "8px",
+                    minHeight: "42px",
+                  },
+                  option: {
+                    color: "#374151",
+                    padding: "8px 12px",
+                  },
+                  optionContainer: {
+                    border: "1px solid #d1d5db",
+                    borderRadius: "0.5rem",
+                    marginTop: "4px",
+                    maxHeight: "300px",
+                  },
+                }}
+              />
+              <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                💡 Languages are prioritized in order of selection - first
+                selected language gets highest priority
+              </p>
+            </div>
+          )}
 
           {/* Session Type Card */}
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">

@@ -61,3 +61,15 @@ export const ErrorTypeLabels: Record<ErrorType, string> = {
 };
 
 
+
+  export interface SaveTranscriptionRequest {
+    caseId: string | undefined;
+    sessionId: string;
+    transcription: string;
+    metadata?: {
+      duration?: string;
+      language?: string;
+      participants?: string[];
+      [key: string]: any;
+    };
+  }

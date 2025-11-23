@@ -91,6 +91,7 @@ const RealTimeView: React.FC<RealTimeViewProps> = ({
   const [startRecording, setStartRecording] = useState(false);
   const [selectedLanguage, setSelectedLanguage] = useState<string>("en-US");
   const [sessionType, setSessionType] = useState<sessionType>("standard");
+  const [detectionLanguages,setDetectionLanguages] = useState([]);
 
   const handleStartInvestigation = (investigationData: InvestigationData) => {
     console.log("Starting investigation with data:", investigationData);
@@ -122,6 +123,8 @@ const RealTimeView: React.FC<RealTimeViewProps> = ({
             <TranscriptionSessionSetup
               selectedLanguage={selectedLanguage}
               setSelectedLanguage={setSelectedLanguage}
+              detectionLanguages={detectionLanguages}
+              setDetectionLanguages={setDetectionLanguages}
               sessionType={sessionType}
               setSessionType={setSessionType}
               setStartRecording={setStartRecording}
@@ -139,6 +142,7 @@ const RealTimeView: React.FC<RealTimeViewProps> = ({
                   startRecordingProp={startRecording}
                   setSessionState={setSessionState}
                   selectedLanguage={selectedLanguage}
+                  detectionLanguages={detectionLanguages}
                   setSessionType={setSessionType}
                   sessionType={sessionType}
                 />
