@@ -12,6 +12,7 @@ import SessionInfo from "./SessionInfo";
 import IdentityVerification from "./IdentityVerification/IdentityVerification";
 import TranscriptionSessionSetup from "../LiveTranscription/TranscriptionSessionSetup"
 import { RecordingStatus } from "../../types/";
+import { TranslationProvider } from '../../context/TranslationContext';
 
 interface SessionData {
   sessionId: string;
@@ -137,7 +138,13 @@ const RealTimeView: React.FC<RealTimeViewProps> = ({
                   setSessionState={setSessionState}
                   selectedLanguage={selectedLanguage}
                 />
-                <Translation />
+                {/* WRAP Translation with Provider */}
+                <TranslationProvider 
+                  investigatorLanguage="en" 
+                  witnessLanguage="ar"
+                >
+                  <Translation />
+                </TranslationProvider>
               </>
             )}
           </div>

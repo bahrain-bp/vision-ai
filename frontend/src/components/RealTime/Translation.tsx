@@ -1,67 +1,179 @@
-import React from "react";
-import { Globe, Download, ChevronDown } from "lucide-react";
+import React, { useEffect, useRef } from 'react';
+import { useRealTimeTranslation } from '../../hooks/useRealTimeTranslation';
+import { Globe, Trash2, Download, Eye } from 'lucide-react';
+import TranslationSettings from './TranslationSettings';
 
-interface TranslationLine {
-  time: string;
-  speaker: string;
-  text: string;
-  confidence: string;
-}
+const RealTimeTranslation: React.FC = () => {
+  const {
+    translations,
+    clearConversation,
+    isTranslating,
+    error,
+    investigatorLanguage,
+    witnessLanguage,
+    setInvestigatorLanguage,
+    setWitnessLanguage
+  } = useRealTimeTranslation();
 
-const Translation: React.FC = () => {
-  const translations: TranslationLine[] = [
-    {
-      time: "00:15:23",
-      speaker: "Ahmad",
-      text: "I was not aware of the policy change",
-      confidence: "98%",
-    },
-    {
-      time: "00:15:28",
-      speaker: "M. AlZebari",
-      text: "When did you learn about this change?",
-      confidence: "99%",
-    },
-    {
-      time: "00:15:32",
-      speaker: "Ahmad",
-      text: "Just last week",
-      confidence: "97%",
-    },
-  ];
+  // Auto-scroll ref
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to bottom when new translations arrive
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [translations]);
+
+  const handleDownload = () => {
+    const content = translations.map(trans => 
+      `[${trans.timestamp.toLocaleTimeString()}] ${trans.speaker}: ${trans.investigatorDisplay}\n`
+    ).join('\n');
+
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `translation-${new Date().toISOString()}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const openWitnessWindow = () => {
+    window.open('/witness', 'witness-window', 'width=800,height=600');
+  };
+
+  const translationSettings = {
+    sourceLanguage: investigatorLanguage,
+    targetLanguage: witnessLanguage
+  };
+
+  const handleTranslationSettingsChange = (field: 'sourceLanguage' | 'targetLanguage', value: string) => {
+    if (field === 'sourceLanguage') {
+      setInvestigatorLanguage(value);
+    } else {
+      setWitnessLanguage(value);
+    }
+  };
 
   return (
     <div className="translation-card">
       <div className="card-header">
         <div className="header-left">
           <Globe className="header-icon" />
-          <h3 className="card-title">Translation</h3>
+          <h3 className="card-title">Real-Time Translation</h3>
         </div>
-        <div className="language-selector">
-          <span>AR → EN</span>
-          <ChevronDown className="chevron-icon" />
+      </div>
+
+      <TranslationSettings 
+        translationSettings={translationSettings}
+        onTranslationSettingsChange={handleTranslationSettingsChange}
+      />
+
+      {error && (
+        <div className="error-message">
+          {error}
+        </div>
+      )}
+
+      <div className="translation-controls">
+        <button
+          onClick={clearConversation}
+          disabled={translations.length === 0}
+          className="control-btn secondary"
+          title="Clear Conversation"
+        >
+          <Trash2 size={16} />
+          <span>Clear All</span>
+        </button>
+
+        <button
+          onClick={openWitnessWindow}
+          className="control-btn witness-btn"
+          title="Open Witness Window"
+        >
+          <Eye size={16} />
+          <span>Witness View</span>
+        </button>
+
+        <div className="conversation-status">
+          {isTranslating ? (
+            <span className="status-active">
+              Translating...
+            </span>
+          ) : translations.length > 0 ? (
+            <span className="status-active">
+              Live • {translations.length} messages
+            </span>
+          ) : (
+            <span className="status-waiting">
+              Waiting for transcription...
+            </span>
+          )}
         </div>
       </div>
 
       <div className="translation-container">
-        {translations.map((line, index) => (
-          <div key={index} className="translation-line">
-            <div className="line-content">
-              <span className="timestamp">{line.time}</span>{" "}
-              <span className="speaker">[{line.speaker}]:</span>{" "}
-              <span className="text">{line.text}</span>
-            </div>
-            <span className="confidence">({line.confidence})</span>
+        {translations.length === 0 ? (
+          <div className="empty-state">
+            <Globe size={48} className="empty-icon" />
+            <p>Translation will start automatically when speech is detected</p>
+            <p className="demo-note">Real-time translation from live transcription</p>
+            <p className="demo-note">Click "Witness View" to open translation for witness</p>
           </div>
-        ))}
+        ) : (
+          <div className="translation-messages">
+            {translations.map((translation) => (
+              <div key={translation.id} className="translation-line">
+                <div className="line-content">
+                  <span className="timestamp">
+                    {translation.timestamp.toLocaleTimeString()}
+                  </span>
+                  <span className="speaker">[{translation.speaker}]:</span>
+                  <span className="text">
+                    {translation.investigatorDisplay}
+                  </span>
+                </div>
+              </div>
+            ))}
+            {/* Auto-scroll anchor */}
+            <div ref={messagesEndRef} />
+          </div>
+        )}
       </div>
 
-      <button className="download-btn">
-        <Download className="btn-icon" />
-        <span>Download</span>
-      </button>
+      <div className="action-buttons">
+        <button 
+          onClick={handleDownload} 
+          className="download-btn"
+          disabled={translations.length === 0}
+          title="Download Transcript"
+        >
+          <Download size={16} />
+          <span>Download</span>
+        </button>
+      </div>
+
+      {translations.length > 0 && (
+        <div className="translation-stats">
+          <div className="stat-item">
+            <span className="stat-label">Total:</span>
+            <span className="stat-value">{translations.length}</span>
+          </div>
+          <div className="stat-item">
+            <span className="stat-label">Investigator:</span>
+            <span className="stat-value">
+              {translations.filter(t => t.speaker === 'Investigator').length}
+            </span>
+          </div>
+          <div className="stat-item">
+            <span className="stat-label">Witness:</span>
+            <span className="stat-value">
+              {translations.filter(t => t.speaker === 'Witness').length}
+            </span>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
-export default Translation;
+export default RealTimeTranslation;
