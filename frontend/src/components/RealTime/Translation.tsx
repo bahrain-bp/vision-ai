@@ -1,7 +1,8 @@
 import React, { useEffect, useRef } from 'react';
 import { useRealTimeTranslation } from '../../hooks/useRealTimeTranslation';
-import { Globe, Trash2, Download, Eye } from 'lucide-react';
+import { Globe, Trash2, Eye } from 'lucide-react';
 import TranslationSettings from './TranslationSettings';
+import PDFExporter from '../LiveTranscription/PDFExporter'; 
 
 const RealTimeTranslation: React.FC = () => {
   const {
@@ -23,18 +24,13 @@ const RealTimeTranslation: React.FC = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [translations]);
 
-  const handleDownload = () => {
-    const content = translations.map(trans => 
-      `[${trans.timestamp.toLocaleTimeString()}] ${trans.speaker}: ${trans.investigatorDisplay}\n`
-    ).join('\n');
-
-    const blob = new Blob([content], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `translation-${new Date().toISOString()}.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
+  // Generate transcript text for PDF export 
+  const generateTranscriptText = () => {
+    if (translations.length === 0) return '';
+    
+    return translations.map(trans => 
+      `[${trans.timestamp.toLocaleTimeString()}] ${trans.speaker}: ${trans.investigatorDisplay}`
+    ).join('\n\n');
   };
 
   const openWitnessWindow = () => {
@@ -141,15 +137,13 @@ const RealTimeTranslation: React.FC = () => {
       </div>
 
       <div className="action-buttons">
-        <button 
-          onClick={handleDownload} 
-          className="download-btn"
-          disabled={translations.length === 0}
-          title="Download Transcript"
-        >
-          <Download size={16} />
-          <span>Download</span>
-        </button>
+        {/* Replace the old download button with PDFExporter - same as transcription */}
+        <PDFExporter
+          transcript={generateTranscriptText()}
+          title={"Investigation Transcript - Translation"}
+          fileName={"translation-transcript"}
+          sessionDate={new Date().toLocaleDateString()}
+        />
       </div>
 
       {translations.length > 0 && (
