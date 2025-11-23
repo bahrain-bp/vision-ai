@@ -47,6 +47,10 @@ export interface QuestionAttempt {
   language: Language;                  // Language questions were generated in
   timestamp: string;                   // ISO timestamp of attempt
   isConfirmed: boolean;                // Whether investigator confirmed this attempt
+  transcriptSnapshot: string;          // Saves testimony at generation time
+  rejectedQuestions?: Question[];      // Store rejected questions from retries
+
+
 }
 
 /**
@@ -114,11 +118,12 @@ export interface AIQuestionPanelProps {
  * Props for Question Card component
  */
 export interface QuestionCardProps {
-  question: Question;                  // The question to display
-  isSelected: boolean;                 // Whether this question is selected
+  question: Question;                          // The question to display
+  isSelected: boolean;                         // Whether this question is selected
   onSelect: (questionId: string) => void;      // Handler for selection
-  onFlip?: (questionId: string) => void;       // Handler for flip animation
-  isFlipped?: boolean;                         // Whether card is currently flipped
+  onFlip?: (questionId: string) => void;       // Handler for flip animation 
+  isFlipped?: boolean;                         // Whether card is currently flipped 
+  disabled?: boolean;    
 }
 
 /**

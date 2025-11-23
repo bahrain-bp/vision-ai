@@ -118,6 +118,8 @@ export const QuestionProvider: React.FC<{ children: ReactNode }> = ({ children }
           language: context.language,
           timestamp: new Date().toISOString(),
           isConfirmed: false,
+          transcriptSnapshot: context.currentTranscript,
+          rejectedQuestions: [],
         };
 
         // Add new attempt to history
@@ -129,6 +131,8 @@ export const QuestionProvider: React.FC<{ children: ReactNode }> = ({ children }
           attemptId: newAttempt.attemptId,
           questionCount: mockQuestions.length,
           language: context.language,
+          transcriptLength: context.currentTranscript.length, // ← Log transcript length for debugging
+
         });
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to generate questions';
@@ -145,73 +149,181 @@ export const QuestionProvider: React.FC<{ children: ReactNode }> = ({ children }
    * Confirm current attempt and save selected questions
    */
   const confirmAttempt = useCallback(() => {
+  if (!currentAttempt) {
+    console.warn('⚠️ No current attempt to confirm');
+    return;
+  }
+
+  // SMART LOGIC: If nothing selected, treat as "all confirmed"
+  const effectiveSelections = selectedQuestionIds.length === 0 
+    ? currentAttempt.questions.map(q => q.id)  // Select all if none selected
+    : selectedQuestionIds;
+
+  // 1. Mark selected questions as confirmed, unselected as rejected
+  const updatedQuestions = currentAttempt.questions.map(q => ({
+    ...q,
+    status: (effectiveSelections.includes(q.id) ? 'confirmed' : 'rejected') as 'confirmed' | 'rejected',
+  }));
+
+  // 2. Create finalized attempt
+  const confirmedAttempt: QuestionAttempt = {
+    ...currentAttempt,
+    questions: updatedQuestions,
+    isConfirmed: true, // Lock this attempt
+  };
+
+  // 3. Update attempts array
+  setAttempts(prev => prev.map(a => 
+    a.attemptId === currentAttempt.attemptId ? confirmedAttempt : a
+  ));
+
+  // 4. Calculate metrics for this confirmation
+  const confirmedCount = effectiveSelections.length;
+  const rejectedCount = updatedQuestions.length - confirmedCount;
+
+  // 5. Update session-wide metrics
+  setMetrics(prev => ({
+    confirmedCount: prev.confirmedCount + confirmedCount,
+    rejectedCount: prev.rejectedCount + rejectedCount,
+    retryCount: prev.retryCount,
+  }));
+
+  // 6. Clear selections (ready for next attempt)
+  setSelectedQuestionIds([]);
+
+  // 7. TODO: Phase 3 - Save to S3
+  // const saveRequest: SaveQuestionsRequest = {
+  //   caseId: confirmedAttempt.caseId,
+  //   sessionId: confirmedAttempt.sessionId,
+  //   attempts: [confirmedAttempt],
+  //   metadata: { /* ... */ }
+  // };
+  // await questionService.saveToS3(saveRequest);
+
+  console.log('✅ Attempt confirmed and ready for S3 save', {
+    attemptId: confirmedAttempt.attemptId,
+    confirmedQuestions: confirmedCount,
+    rejectedQuestions: rejectedCount,
+    smartLogicApplied: selectedQuestionIds.length === 0 ? 'Yes (all confirmed)' : 'No',
+    totalSessionConfirmed: metrics.confirmedCount + confirmedCount,
+    totalSessionRejected: metrics.rejectedCount + rejectedCount,
+  });
+}, [currentAttempt, selectedQuestionIds, metrics]);
+
+  const retryWithSelection = useCallback(
+  async (context: QuestionGenerationContext) => {
     if (!currentAttempt) {
-      console.warn('⚠️ No current attempt to confirm');
+      console.warn('⚠️ No current attempt to retry');
       return;
     }
 
-    // Update question statuses
-    const updatedQuestions = currentAttempt.questions.map(q => ({
-      ...q,
-      status: (selectedQuestionIds.includes(q.id) ? 'confirmed' : 'rejected') as 'confirmed' | 'rejected',
-    }));
+    setIsLoading(true);
+    setError(null);
 
-    // Update attempt
-    const updatedAttempt: QuestionAttempt = {
-      ...currentAttempt,
-      questions: updatedQuestions,
-      isConfirmed: true,
-    };
+    try {
+      // 1. Handle two scenarios: "Retry All" vs "Retry Selected"
+const nothingSelected = selectedQuestionIds.length === 0;
 
-    // Update attempts array
-    const updatedAttempts = [...attempts];
-    updatedAttempts[currentAttemptIndex] = updatedAttempt;
-    setAttempts(updatedAttempts);
+// 2. Determine which questions to reject and which to keep
+const rejectedQuestions = nothingSelected
+  ? currentAttempt.questions.map(q => ({ ...q, status: 'rejected' as const }))  // Retry All: reject all
+  : currentAttempt.questions
+      .filter(q => selectedQuestionIds.includes(q.id))  // Retry Selected: reject only selected
+      .map(q => ({ ...q, status: 'rejected' as const }));
 
-    // Update metrics
-    const confirmedCount = selectedQuestionIds.length;
-    const rejectedCount = updatedQuestions.length - confirmedCount;
+const keptQuestions = nothingSelected
+  ? []  // Retry All: keep nothing
+  : currentAttempt.questions.filter(q => !selectedQuestionIds.includes(q.id));  // Retry Selected: keep unselected
 
-    setMetrics(prev => ({
-      ...prev,
-      confirmedCount: prev.confirmedCount + confirmedCount,
-      rejectedCount: prev.rejectedCount + rejectedCount,
-    }));
+// 3. Calculate how many new questions to generate
+const questionsToGenerate = rejectedQuestions.length;
 
-    // TODO: Phase 3 - Save to S3
-    // await questionService.saveToS3(updatedAttempt);
+console.log('↻ Retry Details:', {
+  mode: nothingSelected ? 'Retry All' : `Retry Selected (${selectedQuestionIds.length})`,
+  keptCount: keptQuestions.length,
+  rejectedCount: rejectedQuestions.length,
+  willGenerate: questionsToGenerate,
+});
 
-    console.log('Confirmed attempt', {
-      attemptId: updatedAttempt.attemptId,
-      confirmedQuestions: confirmedCount,
-      rejectedQuestions: rejectedCount,
-    });
-  }, [currentAttempt, currentAttemptIndex, attempts, selectedQuestionIds]);
+// 4. Update rejected metrics immediately
+setMetrics(prev => ({
+  ...prev,
+  rejectedCount: prev.rejectedCount + rejectedQuestions.length,
+  retryCount: prev.retryCount + 1,
+}));
 
-  /**
-   * Retry generation - keep selected questions, regenerate unselected
-   */
-  const retryWithSelection = useCallback(
-    async (context: QuestionGenerationContext) => {
-      if (!currentAttempt) {
-        console.warn('No current attempt to retry');
-        return;
-      }
+      // 5. Build context for regeneration (CRITICAL: Use saved transcript snapshot!)
+      const retryContext: QuestionGenerationContext = {
+        ...context,
+        currentTranscript: currentAttempt.transcriptSnapshot, // ← Use SAVED transcript, not current!
+        questionCount: questionsToGenerate, // Only generate replacements
+        previousQuestions: [
+          ...keptQuestions, // Don't duplicate kept questions
+          ...rejectedQuestions, // Don't duplicate rejected questions
+          ...(context.previousQuestions || []), // Don't duplicate from other attempts
+        ],
+      };
 
-      // Increment retry count
-      setMetrics(prev => ({ ...prev, retryCount: prev.retryCount + 1 }));
+     // TODO: Phase 3 - Use retryContext for actual API call:
+// const response = await questionService.generateQuestions(retryContext);
+console.log('📋 Retry context prepared (will be used in Phase 3):', {
+  questionCount: retryContext.questionCount,
+  transcriptLength: retryContext.currentTranscript.length,
+});
 
-      // TODO: Phase 3 - Implement selective regeneration
-      // For now, just generate new questions
-      await generateQuestions(context);
+      // 6. Generate replacement questions (mock for now)
+      // TODO: Phase 3 - Replace with actual API call
+      await new Promise(resolve => setTimeout(resolve, 1500));
 
-      console.log('Retrying with selection', {
-        previousAttemptId: currentAttempt.attemptId,
-        selectedCount: selectedQuestionIds.length,
+      const newQuestions: Question[] = Array.from({ length: questionsToGenerate }, (_, i) => ({
+        id: generateQuestionId(),
+        text: `${context.language === 'ar' ? 'سؤال بديل' : 'Replacement question'} ${i + 1}`,
+        category: (['clarification', 'verification', 'timeline', 'motivation'] as const)[i % 4],
+        status: 'pending',
+        reasoning: `Generated as replacement (mock)`,
+        sourceContext: 'Mock replacement context',
+        generatedAt: new Date().toISOString(),
+      }));
+
+      // 7. Merge kept questions + new replacements
+      const mergedQuestions = [...keptQuestions, ...newQuestions];
+
+      // 8. Update current attempt and accumulate rejected questions
+const updatedAttempt: QuestionAttempt = {
+  ...currentAttempt,
+  questions: mergedQuestions,
+  rejectedQuestions: [
+    ...(currentAttempt.rejectedQuestions || []),  // Keep previous rejected
+    ...rejectedQuestions,                          // Add new rejected
+  ],
+  // Keep same transcriptSnapshot, language, timestamp
+};
+
+      // 9. Update attempts array
+      setAttempts(prev => prev.map(a => 
+        a.attemptId === currentAttempt.attemptId ? updatedAttempt : a
+      ));
+
+      // 10. Clear selections (user needs to review new questions)
+      setSelectedQuestionIds([]);
+
+      console.log('✅ Retry completed successfully', {
+        attemptId: updatedAttempt.attemptId,
+        keptQuestions: keptQuestions.length,
+        newQuestions: newQuestions.length,
+        totalQuestions: mergedQuestions.length,
       });
-    },
-    [currentAttempt, selectedQuestionIds.length, generateQuestions]
-  );
+
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to retry generation';
+      setError(errorMessage);
+      console.error('❌ Error during retry:', errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  },
+  [currentAttempt, selectedQuestionIds, generateQuestionId]
+);
 
   /**
    * Navigate to specific attempt
