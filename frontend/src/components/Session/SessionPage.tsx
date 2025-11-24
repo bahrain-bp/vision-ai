@@ -117,6 +117,7 @@ const SessionPage: React.FC<SessionPageProps> = ({
   const handleEndSession = async () => {
     stopRecording(setSessionState);
 
+
     if (currentSession && currentCase) {
       try {
         await updateSessionStatus(
@@ -130,6 +131,7 @@ const SessionPage: React.FC<SessionPageProps> = ({
     }
     setCurrentSession(null);
     setCurrentPersonName(null);
+
 
     setShowSummaryModal(true);
   };
