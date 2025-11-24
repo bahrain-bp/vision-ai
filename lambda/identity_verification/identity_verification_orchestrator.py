@@ -127,7 +127,10 @@ def handle_verification_request(event, context):
     
     if not extraction_result['success']:
         logger.error("Failed to extract data from document")
-        return error_response(500, 'Failed to extract data from document', extraction_result)
+        return error_response(400, extraction_result.get('error', 'Failed to extract data from document'), {
+            'details': extraction_result.get('details', ''),
+            'extractedText': extraction_result.get('extractedText', '')
+        })
     
     cpr_number = extraction_result['cprNumber']
     extracted_name = extraction_result['extractedName']
@@ -531,32 +534,41 @@ def extract_data_from_document(document_key):
         
         full_text = ' '.join(extracted_lines)
         logger.info(f"Extracted {len(extracted_lines)} lines of text")
+        logger.info(f"Full extracted text: {full_text[:200]}...")  # Log first 200 chars
         
-        # Check if this looks like just a person photo (very little text)
-        if len(extracted_lines) < 3 and len(full_text) < 50:
-            logger.error("Document appears to be a person photo, not an ID document")
+        # Enhanced check: detect if this is just a person photo
+        # Criteria: very little text AND no numbers (no CPR/ID numbers)
+        has_significant_numbers = bool(re.search(r'\d{5,}', full_text))  # At least 5 consecutive digits
+        
+        if len(extracted_lines) < 3 and len(full_text) < 100 and not has_significant_numbers:
+            logger.error("Document appears to be invalid")
             return {
                 'success': False,
-                'error': 'This appears to be a person photo, not an identity document. Please upload a CPR or passport document that contains text and identification information.',
+                'error': 'This appears to be invalid document. Please upload a valid CPR card or passport that contains identification information and numbers.',
                 'extractedText': full_text
             }
         
-        # Extract CPR number
+        # Extract CPR number (9 digits)
         cpr_pattern = r'\b\d{9}\b'
         cpr_matches = re.findall(cpr_pattern, full_text)
         
         if not cpr_matches:
             logger.error("CPR number not found in document")
+            logger.error(f"Extracted text was: {full_text}")
             return {
                 'success': False,
-                'error': 'No CPR number found in the document. Please ensure you uploaded a valid CPR or passport document with visible identification numbers, not a person photo.',
+                'error': 'No CPR number (9 digits) found in the document. Please ensure you uploaded a valid CPR card or passport, not just a person photo.',
                 'extractedText': full_text
             }
         
         cpr_number = cpr_matches[0]
         logger.info(f"Found CPR: {cpr_number}")
         
+        # Extract nationality with enhanced logic
         nationality = extract_nationality_from_text(extracted_lines, full_text)
+        logger.info(f"Extracted nationality: {nationality}")
+        
+        # Extract name
         extracted_name = extract_name_from_text(extracted_lines, full_text)
         
         return {
@@ -572,14 +584,14 @@ def extract_data_from_document(document_key):
         logger.error(f"Invalid parameter for Textract: {str(e)}", exc_info=True)
         return {
             'success': False,
-            'error': 'Unable to read the document. Please ensure you uploaded a valid document image or PDF, not a person photo.',
+            'error': 'Unable to read the document. Please ensure you uploaded a valid document image (JPG, PNG) or PDF, not just a person photo.',
             'details': str(e)
         }
     except textract.exceptions.InvalidS3ObjectException as e:
         logger.error(f"Invalid S3 object for Textract: {str(e)}", exc_info=True)
         return {
             'success': False,
-            'error': 'Unable to process the uploaded document. Please ensure the file is a valid image or PDF.',
+            'error': 'Unable to process the uploaded document. Please ensure the file is a valid image or PDF format.',
             'details': str(e)
         }
     except textract.exceptions.DocumentTooLargeException as e:
@@ -593,31 +605,81 @@ def extract_data_from_document(document_key):
         logger.error(f"Error extracting data from document: {str(e)}", exc_info=True)
         return {
             'success': False,
-            'error': 'Failed to extract information from the document. Please ensure you uploaded a valid identity document.',
+            'error': 'Failed to extract information from the document. Please ensure you uploaded a valid identity document with clear text.',
             'details': str(e)
         }
 
 
 def extract_nationality_from_text(lines, full_text):
-    """Extract nationality from document text"""
+    """Extract nationality from document text - ENHANCED VERSION"""
     try:
-        nationality_keywords = ['Nationality', 'الجنسية', 'nationality', 'NATIONALITY']
+        # Method 1: Look for nationality keywords in both English and Arabic
+        nationality_keywords = [
+            'Nationality', 'الجنسية', 'nationality', 'NATIONALITY',
+            'Nat.', 'NAT.', 'nat.'
+        ]
         
+        # First pass: Look for keyword followed by value on same line or next line
         for i, line in enumerate(lines):
             for keyword in nationality_keywords:
                 if keyword in line:
+                    logger.info(f"Found nationality keyword '{keyword}' in line: {line}")
+                    
+                    # Check if nationality is on the same line after the keyword
                     if ':' in line:
                         parts = line.split(':', 1)
                         if len(parts) > 1:
                             nationality = parts[1].strip()
-                            if nationality and len(nationality) > 2:
-                                return clean_nationality(nationality)
+                            if nationality and len(nationality) > 2 and not nationality.isdigit():
+                                cleaned = clean_nationality(nationality)
+                                if cleaned and cleaned != 'Unknown':
+                                    logger.info(f"Extracted nationality from same line: {cleaned}")
+                                    return cleaned
                     
+                    # Check the next line
                     if i + 1 < len(lines):
                         next_line = lines[i + 1].strip()
+                        logger.info(f"Checking next line for nationality: {next_line}")
+                        
                         if next_line and not any(char.isdigit() for char in next_line[:5]):
-                            return clean_nationality(next_line)
+                            cleaned = clean_nationality(next_line)
+                            if cleaned and cleaned != 'Unknown':
+                                logger.info(f"Extracted nationality from next line: {cleaned}")
+                                return cleaned
         
+        # Method 2: Look for common nationality patterns (country names)
+        common_nationalities = [
+            'Indian', 'INDIAN', 'هندي',
+            'Pakistani', 'PAKISTANI', 'باكستاني',
+            'Bangladeshi', 'BANGLADESHI', 'بنغلاديشي',
+            'Filipino', 'FILIPINO', 'فلبيني',
+            'Egyptian', 'EGYPTIAN', 'مصري',
+            'Bahraini', 'BAHRAINI', 'بحريني',
+            'Saudi', 'SAUDI', 'سعودي',
+            'Emirati', 'EMIRATI', 'إماراتي'
+        ]
+        
+        for nationality in common_nationalities:
+            if nationality in full_text:
+                cleaned = clean_nationality(nationality)
+                logger.info(f"Found nationality by pattern matching: {cleaned}")
+                return cleaned
+        
+        # Method 3: Look for text that appears between "Nationality" and "Name" sections
+        nationality_match = re.search(
+            r'(?:Nationality|الجنسية|NATIONALITY|NAT\.)[:\s]*([A-Za-z\u0600-\u06FF\s]+?)(?:\s*(?:Name|الاسم|NAME)|$)',
+            full_text,
+            re.IGNORECASE | re.UNICODE
+        )
+        
+        if nationality_match:
+            extracted = nationality_match.group(1).strip()
+            logger.info(f"Found nationality by regex pattern: {extracted}")
+            cleaned = clean_nationality(extracted)
+            if cleaned and cleaned != 'Unknown':
+                return cleaned
+        
+        logger.warning("Could not extract nationality from document")
         return "Unknown"
         
     except Exception as e:
@@ -626,10 +688,32 @@ def extract_nationality_from_text(lines, full_text):
 
 
 def clean_nationality(nationality):
-    """Clean and format extracted nationality"""
+    """Clean and format extracted nationality - ENHANCED VERSION"""
+    if not nationality:
+        return "Unknown"
+    
+    # Remove extra whitespace
     nationality = ' '.join(nationality.split())
-    nationality = re.sub(r'[^\w\s\-]', '', nationality)
-    return nationality.title().strip()
+    
+    # Remove special characters but keep Arabic characters
+    nationality = re.sub(r'[^\w\s\-\u0600-\u06FF]', '', nationality)
+    
+    # Remove any remaining numbers
+    nationality = re.sub(r'\d+', '', nationality)
+    
+    # Strip whitespace
+    nationality = nationality.strip()
+    
+    # Filter out invalid entries
+    invalid_entries = ['', 'Unknown', 'N/A', 'NA', '-']
+    if nationality in invalid_entries or len(nationality) < 3:
+        return "Unknown"
+    
+    # Capitalize properly (handle both English and Arabic)
+    if re.search(r'[A-Za-z]', nationality):  # If contains English letters
+        nationality = nationality.title()
+    
+    return nationality
 
 
 def extract_name_from_text(lines, full_text):
@@ -646,7 +730,6 @@ def extract_name_from_text(lines, full_text):
                             name = parts[1].strip()
                             if name and len(name) > 2:
                                 return clean_name(name)
-                    
                     if i + 1 < len(lines):
                         next_line = lines[i + 1].strip()
                         if next_line and not any(char.isdigit() for char in next_line[:5]):
@@ -662,7 +745,7 @@ def extract_name_from_text(lines, full_text):
 def clean_name(name):
     """Clean and format extracted name"""
     name = ' '.join(name.split())
-    name = re.sub(r'[^\w\s\-]', '', name)
+    name = re.sub(r'[^\w\s-]', '', name)
     return name.title().strip()
 
 
@@ -671,7 +754,7 @@ def check_reference_photo(cpr_number):
     try:
         possible_extensions = ['.jpg', '.jpeg', '.png']
         found_key = None
-        
+
         for ext in possible_extensions:
             reference_key = f"global-assets/reference-photos/{cpr_number}_reference-photo{ext}"
             
@@ -724,7 +807,7 @@ def compare_faces(source_photo_key, target_photo_key, case_id, session_id, cpr_n
         logger.info(f"Comparing faces (Attempt {attempt_number}):")
         logger.info(f"  Source: {source_photo_key}")
         logger.info(f"  Target: {target_photo_key}")
-        
+
         # Detect face quality in target photo
         try:
             quality_response = rekognition.detect_faces(
@@ -893,11 +976,11 @@ def compare_faces(source_photo_key, target_photo_key, case_id, session_id, cpr_n
         }
 
 
-def create_or_update_session_metadata(case_id, session_id, cpr_number, person_name, person_type, verification_result, nationality, attempt_number=1, manual_override=False, participant_name=None, participant_cpr=None,participant_nationality=None):
+def create_or_update_session_metadata(case_id, session_id, cpr_number, person_name, person_type, verification_result, nationality, attempt_number=1, manual_override=False, participant_name=None, participant_cpr=None, participant_nationality=None):
     """Update existing session metadata with verification results"""
     try:
         metadata_key = f"cases/{case_id}/sessions/{session_id}/session-metadata.json"
-        
+
         # Get existing session metadata 
         try:
             response = s3.get_object(Bucket=BUCKET_NAME, Key=metadata_key)
@@ -960,14 +1043,16 @@ def create_or_update_session_metadata(case_id, session_id, cpr_number, person_na
     except Exception as e:
         logger.error(f"Error updating session metadata: {str(e)}", exc_info=True)
         return None
+
+
 def error_response(status_code, message, additional_data=None):
     """Helper function to create error responses"""
     body = {'error': message}
     if additional_data:
         body.update(additional_data)
-    
+
     logger.error(f"Returning error response: {status_code} - {message}")
-    
+
     return {
         'statusCode': status_code,
         'headers': {
