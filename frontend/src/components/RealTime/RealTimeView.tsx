@@ -1,9 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   User,
   MessageSquare,
   ChevronUp,
   ChevronDown,
+  FileText,
 } from "lucide-react";
 import LiveTranscription from "../LiveTranscription/LiveTranscription";
 import Translation from "./Translation";
@@ -13,7 +14,7 @@ import IdentityVerification from "./IdentityVerification/IdentityVerification";
 import TranscriptionSessionSetup from "../LiveTranscription/TranscriptionSessionSetup"
 import { TranslationProvider } from '../../context/TranslationContext';
 import { RecordingStatus, sessionType } from "../../types/";
-
+import SummarizationReport from "./SummarizationReport";
 
 interface SessionData {
   sessionId: string;
@@ -75,17 +76,19 @@ interface RealTimeViewProps {
     value: string
   ) => void;
   onVerifyIdentity: () => void;
+  triggerSummarization: boolean;
 }
 
 const RealTimeView: React.FC<RealTimeViewProps> = ({
   sessionState,
   setSessionState,
   sessionData,
+  triggerSummarization,
   //identityData,
   //onIdentityDataChange,
   //onVerifyIdentity,
 }) => {
-  const [activeTab, setActiveTab] = useState<"identity" | "transcription">(
+  const [activeTab, setActiveTab] = useState<"identity" | "transcription" | "summarization">(
     "identity"
   );
   const [aiExpanded, setAiExpanded] = useState(false);
@@ -104,6 +107,11 @@ const RealTimeView: React.FC<RealTimeViewProps> = ({
   const handleBackToDashboard = () => {
     console.log("Going back to dashboard");
   };
+    useEffect(() => {
+    if (triggerSummarization) {
+      setActiveTab("summarization");
+    }
+  }, [triggerSummarization]);
 
   return (
     <div className="realtime-view">
@@ -159,6 +167,11 @@ const RealTimeView: React.FC<RealTimeViewProps> = ({
             )}
           </div>
         )}
+            {activeTab === "summarization" && (
+              <div className="recording-content">
+                <SummarizationReport sessionData={sessionData} />
+              </div>
+            )}
       </div>
 
       <div className="session-sidebar">
@@ -202,6 +215,16 @@ const RealTimeView: React.FC<RealTimeViewProps> = ({
           </button>
           {aiExpanded && <AIAssistant sessionState={sessionState} />}
         </div>
+
+          <button
+            onClick={() => setActiveTab("summarization")}
+            className={`sidebar-btn ${
+            activeTab === "summarization" ? "active" : ""
+            }`}
+          >
+            <FileText className="btn-icon" />
+            <span>Summarization</span>
+          </button>      
 
         <SessionInfo sessionData={sessionData} />
       </div>

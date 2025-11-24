@@ -9,6 +9,7 @@ from vision_ai.case_management_stack import CaseManagementStack
 from vision_ai.identity_verification_stack import IdentityVerificationStack
 from vision_ai.advanced_analysis_stack import AdvancedAnalysisStack
 from vision_ai.rewrite_stack import RewriteStack
+from vision_ai.summarization_stack import SummarizationStack
 from vision_ai.api_deployment_stack import APIDeploymentStack
 from vision_ai.transcription_stack import TranscriptionStack
 
@@ -84,8 +85,7 @@ identity_stack = IdentityVerificationStack(
 identity_stack.add_dependency(case_management_stack)
 
 # ==========================================
-
-# 4. ADVANCED ANALYSIS STACK
+# 5. ADVANCED ANALYSIS STACK
 # AI Suggested Questions feature
 # ==========================================
 advanced_analysis_stack = AdvancedAnalysisStack(
@@ -100,7 +100,7 @@ advanced_analysis_stack = AdvancedAnalysisStack(
 advanced_analysis_stack.add_dependency(shared_stack)
 
 # ==========================================
-# 5. REWRITE STACK
+# 6. REWRITE STACK
 # Document rewriting with AWS Bedrock
 # ==========================================
 rewrite_stack = RewriteStack(
@@ -116,7 +116,7 @@ rewrite_stack.add_dependency(shared_stack)
 
 
 # ==========================================
-# 6. TRANSCRIPTION STACK
+# 7. TRANSCRIPTION STACK
 # ==========================================
 transcription_stack = TranscriptionStack(
     app, f"{app_name}-transcription-stack", env=env,
@@ -128,7 +128,23 @@ transcription_stack = TranscriptionStack(
 transcription_stack.add_dependency(shared_stack)
 
 # ==========================================
-# 7. API DEPLOYMENT STACK
+# 8. SUMMARIZATION STACK
+# AI Report Summarization with Bedrock
+# ==========================================
+summarization_stack = SummarizationStack(
+    app, f"{app_name}-summarization-stack", env=env,
+    investigation_bucket=shared_stack.investigation_bucket,
+    shared_api_id=shared_stack.shared_api.rest_api_id,
+    shared_api_root_resource_id=shared_stack.shared_api.rest_api_root_resource_id,
+    description="Summarization Stack: AI report summarization using AWS Bedrock Nova Lite"
+)
+
+# Ensure summarization stack depends on shared stack
+summarization_stack.add_dependency(shared_stack)
+
+
+# ==========================================
+# 9. API DEPLOYMENT STACK
 # Deploys API after all routes are added
 # ==========================================
 deployment_stack = APIDeploymentStack(
@@ -143,6 +159,7 @@ deployment_stack.add_dependency(identity_stack)
 deployment_stack.add_dependency(advanced_analysis_stack)
 deployment_stack.add_dependency(rewrite_stack)
 deployment_stack.add_dependency(transcription_stack)
+deployment_stack.add_dependency(summarization_stack)
 
 # Add tags
 cdk.Tags.of(app).add("Project", "VisionAI")
