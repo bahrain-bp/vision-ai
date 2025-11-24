@@ -6,19 +6,22 @@ import React, {
   useRef,
   useEffect,
 } from "react";
-import { RecordingStatus } from "../types/";
-import { TranscriptionResult } from "../types";
+import { RecordingStatus, sessionType,SaveTranscriptionRequest } from "../types/";
+import { TranscriptionResult,TranscriptionStatus } from "../types";
 import TranscribeService from "../services/LiveTranscription/TranscribeService";
-
+import StreamManager from "../services/LiveTranscription/StreamManager";
+import {useCaseContext} from "../hooks/useCaseContext"
 export interface TranscriptionContextType {
   audioStatus: boolean;
   recordingStatus: RecordingStatus;
   startRecording: (
     setSessionState?: (state: RecordingStatus) => void,
-    selectedLanguage?: string
-  ) => Promise<boolean>;
+    selectedLanguage?: string,
+    sessionType?: sessionType,
+    detectionLanguages?: string
+  ) => Promise<TranscriptionStatus>;
   stopRecording: (setSessionState?: (state: RecordingStatus) => void) => void;
-  getFullTranscript : string;
+  getFullTranscript: string;
 }
 
 export const TranscriptionContext = createContext<
@@ -36,13 +39,26 @@ export const TranscriptionProvider: React.FC<{ children: ReactNode }> = ({
     useState<RecordingStatus>("off");
   const isStartingRef = useRef(false);
 
+  const { currentCase,currentSession } = useCaseContext();
+
+
   const startRecording = useCallback(
     async (
       setSessionState?: (state: RecordingStatus) => void,
-      selectedLanguage?: string
-    ) => {
+      selectedLanguage?: string,
+      sessionType?: sessionType,
+      detectionLanguages?:string,
+    ): Promise<TranscriptionStatus> => {
       if (isStartingRef.current) {
-        return false;
+        return {
+          success: false,
+          timestamp: new Date().toISOString(),
+          source: "both",
+          error: {
+            success: false,
+            message: "Recording already starting",
+          },
+        };
       }
 
       isStartingRef.current = true;
@@ -50,7 +66,9 @@ export const TranscriptionProvider: React.FC<{ children: ReactNode }> = ({
       try {
         const result = await TranscribeService.startRecording(
           setTranscriptUpdate,
-          selectedLanguage
+          selectedLanguage,
+          sessionType,
+          detectionLanguages,
         );
 
         if (result.success) {
@@ -63,9 +81,10 @@ export const TranscriptionProvider: React.FC<{ children: ReactNode }> = ({
           if (setSessionState) {
             setSessionState(newStatus);
           }
-          return true;
+        }else{
+          StreamManager.stopStreams();
         }
-        return false;
+        return result;
       } finally {
         isStartingRef.current = false;
       }
@@ -83,6 +102,7 @@ export const TranscriptionProvider: React.FC<{ children: ReactNode }> = ({
 
     const getFullTranscript = fullTranscript; ;
 
+
   const stopRecording = useCallback(
     (setSessionState?: (state: RecordingStatus) => void) => {
       TranscribeService.stopRecording();
@@ -93,11 +113,23 @@ export const TranscriptionProvider: React.FC<{ children: ReactNode }> = ({
       setRecordingStatus(newStatus);
       setAudioStatus(newAudioStatus);
 
+      console.log("🔍 Saving transcript, length:", fullTranscript.length); // Debug
+
+      const transcriptionData: SaveTranscriptionRequest = {
+        caseId: currentCase?.caseId || "",
+        sessionId:
+          currentSession?.sessionId ||
+          currentCase?.caseId + "_" + crypto.randomUUID(),
+        transcription: fullTranscript, 
+      };
+
+      TranscribeService.saveTranscription(transcriptionData);
+
       if (setSessionState) {
         setSessionState(newStatus);
       }
     },
-    []
+    [fullTranscript, currentCase, currentSession] 
   );
 
   return (
