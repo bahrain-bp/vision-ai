@@ -73,3 +73,9 @@ export const ErrorTypeLabels: Record<ErrorType, string> = {
       [key: string]: any;
     };
   }
+export interface LanguagePreferences {
+  languageMode: "unified" | "separate";
+  sharedLanguage: string; // For unified mode
+  investigatorLanguage: string; // For separate mode
+  witnessLanguage: string; // For separate mode - single language
+}

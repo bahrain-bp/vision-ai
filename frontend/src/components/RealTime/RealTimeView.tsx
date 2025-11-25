@@ -11,7 +11,11 @@ import AIAssistant from "./AIAssistant";
 import SessionInfo from "./SessionInfo";
 import IdentityVerification from "./IdentityVerification/IdentityVerification";
 import TranscriptionSessionSetup from "../LiveTranscription/TranscriptionSessionSetup"
-import { RecordingStatus, sessionType } from "../../types/";
+import {
+  RecordingStatus,
+  sessionType,
+  LanguagePreferences,
+} from "../../types/";
 
 interface SessionData {
   sessionId: string;
@@ -89,9 +93,16 @@ const RealTimeView: React.FC<RealTimeViewProps> = ({
   const [aiExpanded, setAiExpanded] = useState(false);
   const [isIdentityVerified, setIsIdentityVerified] = useState(false);
   const [startRecording, setStartRecording] = useState(false);
-  const [selectedLanguage, setSelectedLanguage] = useState<string>("en-US");
   const [sessionType, setSessionType] = useState<sessionType>("standard");
-  const [detectionLanguages,setDetectionLanguages] = useState([]);
+  const [detectionLanguages, setDetectionLanguages] = useState([]);
+
+  const [languagePreferences, setLanguagePreferences] =
+    useState<LanguagePreferences>({
+      languageMode: "unified",
+      sharedLanguage: "",
+      investigatorLanguage: "",
+      witnessLanguage: "",
+    });
 
   const handleStartInvestigation = (investigationData: InvestigationData) => {
     console.log("Starting investigation with data:", investigationData);
@@ -121,8 +132,8 @@ const RealTimeView: React.FC<RealTimeViewProps> = ({
         {sessionState === "off" && activeTab === "transcription" && (
           <>
             <TranscriptionSessionSetup
-              selectedLanguage={selectedLanguage}
-              setSelectedLanguage={setSelectedLanguage}
+              languagePreferences={languagePreferences}
+              setLanguagePreferences={setLanguagePreferences}
               detectionLanguages={detectionLanguages}
               setDetectionLanguages={setDetectionLanguages}
               sessionType={sessionType}
@@ -141,7 +152,7 @@ const RealTimeView: React.FC<RealTimeViewProps> = ({
                 <LiveTranscription
                   startRecordingProp={startRecording}
                   setSessionState={setSessionState}
-                  selectedLanguage={selectedLanguage}
+                  languagePreferences={languagePreferences}
                   detectionLanguages={detectionLanguages}
                   setSessionType={setSessionType}
                   sessionType={sessionType}

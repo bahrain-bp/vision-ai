@@ -6,7 +6,7 @@ import React, {
   useRef,
   useEffect,
 } from "react";
-import { RecordingStatus, sessionType,SaveTranscriptionRequest } from "../types/";
+import { RecordingStatus, sessionType,SaveTranscriptionRequest,LanguagePreferences } from "../types/";
 import { TranscriptionResult,TranscriptionStatus } from "../types";
 import TranscribeService from "../services/LiveTranscription/TranscribeService";
 import StreamManager from "../services/LiveTranscription/StreamManager";
@@ -16,7 +16,7 @@ export interface TranscriptionContextType {
   recordingStatus: RecordingStatus;
   startRecording: (
     setSessionState?: (state: RecordingStatus) => void,
-    selectedLanguage?: string,
+    languagePreferences?: LanguagePreferences,
     sessionType?: sessionType,
     detectionLanguages?: string
   ) => Promise<TranscriptionStatus>;
@@ -45,9 +45,9 @@ export const TranscriptionProvider: React.FC<{ children: ReactNode }> = ({
   const startRecording = useCallback(
     async (
       setSessionState?: (state: RecordingStatus) => void,
-      selectedLanguage?: string,
+      languagePreferences?: LanguagePreferences,
       sessionType?: sessionType,
-      detectionLanguages?:string,
+      detectionLanguages?: string
     ): Promise<TranscriptionStatus> => {
       if (isStartingRef.current) {
         return {
@@ -66,9 +66,9 @@ export const TranscriptionProvider: React.FC<{ children: ReactNode }> = ({
       try {
         const result = await TranscribeService.startRecording(
           setTranscriptUpdate,
-          selectedLanguage,
+          languagePreferences,
           sessionType,
-          detectionLanguages,
+          detectionLanguages
         );
 
         if (result.success) {
@@ -81,7 +81,7 @@ export const TranscriptionProvider: React.FC<{ children: ReactNode }> = ({
           if (setSessionState) {
             setSessionState(newStatus);
           }
-        }else{
+        } else {
           StreamManager.stopStreams();
         }
         return result;
