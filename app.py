@@ -54,23 +54,8 @@ shared_stack = SharedInfrastructureStack(
 )
 
 # ==========================================
-# 3. CASE MANAGEMENT STACK 
-# Handles case creation, display, and session creation
-# ==========================================
-case_management_stack = CaseManagementStack(
-    app, f"{app_name}-case-management-stack", env=env,
-    investigation_bucket=shared_stack.investigation_bucket,
-    shared_api_id=shared_stack.shared_api.rest_api_id,
-    shared_api_root_resource_id=shared_stack.shared_api.rest_api_root_resource_id,
-    description="Case management: create cases, display cases, and create sessions"
-)
-
-# Ensure case management depends on shared stack
-case_management_stack.add_dependency(shared_stack)
-
-# ==========================================
-# 4. IDENTITY VERIFICATION STACK
-# Uses shared API by ID 
+# 3. IDENTITY VERIFICATION STACK
+# Deploy FIRST to create /identity routes
 # ==========================================
 identity_stack = IdentityVerificationStack(
     app, f"{app_name}-identity-verification-stack", env=env,
@@ -80,8 +65,24 @@ identity_stack = IdentityVerificationStack(
     description="Identity verification: CPR extraction, name extraction, and face comparison with CloudWatch logging"
 )
 
-# Ensure identity stack depends on case management stack
-identity_stack.add_dependency(case_management_stack)
+# Ensure identity stack depends on shared stack
+identity_stack.add_dependency(shared_stack)
+
+# ==========================================
+# 4. CASE MANAGEMENT STACK 
+# Deploy AFTER identity stack to create /cases routes
+# ==========================================
+case_management_stack = CaseManagementStack(
+    app, f"{app_name}-case-management-stack", env=env,
+    investigation_bucket=shared_stack.investigation_bucket,
+    shared_api_id=shared_stack.shared_api.rest_api_id,
+    shared_api_root_resource_id=shared_stack.shared_api.rest_api_root_resource_id,
+    description="Case management: create cases, display cases, and create sessions"
+)
+
+# Ensure case management depends on identity stack
+case_management_stack.add_dependency(shared_stack)
+case_management_stack.add_dependency(identity_stack)  
 
 # ==========================================
 
@@ -140,6 +141,9 @@ deployment_stack = APIDeploymentStack(
 
 # Ensure deployment happens after all feature stacks
 deployment_stack.add_dependency(identity_stack)
+
+deployment_stack.add_dependency(case_management_stack)  
+
 deployment_stack.add_dependency(advanced_analysis_stack)
 deployment_stack.add_dependency(rewrite_stack)
 deployment_stack.add_dependency(transcription_stack)
