@@ -108,67 +108,121 @@ def handler(event, context):
         return api_response(str(e), status=500)
 
 
+def extract_pdf_with_pymupdf(pdf_bytes):
+    """
+    Deterministic PDF text extraction using PyMuPDF to preserve reading order
+    without LLM reflow. Falls back to per-block ordering top->bottom then
+    left->right.
+    """
+    doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+    pages = []
+    try:
+        for page_index, page in enumerate(doc, 1):
+            words = page.get_text(
+                "words", flags=fitz.TEXT_PRESERVE_LIGATURES | fitz.TEXT_PRESERVE_WHITESPACE
+            )
+            page_lines = []
+            if not words:
+                # Fallback to block text if no words returned.
+                blocks = page.get_text(
+                    "blocks",
+                    flags=fitz.TEXT_PRESERVE_LIGATURES | fitz.TEXT_PRESERVE_WHITESPACE,
+                )
+                for block in blocks:
+                    text = (block[4] or "").strip()
+                    if text:
+                        page_lines.append(text)
+                pages.append(page_lines)
+                continue
+
+            words.sort(key=lambda w: (w[5], w[6], w[7]))  # block, line, word index
+            current_block = None
+            current_line = None
+            line_words = []
+
+            def flush_line():
+                if line_words:
+                    page_lines.append(" ".join(line_words))
+
+            for w in words:
+                block_no, line_no, word_text = w[5], w[6], w[4]
+                if (block_no, line_no) != (current_block, current_line):
+                    flush_line()
+                    if current_block is not None and block_no != current_block:
+                        # Blank line between blocks to respect paragraph breaks.
+                        page_lines.append("")
+                    line_words = [word_text]
+                    current_block, current_line = block_no, line_no
+                else:
+                    line_words.append(word_text)
+            flush_line()
+            pages.append(page_lines)
+    finally:
+        doc.close()
+    flat_lines = []
+    for idx, page_lines in enumerate(pages, 1):
+        flat_lines.append(f"=== Page {idx} ===")
+        flat_lines.extend(page_lines)
+        flat_lines.append("")  # page spacer
+
+    return "\n".join(flat_lines).strip()
+
+
 def bedrock_extract_pdf_chunked(s3_key):
     pdf_obj = s3.get_object(Bucket=BUCKET_NAME, Key=s3_key)
     pdf_bytes = pdf_obj["Body"].read()
-    
-    doc = fitz.open(stream=pdf_bytes, filetype="pdf")
-    all_text = []
-    
-    for page_num in range(0, len(doc), 2):
-        chunk_doc = fitz.open()
-        end_page = min(page_num + 1, len(doc) - 1)
-        chunk_doc.insert_pdf(doc, from_page=page_num, to_page=end_page)
-        chunk_bytes = chunk_doc.tobytes()
-        chunk_doc.close()
-        
-        text = extract_chunk(chunk_bytes)
-        if end_page == page_num:
-            all_text.append(f"=== Page {page_num + 1} ===\n{text}")
+
+    extracted_text = extract_pdf_with_pymupdf(pdf_bytes)
+    if not extracted_text:
+        return error_response(500,"failed to extract the text")
+
+    lines = extracted_text.splitlines()
+    cleaned_pages = []
+    current_title = None
+    current_lines = []
+
+    def flush_page():
+        if current_title is None:
+            return
+        page_text = "\n".join(current_lines).strip()
+        cleaned = extract_chunk(page_text, fmt="text") if page_text else ""
+        cleaned_pages.append(f"{current_title}\n{cleaned}")
+
+    for line in lines:
+        if line.startswith("=== Page "):
+            flush_page()
+            current_title = line.strip()
+            current_lines = []
         else:
-            all_text.append(f"=== Pages {page_num + 1}-{end_page + 1} ===\n{text}")
-    
-    doc.close()
-    full_text = "\n\n".join(all_text)
+            current_lines.append(line)
+    flush_page()
+
+    if not cleaned_pages and extracted_text:
+        cleaned_pages.append(extract_chunk(extracted_text, fmt="text"))
+
+    full_text = "\n\n".join(cleaned_pages)
     return api_response(full_text)
 
 
-def extract_chunk(pdf_bytes):
+def extract_chunk(content, fmt):
+ 
+    user_content = [
+        {
+            "text": (
+                "Clean this page of text: fix words broken by line breaks, normalize spaces, and keep list"
+                " items on their own lines. Preserve order and do not translate, summarize, or add content."
+            )
+        },
+        {"text": content},
+    ]
+
     extraction_response = bedrock.converse(
         modelId=MODEL_ID,
-        messages=[{
-            "role": "user",
-            "content": [
-                {
-                    "text": (
-                        "Extract clean plain text from this PDF segment. Preserve the reading order and paragraph"
-                        " breaks. Keep bullet/numbered list items on separate lines. Do not summarize, translate,"
-                        " or add commentary. Return only the extracted text."
-                    )
-                },
-                {"document": {"format": "pdf", "name": "page", "source": {"bytes": pdf_bytes}}},
-            ],
-        }],
+        messages=[{"role": "user", "content": user_content}],
         inferenceConfig={"maxTokens": 2048, "temperature": 0.0},
     )
-    raw_text = extraction_response["output"]["message"]["content"][0]["text"]
+    return extraction_response["output"]["message"]["content"][0]["text"]
 
-    refinement_response = bedrock.converse(
-        modelId=MODEL_ID,
-        messages=[{
-            "role": "user",
-            "content": [{
-                "text": (
-                    "Clean the extracted text: fix words broken by line breaks, normalize spaces, and remove obvious"
-                    " repeated headers or footers if they appear on every page. Do not add or remove actual content"
-                    " beyond these fixes. Return only the cleaned text. \n\n"
-                    f"{raw_text}"
-                )
-            }],
-        }],
-        inferenceConfig={"maxTokens": 2048, "temperature": 0.0},
-    )
-    return refinement_response["output"]["message"]["content"][0]["text"]
 
 
 def bedrock_extract(s3_uri, document_name, fmt):
