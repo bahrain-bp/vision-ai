@@ -173,7 +173,10 @@ const RealTimeView: React.FC<RealTimeViewProps> = ({
 
           <button
             onClick={() => setActiveTab("transcription")}
-            className="sidebar-btn"
+            className={`sidebar-btn ${
+              activeTab === "transcription" ? "active" : ""
+            } ${!isIdentityVerified ? "disabled" : ""}`}
+            disabled={!isIdentityVerified}
           >
             <FileText className="btn-icon" />
             <span>Transcription & Translation</span>
@@ -183,7 +186,8 @@ const RealTimeView: React.FC<RealTimeViewProps> = ({
         <div className="ai-assistant-section">
           <button
             onClick={() => setAiExpanded(!aiExpanded)}
-            className="ai-toggle-btn"
+            className={`ai-toggle-btn ${!isIdentityVerified ? "disabled" : ""}`}
+            disabled={!isIdentityVerified}
           >
             <div className="ai-toggle-header">
               <MessageSquare className="btn-icon" />
