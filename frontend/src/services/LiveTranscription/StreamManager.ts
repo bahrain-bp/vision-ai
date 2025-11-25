@@ -18,6 +18,7 @@ class StreamManager {
 
   async getDisplayStream(): Promise<{
     success: boolean;
+    error?: any;
     displayStream: MediaStream | null;
   }> {
     if (this.displayStream === null) {
@@ -32,7 +33,11 @@ class StreamManager {
         });
       } catch (error) {
         console.error("Display recording error:", error);
-        return { success: false, displayStream: null };
+        return {
+          success: false,
+          error: error,
+          displayStream: null,
+        };
       }
     }
     return { success: true, displayStream: this.displayStream };
@@ -40,6 +45,7 @@ class StreamManager {
 
   async getMicStream(): Promise<{
     success: boolean;
+    error?: any;
     audioStream: MediaStream | null;
   }> {
     if (this.audioStream === null) {
@@ -49,7 +55,11 @@ class StreamManager {
         });
       } catch (error) {
         console.error("Microphone recording error:", error);
-        return { success: false, audioStream: null };
+        return {
+          success: false,
+          error: error,
+          audioStream: null,
+        };
       }
     }
     return { success: true, audioStream: this.audioStream };
@@ -91,23 +101,27 @@ class StreamManager {
           : "Audio tracks present but not all enabled/live",
     };
   }
-  
+
   getDisplayStreamStatus(): {
     isActive: boolean;
     hasVideoTracks: boolean;
+    hasAudioTracks: boolean;
     message: string;
   } {
     if (!this.displayStream) {
       return {
         isActive: false,
         hasVideoTracks: false,
+        hasAudioTracks: false,
         message: "Display stream not initialized",
       };
     }
 
     const videoTracks = this.displayStream.getVideoTracks();
+    const audioTracks = this.displayStream.getAudioTracks();
     const isActive = this.displayStream.active;
     const hasVideoTracks = videoTracks.length > 0;
+    const hasAudioTracks = audioTracks.length > 0;
     const allTracksLive = videoTracks.every(
       (track) => track.enabled && track.readyState === "live"
     );
@@ -115,9 +129,12 @@ class StreamManager {
     return {
       isActive,
       hasVideoTracks,
+      hasAudioTracks,
       message:
         isActive && hasVideoTracks && allTracksLive
-          ? "Display stream active and capturing"
+          ? hasAudioTracks
+            ? "Display stream active with audio"
+            : "Display stream active (no audio)"
           : !isActive
           ? "Display stream inactive"
           : !hasVideoTracks

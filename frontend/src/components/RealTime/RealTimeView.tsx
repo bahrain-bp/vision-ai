@@ -10,7 +10,7 @@ import Translation from "./Translation";
 import SessionInfo from "./SessionInfo";
 import IdentityVerification from "./IdentityVerification/IdentityVerification";
 import TranscriptionSessionSetup from "../LiveTranscription/TranscriptionSessionSetup"
-import { RecordingStatus } from "../../types/";
+//import { RecordingStatus } from "../../types/";
 //import { useQuestionContext } from '../../hooks/useQuestionContext';
 //import MetricsWidget from './AIAssistant/MetricsWidget';
 //import QuestionCard from './AIAssistant/QuestionCard';
@@ -23,6 +23,8 @@ import QuestionGenerator from './AIAssistant/QuestionGenerator';
 
 
 
+import { TranslationProvider } from '../../context/TranslationContext';
+import { RecordingStatus, sessionType } from "../../types/";
 
 
 interface SessionData {
@@ -102,6 +104,8 @@ const RealTimeView: React.FC<RealTimeViewProps> = ({
   const [isIdentityVerified, setIsIdentityVerified] = useState(false);
   const [startRecording, setStartRecording] = useState(false);
   const [selectedLanguage, setSelectedLanguage] = useState<string>("en-US");
+  const [sessionType, setSessionType] = useState<sessionType>("standard");
+  const [detectionLanguages,setDetectionLanguages] = useState([]);
 
   const handleStartInvestigation = (investigationData: InvestigationData) => {
     console.log("Starting investigation with data:", investigationData);
@@ -224,6 +228,10 @@ const mockQuestion = {
             <TranscriptionSessionSetup
               selectedLanguage={selectedLanguage}
               setSelectedLanguage={setSelectedLanguage}
+              detectionLanguages={detectionLanguages}
+              setDetectionLanguages={setDetectionLanguages}
+              sessionType={sessionType}
+              setSessionType={setSessionType}
               setStartRecording={setStartRecording}
               setSessionState={setSessionState}
               setActiveTab={setActiveTab}
@@ -239,8 +247,17 @@ const mockQuestion = {
                   startRecordingProp={startRecording}
                   setSessionState={setSessionState}
                   selectedLanguage={selectedLanguage}
+                  detectionLanguages={detectionLanguages}
+                  setSessionType={setSessionType}
+                  sessionType={sessionType}
                 />
-                <Translation />
+                {/* WRAP Translation with Provider */}
+                <TranslationProvider 
+                  investigatorLanguage="en" 
+                  witnessLanguage="ar"
+                >
+                  <Translation />
+                </TranslationProvider>
               </>
             )}
           </div>

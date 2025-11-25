@@ -9,6 +9,8 @@ import { User } from "./types";
 import { TranscriptionProvider } from "./context/TranscriptionContext";
 import { CaseProvider } from "./context/CaseContext"; // ADD THIS IMPORT
 import { QuestionProvider } from "./context/QuestionContext";
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import WitnessPage from "./components/RealTime/WitnessPage"; 
 
 
 Amplify.configure(awsConfig);
@@ -131,34 +133,49 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="App">
-      {!isAuthenticated ? (
-        <Authentication onAuthSuccess={handleAuthSuccess} />
-      ) : (
-        <CaseProvider>
-          {" "}
-          {/* ADD THIS WRAPPER */}
-          {currentView === "session" && currentUser && sessionData ? (
-            <TranscriptionProvider>
-              <QuestionProvider> 
-              <SessionPage
+    <Router>
+    <Routes>
+      {/* Main app route */}
+      <Route 
+        path="/" 
+        element={
+      <div className="App">
+        {!isAuthenticated ? (
+          <Authentication onAuthSuccess={handleAuthSuccess} />
+        ) : (
+          <CaseProvider>
+            {" "}
+            {/* ADD THIS WRAPPER */}
+            {currentView === "session" && currentUser && sessionData ? (
+              <TranscriptionProvider>
+                <SessionPage
+                  user={currentUser}
+                  onSignOut={handleSignOut}
+                  //sessionData={sessionData}
+                  onEndSession={handleEndSession}
+                />
+              </TranscriptionProvider>
+            ) : currentUser ? (
+              <HomePage
                 user={currentUser}
                 onSignOut={handleSignOut}
-                //sessionData={sessionData}
-                onEndSession={handleEndSession}
+                onStartSession={handleStartSession}
               />
-              </QuestionProvider>
-            </TranscriptionProvider>
-          ) : currentUser ? (
-            <HomePage
-              user={currentUser}
-              onSignOut={handleSignOut}
-              onStartSession={handleStartSession}
-            />
-          ) : null}
-        </CaseProvider>
-      )}
-    </div>
+            ) : null}
+          </CaseProvider>
+        )}
+      </div>
+
+        } 
+      />
+      
+      {/* Witness view route */}
+      <Route 
+        path="/witness" 
+        element={<WitnessPage />} 
+      />
+    </Routes>
+  </Router>
   );
 };
 
