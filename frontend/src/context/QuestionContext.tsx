@@ -71,9 +71,9 @@ export const QuestionProvider: React.FC<{ children: ReactNode }> = ({ children }
   /**
    * Generate unique question ID
    */
-  const generateQuestionId = (): string => {
-    return `question-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  };
+  const generateQuestionId = useCallback((): string => {
+  return `question-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+}, []);
 
   // ========== MAIN ACTIONS ==========
   /**

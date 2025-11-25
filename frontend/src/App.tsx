@@ -148,12 +148,14 @@ const App: React.FC = () => {
             {/* ADD THIS WRAPPER */}
             {currentView === "session" && currentUser && sessionData ? (
               <TranscriptionProvider>
+               <QuestionProvider> 
                 <SessionPage
                   user={currentUser}
                   onSignOut={handleSignOut}
                   //sessionData={sessionData}
                   onEndSession={handleEndSession}
                 />
+                </QuestionProvider>
               </TranscriptionProvider>
             ) : currentUser ? (
               <HomePage
