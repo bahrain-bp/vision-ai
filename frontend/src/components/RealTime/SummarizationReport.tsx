@@ -22,7 +22,7 @@ const SummarizationReport: React.FC<SummarizationReportProps> = ({
   const [selectedLanguage, setSelectedLanguage] = useState<'en' | 'ar'>('en');
   const [summaryLength, setSummaryLength] = useState<'short' | 'medium' | 'long' | 'extra-long'>('medium');
 
-  const API_URL = 'https://z973ttse59.execute-api.us-east-1.amazonaws.com/prod/summarize';
+  const API_URL = 'https://yphcka81y6.execute-api.us-east-1.amazonaws.com/prod/summarize';
 
   const generateSummary = async () => {
     // Hardcoded demo transcript
