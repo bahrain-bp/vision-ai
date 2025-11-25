@@ -1,4 +1,6 @@
 import React from "react";
+import { LanguageCode } from "@aws-sdk/client-transcribe-streaming";
+import "./TranslationSettings.css";
 
 interface TranslationSettings {
   sourceLanguage: string;
@@ -17,61 +19,63 @@ const TranslationSettings: React.FC<TranslationSettingsProps> = ({
   translationSettings,
   onTranslationSettingsChange,
 }) => {
+  // Generate language options from AWS Transcribe LanguageCode
+  const languageOptions = Object.entries(LanguageCode).map(([code, name]) => {
+    const formattedCode = code.split("_")[0].toLowerCase() + "-" + code.split("_")[1].toUpperCase();
+    const displayName = new Intl.DisplayNames(["en"], { type: "language" }).of(
+      formattedCode.split("-")[0]
+    ) || name;
+    const region = formattedCode.split("-")[1];
+
+    return {
+      code: formattedCode,
+      name: `${displayName} (${region})`
+    };
+  });
+
   return (
     <div className="session-card">
       <h2 className="card-title">Translation Settings</h2>
 
-      <div className="space-y-4">
-        <div className="form-group">
-          <label className="form-label">Source Language</label>
+      <div className="translation-settings-row">
+        <div className="language-selector-compact">
+          <label className="form-label">Investigator Language</label>
           <select
             value={translationSettings.sourceLanguage}
             onChange={(e) =>
               onTranslationSettingsChange("sourceLanguage", e.target.value)
             }
-            className="form-select"
+            className="form-select compact"
           >
-            <option value="ar">Arabic</option>
-            <option value="en">English</option>
-            <option value="fr">French</option>
-            <option value="hi">Hindi</option>
-            <option value="ur">Urdu</option>
-            <option value="fil">Filipino</option>
-            <option value="bn">Bengali</option>
-            <option value="ml">Malayalam</option>
+            {languageOptions.map(lang => (
+              <option key={lang.code} value={lang.code}>
+                {lang.name}
+              </option>
+            ))}
           </select>
         </div>
 
-        <div className="form-group">
-          <label className="form-label">Target Language</label>
+        <div className="language-selector-compact">
+          <label className="form-label">Witness Language</label>
           <select
             value={translationSettings.targetLanguage}
             onChange={(e) =>
               onTranslationSettingsChange("targetLanguage", e.target.value)
             }
-            className="form-select"
+            className="form-select compact"
           >
-            <option value="en">English</option>
-            <option value="ar">Arabic</option>
-            <option value="fr">French</option>
-            <option value="hi">Hindi</option>
-            <option value="ur">Urdu</option>
-            <option value="fil">Filipino</option>
-            <option value="bn">Bengali</option>
-            <option value="ml">Malayalam</option>
+            {languageOptions.map(lang => (
+              <option key={lang.code} value={lang.code}>
+                {lang.name}
+              </option>
+            ))}
           </select>
         </div>
 
-        <div className="info-box">
-          <p className="info-text">
-            <strong>Translation:</strong>{" "}
-            {translationSettings.sourceLanguage.toUpperCase()} →{" "}
-            {translationSettings.targetLanguage.toUpperCase()}
-          </p>
-          <p className="info-text mt-1">
-            Real-time transcription, translation, identity verification, and AI
-            assistant will be automatically enabled
-          </p>
+        <div className="translation-display">
+          <span className="translation-direction">
+            {translationSettings.sourceLanguage.toUpperCase()} → {translationSettings.targetLanguage.toUpperCase()}
+          </span>
         </div>
       </div>
     </div>
