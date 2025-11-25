@@ -1,8 +1,7 @@
 import json
 import logging
 import os
-from typing import Any, Dict, Tuple
-from urllib.parse import unquote_plus
+from typing import Any, Dict
 
 import boto3
 from botocore.config import Config
@@ -49,26 +48,6 @@ def parse_body(event: Dict[str, Any]) -> Dict[str, Any]:
         return json.loads(event.get("body", "{}"))
     except Exception:
         return {}
-
-
-def ensure_key_access(key: str, user_sub: str, session_id: str) -> Tuple[bool, str]:
-    safe_session = str(session_id).replace("/", "_")
-    if ".." in key.split("/"):
-        return False, "Invalid key"
-
-    allowed_prefix = f"classification/extracted/{user_sub}/"
-    if not key.startswith(allowed_prefix):
-        return False, "Access to the requested key is not allowed"
-
-    if f"/{safe_session}/" not in key:
-        return False, "Key does not belong to the provided session"
-
-    return True, ""
-
-
-def load_text_from_s3(key: str) -> str:
-    obj = s3.get_object(Bucket=BUCKET_NAME, Key=key)
-    return obj["Body"].read().decode("utf-8", errors="ignore")
 
 
 def extract_json_block(text: str) -> str:
@@ -168,23 +147,20 @@ def handler(event, context):
             return error_response(401, "Unauthorized")
 
         body = parse_body(event)
-        s3_key = unquote_plus(body.get("key", "")).strip()
         session_id = (body.get("sessionId") or "").strip()
+        extracted_text = (body.get("extracted_text") or body.get("text") or "").strip()
 
-        if not s3_key or not session_id:
-            return error_response(400, "sessionId and key are required")
+        if not session_id:
+            return error_response(400, "sessionId is required")
+        if not extracted_text:
+            return error_response(400, "extracted_text is required")
 
-        ok, msg = ensure_key_access(s3_key, user_sub, session_id)
-        if not ok:
-            return error_response(403, msg)
+        logger.info("Classifying report for user=%s session=%s (inline text)", user_sub, session_id)
 
-        logger.info("Classifying report for user=%s session=%s key=%s", user_sub, session_id, s3_key)
-
-        text = load_text_from_s3(s3_key)
-        if not text.strip():
+        if not extracted_text.strip():
             return error_response(400, "Extracted text is empty")
 
-        result = classify_report(text)
+        result = classify_report(extracted_text)
 
         return {
             "statusCode": 200,

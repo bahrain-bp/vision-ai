@@ -37,7 +37,7 @@ const Classification: React.FC<ClassificationProps> = ({ sessionData, onExtracte
   const extractFnUrl =
     process.env.REACT_APP_EXTRACT_FN_URL && process.env.REACT_APP_EXTRACT_FN_URL !== ""
       ? process.env.REACT_APP_EXTRACT_FN_URL
-      : null;
+      : "https://s2dntz6phbvnsmferrtuirulfe0ziteu.lambda-url.us-east-1.on.aws/";
 
 
   const clearMessages = () => {
@@ -189,29 +189,25 @@ const Classification: React.FC<ClassificationProps> = ({ sessionData, onExtracte
       const result = await extractText(key);
 
       setText(result.extracted_text || "");
-      setCategory(result.category || "");
+      setCategory("");
       setConfidence(null);
       setInfo("Text extracted successfully.");
 
       setLoading("classify");
-      const saveResult = await storeExtractedText(result.extracted_text || "");
-      if (saveResult?.key) {
-        onExtractedKey?.(saveResult.key);
-        const classification = await classifyExtractedText(saveResult.key);
-        setCategory(classification.category || "");
-        setConfidence(
-          typeof classification.confidence === "number"
-            ? classification.confidence
-            : null
-        );
-        if (classification.reason) {
-          setInfo(`Classified. ${classification.reason}`);
-        } else {
-          setInfo("Classified successfully.");
-        }
+      
+      const classification = await classifyExtractedText(result.extracted_text || "");
+      setCategory(classification.category || "");
+      setConfidence(
+        typeof classification.confidence === "number"
+          ? classification.confidence
+          : null
+      );
+      if (classification.reason) {
+        setInfo(`Classified. ${classification.reason}`);
       } else {
-        setInfo("Text stored, but no key returned for classification.");
+        setInfo("Classified successfully.");
       }
+      
     } catch (e: any) {
       setError(e.message || "Something went wrong.");
     } finally {
@@ -241,15 +237,15 @@ const Classification: React.FC<ClassificationProps> = ({ sessionData, onExtracte
     }
   };
 
-  const classifyExtractedText = async (key: string) => {
+  const classifyExtractedText = async (textToClassify: string) => {
     const { idToken } = await getTokens();
 
     const res = await fetch(classifyUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
       body: JSON.stringify({
-        key,
         sessionId: sessionData.sessionId,
+        extracted_text: textToClassify,
       }),
     });
 

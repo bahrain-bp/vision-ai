@@ -2,6 +2,7 @@ import json
 import os
 import logging
 import boto3
+import fitz
 from urllib.parse import unquote_plus
 from botocore.config import Config
 
@@ -14,11 +15,10 @@ cognito_idp = boto3.client("cognito-idp")
 bedrock = boto3.client(
     "bedrock-runtime",
     region_name=os.environ.get("AWS_REGION", "us-east-1"),
-    config=Config(read_timeout=3600, connect_timeout=3600),
 )
 
 BUCKET_NAME = os.environ["BUCKET_NAME"]
-MODEL_ID = os.environ.get("NOVA_MODEL_ID", "amazon.nova-lite-v1:0")
+MODEL_ID = os.environ.get("NOVA_MODEL_ID", "us.meta.llama3-2-11b-instruct-v1:0")
 
 
 def get_user_sub(event):
@@ -53,7 +53,7 @@ def error_response(status_code, message):
 def handler(event, context):
     """
     Input (API Gateway):
-      { "key": "classification/uploads/file.pdf" }
+      { "key": "classification/upload/...", "sessionId": "..." }
 
     Output:
       { "extracted_text": "..." }
@@ -89,7 +89,7 @@ def handler(event, context):
         bedrock_name = f"document-{fmt_safe}"
 
         if filename.endswith(".pdf"):
-            return bedrock_extract(s3_uri, bedrock_name, "pdf")
+            return bedrock_extract_pdf_chunked(s3_key)
 
         if filename.endswith(".docx"):
             return bedrock_extract(s3_uri, bedrock_name, "docx")
@@ -108,36 +108,92 @@ def handler(event, context):
         return api_response(str(e), status=500)
 
 
-def bedrock_extract(s3_uri, document_name, fmt):
-    """
-    Use Amazon Nova Lite on Bedrock to extract text from a pdf/docx document.
-    """
+def bedrock_extract_pdf_chunked(s3_key):
+    pdf_obj = s3.get_object(Bucket=BUCKET_NAME, Key=s3_key)
+    pdf_bytes = pdf_obj["Body"].read()
+    
+    doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+    all_text = []
+    
+    for page_num in range(0, len(doc), 2):
+        chunk_doc = fitz.open()
+        end_page = min(page_num + 1, len(doc) - 1)
+        chunk_doc.insert_pdf(doc, from_page=page_num, to_page=end_page)
+        chunk_bytes = chunk_doc.tobytes()
+        chunk_doc.close()
+        
+        text = extract_chunk(chunk_bytes)
+        if end_page == page_num:
+            all_text.append(f"=== Page {page_num + 1} ===\n{text}")
+        else:
+            all_text.append(f"=== Pages {page_num + 1}-{end_page + 1} ===\n{text}")
+    
+    doc.close()
+    full_text = "\n\n".join(all_text)
+    return api_response(full_text)
 
+
+def extract_chunk(pdf_bytes):
+    extraction_response = bedrock.converse(
+        modelId=MODEL_ID,
+        messages=[{
+            "role": "user",
+            "content": [
+                {
+                    "text": (
+                        "Extract clean plain text from this PDF segment. Preserve the reading order and paragraph"
+                        " breaks. Keep bullet/numbered list items on separate lines. Do not summarize, translate,"
+                        " or add commentary. Return only the extracted text."
+                    )
+                },
+                {"document": {"format": "pdf", "name": "page", "source": {"bytes": pdf_bytes}}},
+            ],
+        }],
+        inferenceConfig={"maxTokens": 2048, "temperature": 0.0},
+    )
+    raw_text = extraction_response["output"]["message"]["content"][0]["text"]
+
+    refinement_response = bedrock.converse(
+        modelId=MODEL_ID,
+        messages=[{
+            "role": "user",
+            "content": [{
+                "text": (
+                    "Clean the extracted text: fix words broken by line breaks, normalize spaces, and remove obvious"
+                    " repeated headers or footers if they appear on every page. Do not add or remove actual content"
+                    " beyond these fixes. Return only the cleaned text. \n\n"
+                    f"{raw_text}"
+                )
+            }],
+        }],
+        inferenceConfig={"maxTokens": 2048, "temperature": 0.0},
+    )
+    return refinement_response["output"]["message"]["content"][0]["text"]
+
+
+def bedrock_extract(s3_uri, document_name, fmt):
     system_list = [
         {
             "text": (
-                "أنت نموذج متخصص في نسخ المستندات دون تلخيص أو إعادة صياغة. استخرج كل النصوص الواضحة كما هي "
-                "وباللغة الأصلية، مع الحفاظ على ترتيب القراءة صفحة بصفحة وإضافة فواصل صفحات بصيغة [[page 1]], "
-                "[[page 2]]، إلخ. ضمّن البيانات الحساسة والتحقيقية كاملة: الأطراف، الأرقام، التواريخ، الأماكن، "
-                "الوقائع، الأقوال، القرارات، المرفقات، التوقيعات، الأختام، الملاحظات اليدوية والهامشية، الرؤوس "
-                "والتذييل وأرقام الصفحات. امثل الجداول كـ Markdown (صفوف وأعمدة). لا تكرر المقاطع ولا تحذف أي "
-                "جزء. إذا كان هناك نص غير مقروء اكتب [UNCERTAIN: وصف المشكلة]. أعد النص فقط."
+                "You are a document text extractor. Return the document's text in reading order as plain text."
+                " Preserve paragraphs and list formatting with line breaks; render tables in a readable row/column"
+                " text form. Do not summarize, translate, or add commentary. If content is unreadable, omit it rather"
+                " than guessing."
             )
         }
     ]
-
+ 
     conversation = [
         {
             "role": "user",
             "content": [
                 {
                     "text": (
-                        f"اقرأ المستند المرفق (الصيغة: {fmt}, الاسم: {document_name}) وأعد نصاً حرفياً كاملاً دون "
-                        "حذف أو اختصار، وباللغة الأصلية. حافظ على ترتيب الظهور صفحة بصفحة مع وضع علامات الصفحات "
-                        "[[page 1]], [[page 2]], إلخ. ضمّن كل تفاصيل القضية الحساسة: البيانات الشخصية، أرقام "
-                        "القضايا، التواريخ، الأماكن، الوقائع، الشهادات، الأدلة، التوجيهات، الملاحق، الجداول "
-                        "(Markdown)، القوائم النقطية أو المرقمة، الحواشي، الأختام، والتوقيعات. لا تغيّر اللغة أو "
-                        "الصياغة. إذا تعذّر قراءة جزء، اكتب [UNCERTAIN: وصف المشكلة]. أعد النص فقط."
+                        f"Extract the text from the attached document.\n"
+                        f"- Format: {fmt}\n"
+                        f"- Name: {document_name}\n"
+                        "Return plain text only. Keep the order of content and basic structure (paragraphs, lists,"
+                        " simple tables). Do not summarize or add notes."
                     )
                 },
                 {
@@ -150,7 +206,7 @@ def bedrock_extract(s3_uri, document_name, fmt):
             ],
         }
     ]
-
+ 
     response = bedrock.converse(
         modelId=MODEL_ID,
         system=system_list,
@@ -161,11 +217,11 @@ def bedrock_extract(s3_uri, document_name, fmt):
             "topP": 1.0,
         },
     )
-
+ 
     extracted = response["output"]["message"]["content"][0]["text"]
     return api_response(extracted)
-
-
+ 
+ 
 def api_response(text, status=200):
     return {
         "statusCode": status,
