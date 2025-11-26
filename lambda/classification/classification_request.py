@@ -129,8 +129,12 @@ def classify_report(text: str) -> Dict[str, Any]:
     reason = parsed.get("reason") or ""
     category_label = default_labels.get(code_from_label, default_labels["violation"])
 
+    final_category = (
+        category_label if confidence >= 0.5 else "The category couldn't be detected"
+    )
+
     return {
-        "category": category_label,
+        "category": final_category,
         "confidence": confidence,
         "reason": reason,
         "model": MODEL_ID,

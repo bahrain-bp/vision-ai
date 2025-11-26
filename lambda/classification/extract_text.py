@@ -1,10 +1,15 @@
 import json
 import os
+import io
 import logging
 import boto3
 import fitz
 from urllib.parse import unquote_plus
-from botocore.config import Config
+from docx import Document
+from docx.oxml.text.paragraph import CT_P
+from docx.oxml.table import CT_Tbl
+from docx.text.paragraph import Paragraph
+from docx.table import Table
 
 
 logger = logging.getLogger()
@@ -19,6 +24,7 @@ bedrock = boto3.client(
 
 BUCKET_NAME = os.environ["BUCKET_NAME"]
 MODEL_ID = os.environ.get("NOVA_MODEL_ID", "us.meta.llama3-2-11b-instruct-v1:0")
+MAX_CHARS_PER_CHUNK =  6000
 
 
 def get_user_sub(event):
@@ -47,6 +53,13 @@ def error_response(status_code, message):
         "statusCode": status_code,
         "headers": {"Content-Type": "application/json"},
         "body": json.dumps({"error": message}),
+    }
+
+def api_response(text, status=200):
+    return {
+        "statusCode": status,
+        "headers": {"Content-Type": "application/json; charset=utf-8"},
+        "body": json.dumps({"extracted_text": text}, ensure_ascii=False),
     }
 
 
@@ -82,17 +95,13 @@ def handler(event, context):
 
         logger.info("User %s extracting from s3://%s/%s", caller_sub, BUCKET_NAME, s3_key)
 
-        s3_uri = f"s3://{BUCKET_NAME}/{s3_key}"
         filename = s3_key.split("/")[-1].lower()
-        fmt = filename.split(".")[-1] if "." in filename else "file"
-        fmt_safe = "".join(ch for ch in fmt if ch.isalnum()) or "file"
-        bedrock_name = f"document-{fmt_safe}"
 
         if filename.endswith(".pdf"):
-            return bedrock_extract_pdf_chunked(s3_key)
+            return extract_pdf(s3_key)
 
         if filename.endswith(".docx"):
-            return bedrock_extract(s3_uri, bedrock_name, "docx")
+            return extract_docx(s3_key)
 
         if filename.endswith(".txt"):
             obj = s3.get_object(Bucket=BUCKET_NAME, Key=s3_key)
@@ -101,19 +110,24 @@ def handler(event, context):
 
         msg = "Unsupported file type. Allowed: .pdf, .docx, .txt"
         logger.warning(msg)
-        return api_response(msg, status=400)
+        return error_response(msg, status=400)
 
     except Exception as e:
         logger.exception("Extraction error")
-        return api_response(str(e), status=500)
+        return error_response(str(e), status=500)
 
+def extract_pdf(s3_key):
+    pdf_obj = s3.get_object(Bucket=BUCKET_NAME, Key=s3_key)
+    pdf_bytes = pdf_obj["Body"].read()
+
+    extracted_text = extract_pdf_with_pymupdf(pdf_bytes)
+    if not extracted_text:
+        return error_response(500,"failed to extract the text")
+
+    cleaned_text = clean_pages_text(extracted_text)
+    return api_response(cleaned_text)
 
 def extract_pdf_with_pymupdf(pdf_bytes):
-    """
-    Deterministic PDF text extraction using PyMuPDF to preserve reading order
-    without LLM reflow. Falls back to per-block ordering top->bottom then
-    left->right.
-    """
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
     pages = []
     try:
@@ -168,43 +182,153 @@ def extract_pdf_with_pymupdf(pdf_bytes):
     return "\n".join(flat_lines).strip()
 
 
-def bedrock_extract_pdf_chunked(s3_key):
-    pdf_obj = s3.get_object(Bucket=BUCKET_NAME, Key=s3_key)
-    pdf_bytes = pdf_obj["Body"].read()
+def extract_docx(s3_key):
+    """Fetch DOCX from S3 and extract with python-docx, returning page-labeled text."""
+    obj = s3.get_object(Bucket=BUCKET_NAME, Key=s3_key)
+    data = obj["Body"].read()
+    extracted_text = extract_docx_with_pydocx(data)
 
-    extracted_text = extract_pdf_with_pymupdf(pdf_bytes)
     if not extracted_text:
         return error_response(500,"failed to extract the text")
 
-    lines = extracted_text.splitlines()
+    cleaned_text = clean_pages_text(extracted_text)
+    return api_response(cleaned_text)
+
+
+def extract_docx_with_pydocx(docx_bytes):
+    """Extract DOCX text deterministically and label as a single page."""
+
+    document = Document(io.BytesIO(docx_bytes))
+
+    def iter_block_items(parent):
+        for child in parent.element.body.iterchildren():
+            if isinstance(child, CT_P):
+                yield Paragraph(child, parent)
+            elif isinstance(child, CT_Tbl):
+                yield Table(child, parent)
+
+    lines = []
+    for block in iter_block_items(document):
+        if isinstance(block, Paragraph):
+            text = block.text.strip()
+            if text:
+                lines.append(text)
+        elif isinstance(block, Table):
+            for row in block.rows:
+                row_text = "\t".join(cell.text.strip() for cell in row.cells)
+                if row_text.strip():
+                    lines.append(row_text)
+            lines.append("")  # spacer after table
+
+    body = "\n".join(lines).strip()
+    if not body:
+        return ""
+    return f"=== Page 1 ===\n{body}"
+
+
+def chunk_text(text, max_chars=MAX_CHARS_PER_CHUNK):
+    """Split text into newline-preserving chunks that stay within model limits."""
+    if not text:
+        return []
+
+    chunks = []
+    current = []
+    current_len = 0
+
+    def flush_current():
+        nonlocal current, current_len
+        if current:
+            chunk = "\n".join(current).strip()
+            if chunk:
+                chunks.append(chunk)
+            current = []
+            current_len = 0
+
+    for line in text.splitlines():
+        if len(line) >= max_chars:
+            flush_current()
+            for start in range(0, len(line), max_chars):
+                segment = line[start : start + max_chars].strip()
+                if segment:
+                    chunks.append(segment)
+            continue
+
+        projected_len = current_len + (1 if current else 0) + len(line)
+        if projected_len > max_chars:
+            flush_current()
+
+        current.append(line)
+        current_len += (1 if current_len else 0) + len(line)
+
+    flush_current()
+    return chunks
+
+
+def clean_pages_text(text, max_chars=MAX_CHARS_PER_CHUNK):
+    """
+    Stream pages and chunk in one pass: keeps headers, chunks per page, cleans via Bedrock.
+    Fewer passes than splitting then chunking separately.
+    """
+    if not text:
+        return ""
+
+    lines = text.splitlines()
     cleaned_pages = []
+    page_chunks = []
+    chunk_lines = []
+    chunk_len = 0
     current_title = None
-    current_lines = []
+    page_index = 1
+
+    def flush_chunk():
+        nonlocal chunk_lines, chunk_len, page_chunks
+        if not chunk_lines:
+            return
+        chunk = "\n".join(chunk_lines).strip()
+        if chunk:
+            page_chunks.append(enhance_chunk(chunk))
+        chunk_lines = []
+        chunk_len = 0
 
     def flush_page():
-        if current_title is None:
+        nonlocal page_chunks, current_title, page_index
+        flush_chunk()
+        if current_title is None and not page_chunks:
             return
-        page_text = "\n".join(current_lines).strip()
-        cleaned = extract_chunk(page_text, fmt="text") if page_text else ""
-        cleaned_pages.append(f"{current_title}\n{cleaned}")
+        title = current_title or f"=== Page {page_index} ==="
+        cleaned_body = "\n\n".join(page_chunks) if page_chunks else ""
+        cleaned_pages.append(f"{title}\n{cleaned_body}".strip())
+        page_chunks = []
+        page_index += 1
 
     for line in lines:
         if line.startswith("=== Page "):
             flush_page()
             current_title = line.strip()
-            current_lines = []
-        else:
-            current_lines.append(line)
+            continue
+
+        projected_len = chunk_len + (1 if chunk_lines else 0) + len(line)
+        if projected_len > max_chars:
+            flush_chunk()
+
+        chunk_lines.append(line)
+        chunk_len += (1 if chunk_len else 0) + len(line)
+
     flush_page()
 
-    if not cleaned_pages and extracted_text:
-        cleaned_pages.append(extract_chunk(extracted_text, fmt="text"))
+    if not cleaned_pages and text.strip():
+        # Fallback: treat the whole text as one page.
+        chunks = chunk_text(text.strip(), max_chars)
+        cleaned_chunks = [enhance_chunk(c) for c in chunks] if chunks else []
+        if cleaned_chunks:
+            cleaned_pages.append("\n\n".join(cleaned_chunks))
+        else:
+            cleaned_pages.append(text.strip())
 
-    full_text = "\n\n".join(cleaned_pages)
-    return api_response(full_text)
+    return "\n\n".join(cleaned_pages).strip()
 
 
-def extract_chunk(content, fmt):
+def enhance_chunk(content):
  
     user_content = [
         {
@@ -219,66 +343,9 @@ def extract_chunk(content, fmt):
     extraction_response = bedrock.converse(
         modelId=MODEL_ID,
         messages=[{"role": "user", "content": user_content}],
-        inferenceConfig={"maxTokens": 2048, "temperature": 0.0},
+        inferenceConfig={"maxTokens": 7000, "temperature": 0.0},
     )
     return extraction_response["output"]["message"]["content"][0]["text"]
+ 
+ 
 
-
-
-def bedrock_extract(s3_uri, document_name, fmt):
-    system_list = [
-        {
-            "text": (
-                "You are a document text extractor. Return the document's text in reading order as plain text."
-                " Preserve paragraphs and list formatting with line breaks; render tables in a readable row/column"
-                " text form. Do not summarize, translate, or add commentary. If content is unreadable, omit it rather"
-                " than guessing."
-            )
-        }
-    ]
- 
-    conversation = [
-        {
-            "role": "user",
-            "content": [
-                {
-                    "text": (
-                        f"Extract the text from the attached document.\n"
-                        f"- Format: {fmt}\n"
-                        f"- Name: {document_name}\n"
-                        "Return plain text only. Keep the order of content and basic structure (paragraphs, lists,"
-                        " simple tables). Do not summarize or add notes."
-                    )
-                },
-                {
-                    "document": {
-                        "format": fmt,
-                        "name": document_name,
-                        "source": {"s3Location": {"uri": f"{s3_uri}"}},
-                    }
-                },
-            ],
-        }
-    ]
- 
-    response = bedrock.converse(
-        modelId=MODEL_ID,
-        system=system_list,
-        messages=conversation,
-        inferenceConfig={
-            "maxTokens": 10000,
-            "temperature": 0.0,
-            "topP": 1.0,
-        },
-    )
- 
-    extracted = response["output"]["message"]["content"][0]["text"]
-    return api_response(extracted)
- 
- 
-def api_response(text, status=200):
-    return {
-        "statusCode": status,
-        "headers": {"Content-Type": "application/json; charset=utf-8"},
-        "body": json.dumps({"extracted_text": text}, ensure_ascii=False),
-    }

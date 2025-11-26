@@ -81,6 +81,14 @@ class classificationStack(Stack):
             resources=["*"],
         ))
 
+        docx_layer = _lambda.LayerVersion(
+            self,
+            "DocxLayer",
+            code=_lambda.Code.from_asset("./layers/docx-layer.zip"),
+            compatible_runtimes=[_lambda.Runtime.PYTHON_3_12],
+            description="python-docx dependency layer",
+        )
+
         get_upload_url_lambda = _lambda.Function(
             self, "GetUploadUrlFunction",
             runtime=_lambda.Runtime.PYTHON_3_11,
@@ -129,7 +137,12 @@ class classificationStack(Stack):
             role=lambda_role,
             memory_size=512,
             timeout = Duration.seconds(600),  
-            layers=[_lambda.LayerVersion.from_layer_version_arn(self, "PDFLayer", "arn:aws:lambda:us-east-1:770693421928:layer:Klayers-p312-PyMuPDF:11")],
+            layers=[
+                _lambda.LayerVersion.from_layer_version_arn(
+                    self, "PDFLayer", "arn:aws:lambda:us-east-1:770693421928:layer:Klayers-p312-PyMuPDF:11"
+                ),
+                docx_layer,
+            ],
             environment={
                 "BUCKET_NAME": investigation_bucket.bucket_name,
                 "BEDROCK_REGION": "us-east-1",             
