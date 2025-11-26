@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
-    "@aws-sdk/client-transcribe-streaming": "^3.928.0",
+    "@aws-sdk/client-transcribe-streaming": "^3.922.0",
     "@aws-sdk/credential-providers": "^3.922.0",
     "aws-amplify": "^6.15.7",
     "axios": "^1.13.2",

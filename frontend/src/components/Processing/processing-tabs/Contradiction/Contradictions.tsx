@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import "./Contradictions.css";
 
 interface Contradiction {
@@ -6,96 +6,164 @@ interface Contradiction {
   severity: "red" | "yellow" | "green";
 }
 
-interface Witness {
-  name: string;
-  contradictions: Contradiction[];
+interface AnalysisResponse {
+  caseId: string;
+  witnessId: string;
+  results: Contradiction[];
+  storedAt: string;
 }
 
-// mock data 
-const witnesses: Witness[] = [
-  {
-    name: "Robert Johnson - Witness Statement #3",
-    contradictions: [
-      { text: "Subject claimed to have never been to the location, but phone GPS data shows presence at the scene.", severity: "red" },
-      { text: "Subject denied knowing the complainant personally, but text messages show frequent communication.", severity: "yellow" },
-      { text: "Subject mentioned being alone, but earlier stated someone else was present. This requires clarification.", severity: "yellow" },
-    ],
-  },
-  {
-    name: "Emily Smith - Witness Statement #1",
-    contradictions: [
-      { text: "Subject stated they were at home, but security footage shows them outside.", severity: "red" },
-      { text: "Subject claimed not to know the other party, but emails indicate previous contact.", severity: "yellow" },
-      { text: "Timing of the phone call conflicts with their stated location.", severity: "yellow" },
-    ],
-  },
-  {
-    name: "Michael Brown - Witness Statement #2",
-    contradictions: [
-      { text: "Subject reported no involvement, but credit card records show purchases at the scene.", severity: "red" },
-      { text: "Subject denied seeing anyone else, but CCTV footage contradicts this.", severity: "yellow" },
-      { text: "Subject claimed they were alone, and a neighbor confirms they were indeed alone.", severity: "green" },
-    ],
-  },
-];
-
-// severity levels
-const severityIcons: { [key: string]: string } = {
+const severityIcons: Record<string, string> = {
   red: "❌",
   yellow: "⚠️",
   green: "✅",
 };
 
+const API_BASE_URL = "https://hvjlr6aa2m.execute-api.us-east-1.amazonaws.com/prod";
+
+const BUCKET_NAME = "vision-investigation-system-052904446370";
 
 const Contradictions: React.FC = () => {
-  const [selectedWitness, setSelectedWitness] = useState<Witness | null>(witnesses[0]);
-  const [showResults, setShowResults] = useState(false);
+  const [caseId, setCaseId] = useState("CASE-001");
+  const [witnesses, setWitnesses] = useState<string[]>([]);
+  const [selectedWitness, setSelectedWitness] = useState("");
+  const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [loadingWitnesses, setLoadingWitnesses] = useState(false);
 
-  const handleAnalyzeClick = () => {
-    setShowResults(true);
+  useEffect(() => {
+    const loadWitnesses = async () => {
+      if (!caseId.trim()) return;
+      setLoadingWitnesses(true);
+
+      try {
+        const res = await fetch(
+          `${API_BASE_URL}/contradictions/witnesses?caseId=${caseId}`
+        );
+        const json = await res.json();
+        if (json.witnesses) {
+          setWitnesses(json.witnesses);
+        } else {
+          setWitnesses([]);
+        }
+      } catch (err) {
+        console.error("Error loading witnesses:", err);
+        setWitnesses([]);
+      }
+
+      setLoadingWitnesses(false);
+    };
+
+    loadWitnesses();
+  }, [caseId]);
+
+  // ============================================================
+  // ANALYZE CONTRADICTIONS
+  // ============================================================
+  const handleAnalyzeClick = async () => {
+    if (!selectedWitness) return;
+
+    setLoading(true);
+    setAnalysis(null);
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/contradictions/analyze`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ caseId, witnessId: selectedWitness }),
+      });
+
+      const raw = await res.json();
+      console.log("Raw response:", raw);
+
+      // Handle both wrapped and unwrapped responses
+      let parsed: AnalysisResponse;
+      if (typeof raw.body === "string") {
+        parsed = JSON.parse(raw.body);
+      } else if (typeof raw.body === "object") {
+        parsed = raw.body;
+      } else {
+        parsed = raw;
+      }
+
+      console.log("Parsed analysis:", parsed);
+      setAnalysis(parsed);
+    } catch (err) {
+      console.error("Error analyzing contradictions:", err);
+    }
+
+    setLoading(false);
   };
 
   return (
     <div className="contradictions-container">
-      <h2>Analyze Contradictions</h2>
+      <h2>Contradiction Analysis</h2>
 
-      <div className="dropdown-container">
-        <label htmlFor="witness-select">Select Witness:</label>
-        <select
-          id="witness-select"
-          value={selectedWitness?.name}
-          onChange={(e) => {
-            const witness = witnesses.find((w) => w.name === e.target.value) || null;
-            setSelectedWitness(witness);
-            setShowResults(false); // reset results when switching witness
-          }}
-        >
-          {witnesses.map((w) => (
-            <option key={w.name} value={w.name}>
-              {w.name}
-            </option>
-          ))}
-        </select>
+      {/* CASE ID INPUT */}
+      <div className="case-id-container">
+        <label>Case ID:</label>
+        <input
+          value={caseId}
+          onChange={(e) => setCaseId(e.target.value)}
+          placeholder="CASE-001"
+        />
       </div>
 
+      {/* WITNESS DROPDOWN */}
+      <div className="dropdown-container">
+        <label>Select Witness:</label>
+        {loadingWitnesses ? (
+          <p>Loading witnesses...</p>
+        ) : (
+          <select
+            value={selectedWitness}
+            onChange={(e) => setSelectedWitness(e.target.value)}
+          >
+            <option value="">-- Select Witness --</option>
+            {witnesses.map((w) => (
+              <option key={w} value={w}>
+                {w}
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
+
+      {/* BUTTON */}
       <div className="analyze-button-container">
-        <button className="analyze-btn" onClick={handleAnalyzeClick}>
-          Analyze Contradictions
+        <button
+          className="analyze-btn"
+          onClick={handleAnalyzeClick}
+          disabled={loading || !selectedWitness}
+        >
+          {loading ? "Analyzing..." : "Analyze Contradictions"}
         </button>
       </div>
 
-      {showResults && selectedWitness && (
+      {/* RESULTS */}
+      {analysis && (
         <div className="results-container">
           <h3 className="results-heading">
-           Contradiction Analysis Results
+            Results – {analysis.witnessId}
           </h3>
+
           <div className="contradiction-cards">
-            {selectedWitness.contradictions.map((c, idx) => (
-              <div key={idx} className={`contradiction-card ${c.severity}`}>
-                <span className="severity-icon">{severityIcons[c.severity]}</span>
-                <span>{c.text}</span>
+            {analysis.results.map((item, index) => (
+              <div key={index} className={`contradiction-card ${item.severity}`}>
+                <span className="severity-icon">
+                  {severityIcons[item.severity]}
+                </span>
+                <span>{item.text}</span>
               </div>
             ))}
+          </div>
+
+          {/* TO Show the full S3 path */}
+          <div className="save-path">
+            <p>
+              <strong>Saved S3 Path:</strong>{" "}
+              s3://{BUCKET_NAME}/{analysis.storedAt}
+            </p>
           </div>
         </div>
       )}

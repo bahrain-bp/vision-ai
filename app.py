@@ -10,6 +10,8 @@ from vision_ai.identity_verification_stack import IdentityVerificationStack
 from vision_ai.advanced_analysis_stack import AdvancedAnalysisStack
 from vision_ai.rewrite_stack import RewriteStack
 from vision_ai.api_deployment_stack import APIDeploymentStack
+from vision_ai.detect_contradiction_stack import ContradictionStack
+
 
 load_dotenv()
 app = cdk.App()
@@ -83,7 +85,6 @@ identity_stack = IdentityVerificationStack(
 identity_stack.add_dependency(case_management_stack)
 
 # ==========================================
-
 # 4. ADVANCED ANALYSIS STACK
 # AI Suggested Questions feature
 # ==========================================
@@ -114,7 +115,20 @@ rewrite_stack = RewriteStack(
 rewrite_stack.add_dependency(shared_stack)
 
 # ==========================================
-# 6. API DEPLOYMENT STACK
+# 6. Detect Contradiction STACK
+# ==========================================
+detect_contradiction_stack = ContradictionStack(
+    app, f"{app_name}-detect-contradiction-stack",
+    investigation_bucket=shared_stack.investigation_bucket,
+    shared_api_id=shared_stack.shared_api.rest_api_id,
+    shared_api_root_resource_id=shared_stack.shared_api.rest_api_root_resource_id,
+    env=env,
+    description="Detect Contradiction using 2 Lambda and AWS Bedrock Nova Lite"
+)
+detect_contradiction_stack.add_dependency(shared_stack)
+
+# ==========================================
+# 7. API DEPLOYMENT STACK
 # Deploys API after all routes are added
 # ==========================================
 deployment_stack = APIDeploymentStack(
@@ -128,6 +142,7 @@ deployment_stack = APIDeploymentStack(
 deployment_stack.add_dependency(identity_stack)
 deployment_stack.add_dependency(advanced_analysis_stack)
 deployment_stack.add_dependency(rewrite_stack)
+deployment_stack.add_dependency(detect_contradiction_stack)
 
 # Add tags
 cdk.Tags.of(app).add("Project", "VisionAI")
