@@ -1,29 +1,40 @@
 import React, { useEffect, useRef } from "react";
 import { FileText, Copy, Loader } from "lucide-react";
 import { useTranscription } from "../../hooks/useTranscription";
-import { RecordingStatus, TranscriptionResult } from "../../types/";
+import {
+  RecordingStatus,
+  TranscriptionStatus,
+  sessionType,
+} from "../../types/";
 import PDFExporter from "./PDFExporter";
+import ErrorDisplay from "./ErrorDisplay";
 import { useState } from "react";
 
 interface LiveTranscriptionProps {
   startRecordingProp: boolean;
   setSessionState: (state: RecordingStatus) => void;
   selectedLanguage: string;
+  detectionLanguages?:string[];
+  setSessionType: (sesType: sessionType) => void;
+  sessionType: sessionType;
 }
 
 const LiveTranscription: React.FC<LiveTranscriptionProps> = ({
   startRecordingProp,
   setSessionState,
   selectedLanguage,
+  detectionLanguages,
+  //setSessionType,
+  sessionType,
 }) => {
-  const { audioStatus, recordingStatus, startRecording } =
+  const { audioStatus, recordingStatus, startRecording, getFullTranscript } =
     useTranscription();
+  const [error, setError] = useState<TranscriptionStatus | null>(null);
 
-  const [liveTranscript, setLiveTranscript] =
-    useState<TranscriptionResult | null>(null);
-  const [fullTranscript, setFullTranscript] = useState<string>("");
   const [isStarting, setIsStarting] = useState(false);
+
   const hasStarted = useRef(false);
+
 
   useEffect(() => {
     if (
@@ -35,18 +46,23 @@ const LiveTranscription: React.FC<LiveTranscriptionProps> = ({
 
       const start = async () => {
         setIsStarting(true);
-
+        setError(null);
         try {
-          const success = await startRecording(
-            setSessionState,
-            (text: TranscriptionResult) => {
-              setLiveTranscript(text);
-            },
-            selectedLanguage
-          );
+              const detectionLangString =
+                detectionLanguages && detectionLanguages.length > 0
+                  ? detectionLanguages.join(",")
+                  : undefined;
+            const result: TranscriptionStatus = await startRecording(
+              setSessionState,
+              selectedLanguage,
+              sessionType,
+              detectionLangString
+            );
 
-          if (!success) {
-            console.error("Failed to start recording");
+          if (!result.success) {
+            console.error("Failed to start recording: ", result.error);
+            console.error("Error: ", result.error?.rawError);
+            setError(result);
             hasStarted.current = false;
           }
         } catch (error) {
@@ -61,24 +77,32 @@ const LiveTranscription: React.FC<LiveTranscriptionProps> = ({
     }
   }, [startRecordingProp, recordingStatus, selectedLanguage]);
 
-  useEffect(() => {
-    if (liveTranscript?.formattedTranscript) {
-      setFullTranscript((prev) => prev + liveTranscript.formattedTranscript);
-    }
-  }, [liveTranscript]);
+  if (error) {
+    return (
+      <ErrorDisplay
+        displayMessage={error.error?.message ?? "Failed to start recording"}
+        rawMessage={error.error?.rawError}
+        displayTitle={error.error?.type}
+        onClose={() => {
+          setError(null);
+          hasStarted.current = false;
+        }}
+      />
+    );
+  }
 
-if (isStarting) {
-  return (
-    <div className="flex items-center justify-center w-full min-h-[400px]">
-      <div className="flex flex-col items-center gap-4">
-        <Loader className="w-8 h-8 animate-spin text-blue-500" />
-        <p className="text-gray-600 font-medium">
-          Initializing recording session...
-        </p>
+  if (isStarting) {
+    return (
+      <div className="flex items-center justify-center w-full min-h-[400px]">
+        <div className="flex flex-col items-center gap-4">
+          <Loader className="w-8 h-8 animate-spin text-blue-500" />
+          <p className="text-gray-600 font-medium">
+            Initializing recording session...
+          </p>
+        </div>
       </div>
-    </div>
-  );
-}
+    );
+  }
 
   return (
     <div className="transcription-card">
@@ -100,7 +124,7 @@ if (isStarting) {
         </div>
       </div>
       <textarea
-        value={fullTranscript}
+        value={getFullTranscript}
         readOnly
         placeholder="Transcript will appear here..."
         style={{
@@ -113,20 +137,16 @@ if (isStarting) {
           borderRadius: "4px",
           resize: "vertical",
           whiteSpace: "pre-wrap",
+          overflow: "auto",
         }}
       />
 
       <div className="action-buttons">
-        <button
-          className="action-btn"
-          //onClick={() => stopRecording(setSessionState)}
-        >
-          <PDFExporter
-            transcript={fullTranscript}
-            title={"Investigation Transcript"}
-            fileName={"Transcript"}
-          />
-        </button>
+        <PDFExporter
+          transcript={getFullTranscript}
+          title={"Investigation Transcript"}
+          fileName={"Transcript"}
+        />
         <button className="action-btn">
           <Copy className="btn-icon" />
           <span>Copy All</span>

@@ -1,11 +1,16 @@
 import React from "react";
-import { Play } from "lucide-react";
-import { LanguageCode } from "@aws-sdk/client-transcribe-streaming";
-import { RecordingStatus } from "../../types/";
+import { Play, Users, Info, Zap, Settings } from "lucide-react";
+import { RecordingStatus, sessionType } from "../../types/";
+import { STREAMING_LANGUAGES } from "./StreamLanguages";
+import Multiselect from "multiselect-react-dropdown";
 
 interface TranscriptionSessionSetupProps {
   selectedLanguage: string;
   setSelectedLanguage: (language: string) => void;
+  detectionLanguages: string[];
+  setDetectionLanguages: (lang: []) => void;
+  sessionType: sessionType;
+  setSessionType: (type: "standard" | "multi") => void;
   setStartRecording: (value: boolean) => void;
   setSessionState: (state: RecordingStatus) => void;
   setActiveTab: (tab: "identity" | "transcription") => void;
@@ -14,10 +19,24 @@ interface TranscriptionSessionSetupProps {
 const TranscriptionSessionSetup: React.FC<TranscriptionSessionSetupProps> = ({
   selectedLanguage,
   setSelectedLanguage,
+  //detectionLanguages,
+  setDetectionLanguages,
+  sessionType,
+  setSessionType,
   setStartRecording,
   setSessionState,
   setActiveTab,
 }) => {
+
+const handleLanguageSelect = (selectedList: any) => {
+  setDetectionLanguages(selectedList.map((lang: any) => lang.code));
+
+};
+
+const handleLanguageRemove = (selectedList: any) => {
+  setDetectionLanguages(selectedList.map((lang: any) => lang.code));
+};
+
   const handleStartRecording = () => {
     setStartRecording(true);
     setSessionState("on");
@@ -25,59 +44,181 @@ const TranscriptionSessionSetup: React.FC<TranscriptionSessionSetupProps> = ({
   };
 
   return (
-    <div className="ready-state">
-      <div className="ready-content">
+    <div className="ready-state w-ful">
+      <div className="ready-content w-4/5">
         <div className="play-icon-container">
           <Play className="play-icon" />
         </div>
         <h2 className="ready-title">Ready to Start</h2>
         <p className="ready-description">
-          Click the button below to begin recording the investigation session.
+          Configure your session settings before starting the recording.
         </p>
-        <button onClick={handleStartRecording} className="start-recording-btn">
+
+        {/* Settings Container */}
+        <div className="w-full space-y-5 mt-8">
+          {/* Language Selection Card */}
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+            <label className="flex items-center gap-2 text-sm font-semibold text-gray-800 mb-3">
+              <Settings className="w-4 h-4 text-blue-600" />
+              Session Language
+            </label>
+            <select
+              id="language-select"
+              value={selectedLanguage}
+              onChange={(e) => setSelectedLanguage(e.target.value)}
+              className="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg 
+               focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
+               text-gray-900 font-medium cursor-pointer hover:bg-gray-100 transition-all"
+            >
+              <option value="auto">🌐 Auto Detect Multiple Languages</option>
+              {Object.entries(STREAMING_LANGUAGES).map(([code, name]) => (
+                <option key={code} value={code}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </div>
+          {selectedLanguage === "auto" && (
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Select Languages to Detect
+              </label>
+              <Multiselect
+                options={Object.entries(STREAMING_LANGUAGES).map(
+                  ([code, name]) => ({
+                    code: code,
+                    name: name,
+                  })
+                )}
+                displayValue="name"
+                placeholder="Choose languages..."
+                showCheckbox={true}
+                onSelect={handleLanguageSelect}
+                onRemove={handleLanguageRemove}
+                avoidHighlightFirstOption={true}
+                style={{
+                  chips: {
+                    background: "#3b82f6",
+                    fontSize: "14px",
+                  },
+                  searchBox: {
+                    border: "1px solid #d1d5db",
+                    borderRadius: "0.5rem",
+                    padding: "8px",
+                    minHeight: "42px",
+                  },
+                  option: {
+                    color: "#374151",
+                    padding: "8px 12px",
+                  },
+                  optionContainer: {
+                    border: "1px solid #d1d5db",
+                    borderRadius: "0.5rem",
+                    marginTop: "4px",
+                    maxHeight: "300px",
+                  },
+                }}
+              />
+              <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                💡 Languages are prioritized in order of selection - first
+                selected language gets highest priority
+              </p>
+            </div>
+          )}
+
+          {/* Session Type Card */}
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+            <label className="flex items-center gap-2 text-sm font-semibold text-gray-800 mb-4">
+              <Users className="w-4 h-4 text-blue-600" />
+              Number of Participants
+            </label>
+
+            <div className="space-y-3">
+              {/* Standard - One-on-One */}
+              <label
+                className="flex items-start gap-3 p-4 border-2 rounded-xl cursor-pointer 
+                 transition-all hover:shadow-md group"
+                style={{
+                  borderColor:
+                    sessionType === "standard" ? "#3b82f6" : "#e5e7eb",
+                  backgroundColor:
+                    sessionType === "standard" ? "#eff6ff" : "#ffffff",
+                }}
+              >
+                <input
+                  type="radio"
+                  name="session-type"
+                  value="standard"
+                  checked={sessionType === "standard"}
+                  onChange={() => setSessionType("standard")}
+                  className="mt-1 w-4 h-4 text-blue-600"
+                />
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-gray-900">
+                      One-on-One Interview
+                    </span>
+                    <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs font-medium rounded-full flex items-center gap-1">
+                      <Zap className="w-3 h-3" />
+                      Recommended
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-600 mt-1.5 leading-relaxed">
+                    Standard interview with two speakers (investigator + one
+                    participant). Provides the highest accuracy.
+                  </p>
+                </div>
+              </label>
+
+              {/* Multi-Party - Multiple Participants */}
+              <label
+                className="flex items-start gap-3 p-4 border-2 rounded-xl cursor-pointer 
+                 transition-all hover:shadow-md group"
+                style={{
+                  borderColor: sessionType === "multi" ? "#3b82f6" : "#e5e7eb",
+                  backgroundColor:
+                    sessionType === "multi" ? "#eff6ff" : "#ffffff",
+                }}
+              >
+                <input
+                  type="radio"
+                  name="session-type"
+                  value="multi"
+                  checked={sessionType === "multi"}
+                  onChange={() => setSessionType("multi")}
+                  className="mt-1 w-4 h-4 text-blue-600"
+                />
+                <div className="flex-1">
+                  <div className="font-semibold text-gray-900 mb-1.5">
+                    Multiple Participants
+                  </div>
+                  <p className="text-sm text-gray-600 leading-relaxed">
+                    For group interviews or when multiple people are present
+                    (witnesses, lawyers, translators, etc.). AWS will
+                    auto-detect up to 10 speakers.
+                  </p>
+                </div>
+              </label>
+            </div>
+
+            <div className="mt-4 flex items-center gap-2 text-xs text-gray-500 bg-gray-50 rounded-lg p-3">
+              <Info className="w-4 h-4 flex-shrink-0" />
+              <span>
+                {sessionType === "standard"
+                  ? 'Speakers will be labeled as "Investigator" and "Witness"'
+                  : 'Speakers will be labeled as "Investigator", "Speaker 0", "Speaker 1", etc.'}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <button
+          onClick={handleStartRecording}
+          className="start-recording-btn mt-8 shadow-lg hover:shadow-xl"
+        >
           <Play className="btn-icon" />
           <span>Start Recording</span>
         </button>
-
-        <div className="language-selector mt-6 w-full max-w-md">
-          <label
-            htmlFor="language-select"
-            className="block text-sm font-medium text-gray-700 mb-2"
-          >
-            Select Language
-          </label>
-          <select
-            id="language-select"
-            value={selectedLanguage}
-            onChange={(e) => setSelectedLanguage(e.target.value)}
-            className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg shadow-sm 
-             focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 
-             text-gray-900 cursor-pointer hover:border-gray-400 transition-colors"
-          >
-            <option value="auto">Auto Detect</option>
-
-            {Object.entries(LanguageCode).map(([code, name]) => {
-              const formattedCode =
-                code.split("_")[0].toLowerCase() +
-                "-" +
-                code.split("_")[1].toUpperCase();
-
-              // Use browser's built-in Intl API for language names
-              const displayName =
-                new Intl.DisplayNames(["en"], { type: "language" }).of(
-                  formattedCode.split("-")[0]
-                ) || name;
-
-              const region = formattedCode.split("-")[1];
-
-              return (
-                <option key={code} value={formattedCode}>
-                  {displayName} ({region})
-                </option>
-              );
-            })}
-          </select>
-        </div>
       </div>
     </div>
   );

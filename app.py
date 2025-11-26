@@ -1,21 +1,36 @@
 #!/usr/bin/env python3
 import os
+import sys
 from dotenv import load_dotenv 
 import aws_cdk as cdk
 from vision_ai.cognito_stack import CognitoStack
 from vision_ai.shared_infrastructure_stack import SharedInfrastructureStack
+from vision_ai.case_management_stack import CaseManagementStack  
 from vision_ai.identity_verification_stack import IdentityVerificationStack
 from vision_ai.advanced_analysis_stack import AdvancedAnalysisStack
 from vision_ai.rewrite_stack import RewriteStack
 from vision_ai.api_deployment_stack import APIDeploymentStack
+from vision_ai.transcription_stack import TranscriptionStack
 
 load_dotenv()
 app = cdk.App()
 
-# Environment configuration
+# Validate required environment variables 
+required_vars = {
+    'AWS_ACCOUNT_ID': os.getenv('AWS_ACCOUNT_ID'),
+    'AWS_REGION': os.getenv('AWS_REGION')
+}
+
+missing_vars = [var for var, value in required_vars.items() if not value]
+if missing_vars:
+    print(f"ERROR: Missing required environment variables: {', '.join(missing_vars)}")
+    print("Please check your .env file")
+    sys.exit(1)
+
+# Environment configuration 
 env = cdk.Environment(
-    account=os.environ.get('CDK_DEFAULT_ACCOUNT'),
-    region="us-east-1"
+    account=required_vars['AWS_ACCOUNT_ID'], 
+    region=required_vars['AWS_REGION']
 )
  
 app_name = "vision-ai"
@@ -40,7 +55,7 @@ shared_stack = SharedInfrastructureStack(
 
 # ==========================================
 # 3. IDENTITY VERIFICATION STACK
-# Uses shared API by ID 
+# Deploy FIRST to create /identity routes
 # ==========================================
 identity_stack = IdentityVerificationStack(
     app, f"{app_name}-identity-verification-stack", env=env,
@@ -54,6 +69,23 @@ identity_stack = IdentityVerificationStack(
 identity_stack.add_dependency(shared_stack)
 
 # ==========================================
+# 4. CASE MANAGEMENT STACK 
+# Deploy AFTER identity stack to create /cases routes
+# ==========================================
+case_management_stack = CaseManagementStack(
+    app, f"{app_name}-case-management-stack", env=env,
+    investigation_bucket=shared_stack.investigation_bucket,
+    shared_api_id=shared_stack.shared_api.rest_api_id,
+    shared_api_root_resource_id=shared_stack.shared_api.rest_api_root_resource_id,
+    description="Case management: create cases, display cases, and create sessions"
+)
+
+# Ensure case management depends on identity stack
+case_management_stack.add_dependency(shared_stack)
+case_management_stack.add_dependency(identity_stack)  
+
+# ==========================================
+
 # 4. ADVANCED ANALYSIS STACK
 # AI Suggested Questions feature
 # ==========================================
@@ -83,8 +115,21 @@ rewrite_stack = RewriteStack(
 # Ensure rewrite stack depends on shared stack
 rewrite_stack.add_dependency(shared_stack)
 
+
 # ==========================================
-# 6. API DEPLOYMENT STACK
+# 6. TRANSCRIPTION STACK
+# ==========================================
+transcription_stack = TranscriptionStack(
+    app, f"{app_name}-transcription-stack", env=env,
+    investigation_bucket=shared_stack.investigation_bucket,
+    shared_api_id=shared_stack.shared_api.rest_api_id,
+    shared_api_root_resource_id=shared_stack.shared_api.rest_api_root_resource_id,
+    description="Transcription Stack: Save live transcriptions"
+)
+transcription_stack.add_dependency(shared_stack)
+
+# ==========================================
+# 7. API DEPLOYMENT STACK
 # Deploys API after all routes are added
 # ==========================================
 deployment_stack = APIDeploymentStack(
@@ -96,8 +141,12 @@ deployment_stack = APIDeploymentStack(
 
 # Ensure deployment happens after all feature stacks
 deployment_stack.add_dependency(identity_stack)
+
+deployment_stack.add_dependency(case_management_stack)  
+
 deployment_stack.add_dependency(advanced_analysis_stack)
 deployment_stack.add_dependency(rewrite_stack)
+deployment_stack.add_dependency(transcription_stack)
 
 # Add tags
 cdk.Tags.of(app).add("Project", "VisionAI")
