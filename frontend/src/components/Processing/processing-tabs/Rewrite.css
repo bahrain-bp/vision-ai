@@ -21,6 +21,58 @@
   margin: 0 auto;
 }
 
+/* Case Number Banner */
+.case-number-banner {
+  background: #f9fafb;
+  border-radius: 10px;
+  padding: 12px 20px;
+  margin-bottom: 24px;
+  text-align: center;
+  border: 1.5px solid #e0e7ef;
+}
+
+.case-number-label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #64748b;
+  margin-bottom: 4px;
+  font-family: 'Noto Sans Arabic', 'Segoe UI', Tahoma, sans-serif;
+}
+
+.case-number-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1e293b;
+  letter-spacing: 1px;
+  font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+  direction: ltr;
+}
+
+/* S3 Path Display */
+.s3-path-display {
+  background: #f0f9ff;
+  border: 1.5px solid #bae6fd;
+  border-radius: 8px;
+  padding: 10px 16px;
+  margin-bottom: 16px;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.s3-path-label {
+  font-weight: 600;
+  color: #0369a1;
+}
+
+.s3-path-value {
+  font-family: 'Courier New', monospace;
+  color: #0c4a6e;
+  word-break: break-all;
+}
+
 .rewrite-header-row {
   display: flex;
   align-items: center;
