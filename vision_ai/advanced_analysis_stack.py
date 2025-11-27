@@ -182,6 +182,9 @@ class AdvancedAnalysisStack(Stack):
             }]
         )
         
+        # Store inference profile ARN for other stacks
+        self.inference_profile_arn = "us.amazon.nova-lite-v1:0"
+        
         # Outputs
         CfnOutput(
             self, "AdvancedAnalysisReady",

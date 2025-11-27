@@ -31,6 +31,7 @@ interface SetupData {
 
 interface SessionData {
   sessionId: string;
+  caseId?: string;
   investigator: string;
   language: string;
   duration: string;
@@ -93,6 +94,7 @@ const SessionPage: React.FC<SessionPageProps> = ({
   const currentSessionData: SessionData = currentSession
     ? {
         sessionId: currentSession.sessionId,
+        caseId: currentSession.caseId,
         investigator: currentSession.investigator || getInvestigatorName(),
         language: "Arabic",
         duration: currentSession.duration,
@@ -101,6 +103,7 @@ const SessionPage: React.FC<SessionPageProps> = ({
       }
     : {
         sessionId: "#2025-INV-0042",
+        caseId: currentCase?.caseId,
         investigator: getInvestigatorName(),
         language: "Arabic",
         duration: "00:00",

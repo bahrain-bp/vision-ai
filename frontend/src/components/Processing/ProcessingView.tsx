@@ -12,6 +12,7 @@ import Outcome from "./processing-tabs/Outcome";
 
 export interface SessionData {
   sessionId: string;
+  caseId?: string;
   investigator?: string;
   language?: string;
   duration?: string;
@@ -65,7 +66,7 @@ const ProcessingView: React.FC<ProcessingViewProps> = ({ sessionData }) => {
     {
       id: "Outcome",
       label: "Outcome",
-      render: () => <Outcome />,
+      render: () => <Outcome sessionData={sessionData} />,
     },
   ];
    

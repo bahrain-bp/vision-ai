@@ -4,14 +4,14 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { Sparkles, AlertCircle, ChevronDown, Plus } from "lucide-react";
+import { AlertCircle, ChevronDown, Plus } from "lucide-react";
 import { createPortal } from "react-dom";
 import { SessionData } from "../../ProcessingView";
+import AmazonNovaIcon from "../../../common/AmazonNovaIcon";
 
 export interface AISuggestionsProps {
   sessionData: SessionData;
   isLoading?: boolean;
-  lastUpdatedAt?: string | null;
   errorMessage?: string | null;
 }
 
@@ -73,56 +73,14 @@ const isArabicLanguage = (value?: string | null): boolean => {
 const AISuggestions: React.FC<AISuggestionsProps> = ({
   sessionData,
   isLoading = false,
-  lastUpdatedAt = null,
   errorMessage = null,
 }) => {
   const [statusMessage, setStatusMessage] = useState<string>("");
-  const [questions, setQuestions] = useState<Question[]>([
-    {
-      id: "q1",
-      text: "Walk me through the sequence of events leading to the incident.",
-      context: "Clarify timeline and causal links",
-      priority: "High",
-    },
-    {
-      id: "q2",
-      text: "Who else was present, and what did they observe?",
-      context: "Identify corroborating witnesses",
-      priority: "High",
-    },
-    {
-      id: "q3",
-      text: "What supporting evidence should we review to validate your account?",
-      context: "Connect testimony to available artefacts",
-      priority: "Medium",
-    },
-  ]);
-  const [gaps, setGaps] = useState<Gap[]>([
-    {
-      id: "gap1",
-      title: "Timeline Precision",
-      description:
-        "Multiple statements diverge on when the confrontation began. Pin down exact timestamps.",
-      severity: "high",
-      resolved: false,
-    },
-    {
-      id: "gap2",
-      title: "Witness Roles",
-      description:
-        "Witness identities are mentioned without clarifying involvement or relation to the case.",
-      severity: "medium",
-      resolved: false,
-    },
-    {
-      id: "gap3",
-      title: "Environmental Details",
-      description:
-        "Weather and lighting conditions are missing, making it hard to validate visibility claims.",
-      severity: "low",
-      resolved: false,
-    },
-  ]);
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [gaps, setGaps] = useState<Gap[]>([]);
+  const [hasQuestions, setHasQuestions] = useState<boolean>(false);
+  const [hasFocusAreas, setHasFocusAreas] = useState<boolean>(false);
+  const [lastGeneratedAt, setLastGeneratedAt] = useState<string | null>(null);
   const [focusAreas, setFocusAreas] = useState<string[]>([]);
   const [customQuestion, setCustomQuestion] = useState<string>("");
   const [customPriority, setCustomPriority] =
@@ -148,6 +106,46 @@ const AISuggestions: React.FC<AISuggestionsProps> = ({
   const priorityTriggerRef = useRef<HTMLButtonElement | null>(null);
   const priorityOptionRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const priorityOptions: Question["priority"][] = ["High", "Medium", "Low"];
+
+  useEffect(() => {
+    const storageKey = `ai-suggestions-${sessionData.sessionId}`;
+    const stored = localStorage.getItem(storageKey);
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        if (parsed.questions) {
+          setQuestions(parsed.questions);
+          setHasQuestions(true);
+        } else {
+          setQuestions([]);
+          setHasQuestions(false);
+        }
+        if (parsed.gaps) {
+          setGaps(parsed.gaps);
+          setHasFocusAreas(true);
+        } else {
+          setGaps([]);
+          setHasFocusAreas(false);
+        }
+        if (parsed.focusAreas) {
+          setFocusAreas(parsed.focusAreas);
+        }
+        if (parsed.generatedAt) {
+          setLastGeneratedAt(parsed.generatedAt);
+          setStatusMessage("Loaded last AI suggestions for this session.");
+        }
+      } catch (e) {
+        console.error("Failed to parse stored AI suggestions:", e);
+      }
+    } else {
+      setQuestions([]);
+      setGaps([]);
+      setFocusAreas([]);
+      setHasQuestions(false);
+      setHasFocusAreas(false);
+      setLastGeneratedAt(null);
+    }
+  }, [sessionData.sessionId]);
 
   useEffect(() => {
     if (errorMessage) {
@@ -322,6 +320,10 @@ const AISuggestions: React.FC<AISuggestionsProps> = ({
     if (isQuestionGenerating) {
       return;
     }
+    if (!sessionData.caseId) {
+      setStatusMessage("Case ID missing. Open a session from a case to use AI suggestions.");
+      return;
+    }
     setIsQuestionGenerating(true);
     setStatusMessage(message || "Generating AI questions...");
 
@@ -332,7 +334,8 @@ const AISuggestions: React.FC<AISuggestionsProps> = ({
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            sessionId: "test-session-001",
+            caseId: sessionData.caseId,
+            sessionId: sessionData.sessionId,
             witness: sessionData.witness || "سارة محمود",
             language: "ar",
           }),
@@ -353,6 +356,13 @@ const AISuggestions: React.FC<AISuggestionsProps> = ({
         })
       );
       setQuestions(normalizedQuestions);
+      setHasQuestions(true);
+      const generatedAt = new Date().toISOString();
+      setLastGeneratedAt(generatedAt);
+      const storageKey = `ai-suggestions-${sessionData.sessionId}`;
+      const stored = localStorage.getItem(storageKey);
+      const parsed = stored ? JSON.parse(stored) : {};
+      localStorage.setItem(storageKey, JSON.stringify({ ...parsed, questions: normalizedQuestions, generatedAt }));
       setStatusMessage(successMessage || "AI questions generated!");
     } catch (error) {
       console.error("Error generating questions:", error);
@@ -366,6 +376,10 @@ const AISuggestions: React.FC<AISuggestionsProps> = ({
     if (isFocusGenerating) {
       return;
     }
+    if (!sessionData.caseId) {
+      setStatusMessage("Case ID missing. Open a session from a case to use AI suggestions.");
+      return;
+    }
     setIsFocusGenerating(true);
     setStatusMessage("Generating Key Focus Areas...");
     try {
@@ -375,7 +389,8 @@ const AISuggestions: React.FC<AISuggestionsProps> = ({
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            sessionId: "test-session-001",
+            caseId: sessionData.caseId,
+            sessionId: sessionData.sessionId,
             language: "ar",
           }),
         }
@@ -384,6 +399,11 @@ const AISuggestions: React.FC<AISuggestionsProps> = ({
         throw new Error("Failed to generate focus areas");
       }
       const data = await response.json();
+      const storageKey = `ai-suggestions-${sessionData.sessionId}`;
+      const stored = localStorage.getItem(storageKey);
+      const parsed = stored ? JSON.parse(stored) : {};
+      const existingResolvedGaps = (parsed.gaps || []).filter((g: Gap) => g.resolved);
+      
       const mappedGaps = data.focusAreas.map((area: any, index: number) => ({
         id: `gap-${Date.now()}-${index}`,
         title: area.title,
@@ -391,7 +411,13 @@ const AISuggestions: React.FC<AISuggestionsProps> = ({
         severity: area.priority.toLowerCase() as "high" | "medium" | "low",
         resolved: false,
       }));
-      setGaps(mappedGaps);
+      
+      const combinedGaps = [...mappedGaps, ...existingResolvedGaps];
+      setGaps(combinedGaps);
+      setHasFocusAreas(true);
+      const generatedAt = new Date().toISOString();
+      setLastGeneratedAt(generatedAt);
+      localStorage.setItem(storageKey, JSON.stringify({ ...parsed, gaps: combinedGaps, generatedAt }));
       setStatusMessage("Key Focus Areas generated!");
     } catch (error) {
       console.error("Error:", error);
@@ -422,18 +448,29 @@ const AISuggestions: React.FC<AISuggestionsProps> = ({
   };
 
   const handleAddFocusArea = (label: string): void => {
-    setFocusAreas((prev) =>
-      prev.includes(label) ? prev : [...prev, label]
-    );
+    setFocusAreas((prev) => {
+      if (prev.includes(label)) return prev;
+      const updated = [...prev, label];
+      const storageKey = `ai-suggestions-${sessionData.sessionId}`;
+      const stored = localStorage.getItem(storageKey);
+      const parsed = stored ? JSON.parse(stored) : {};
+      localStorage.setItem(storageKey, JSON.stringify({ ...parsed, focusAreas: updated }));
+      return updated;
+    });
     setStatusMessage(`Focus area added: ${label}`);
   };
 
   const handleToggleGapResolved = (id: string): void => {
-    setGaps((prev) =>
-      prev.map((gap) =>
+    setGaps((prev) => {
+      const updated = prev.map((gap) =>
         gap.id === id ? { ...gap, resolved: !gap.resolved } : gap
-      )
-    );
+      );
+      const storageKey = `ai-suggestions-${sessionData.sessionId}`;
+      const stored = localStorage.getItem(storageKey);
+      const parsed = stored ? JSON.parse(stored) : {};
+      localStorage.setItem(storageKey, JSON.stringify({ ...parsed, gaps: updated }));
+      return updated;
+    });
   };
 
   const priorityRank: Record<Question["priority"], number> = {
@@ -461,15 +498,20 @@ const AISuggestions: React.FC<AISuggestionsProps> = ({
   const contentLanguage = sessionData.language || "";
   const isRTLContent = isArabicLanguage(contentLanguage);
 
+  const formattedGeneratedAt = lastGeneratedAt
+    ? new Date(lastGeneratedAt).toLocaleString()
+    : null;
+  const shouldShowBanner = statusMessage || isQuestionGenerating || isFocusGenerating || formattedGeneratedAt;
+
   return (
     <div className="ai-suggestions-view">
-      {(statusMessage || lastUpdatedAt || isLoading) && (
+      {shouldShowBanner && (
         <div className="ai-status-banner" aria-live="polite">
           {statusMessage && <span>{statusMessage}</span>}
-          {isLoading && <span className="ai-status-pulse">Processing…</span>}
-          {lastUpdatedAt && (
+          {(isQuestionGenerating || isFocusGenerating) && <span className="ai-status-pulse">Processing…</span>}
+          {formattedGeneratedAt && (
             <span className="ai-status-timestamp">
-              Last synced {new Date(lastUpdatedAt).toLocaleString()}
+              AI suggestions updated {formattedGeneratedAt}
             </span>
           )}
         </div>
@@ -496,39 +538,53 @@ const AISuggestions: React.FC<AISuggestionsProps> = ({
                 onClick={() => handleGenerateQuestions()}
                 disabled={isLoading || isQuestionGenerating}
               >
-                <Sparkles size={16} />
+                <AmazonNovaIcon size={16} />
                 {isQuestionGenerating ? "Generating..." : "Generate"}
               </button>
             </div>
             <div className="ai-panel-body">
-              <div className="ai-question-grid">
-                {sortedQuestions.map((question) => (
-                  <div
-                    key={question.id}
-                    className={`ai-question-card priority-${question.priority.toLowerCase()} ${
-                      isRTLContent ? "rtl" : ""
-                    }`}
-                  >
-                    <div className="ai-question-header">
-                      <span
-                        className={`ai-priority-chip priority-${question.priority.toLowerCase()}`}
-                      >
-                        {question.priority}
-                      </span>
-                      <button
-                        type="button"
-                        className="ai-focus-add"
-                        onClick={() => handleAddFocusArea(question.context)}
-                      >
-                        Add focus
-                      </button>
+              {isQuestionGenerating ? (
+                <div className="ai-question-grid">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="ai-question-card skeleton" aria-hidden="true">
+                      <div className="ai-question-header">
+                        <div style={{ width: 60, height: 20, backgroundColor: "#e5e7eb", borderRadius: 4 }} />
+                      </div>
+                      <div style={{ width: "90%", height: 14, backgroundColor: "#e5e7eb", borderRadius: 4, marginBottom: 8 }} />
+                      <div style={{ width: "70%", height: 12, backgroundColor: "#f3f4f6", borderRadius: 4 }} />
                     </div>
-                    <p className="ai-question-text">{question.text}</p>
-                    <p className="ai-question-context">{question.context}</p>
+                  ))}
+                </div>
+              ) : hasQuestions ? (
+                <>
+                  <div className="ai-question-grid">
+                    {sortedQuestions.map((question) => (
+                      <div
+                        key={question.id}
+                        className={`ai-question-card priority-${question.priority.toLowerCase()} ${
+                          isRTLContent ? "rtl" : ""
+                        }`}
+                      >
+                        <div className="ai-question-header">
+                          <span
+                            className={`ai-priority-chip priority-${question.priority.toLowerCase()}`}
+                          >
+                            {question.priority}
+                          </span>
+                          <button
+                            type="button"
+                            className="ai-focus-add"
+                            onClick={() => handleAddFocusArea(question.context)}
+                          >
+                            Add focus
+                          </button>
+                        </div>
+                        <p className="ai-question-text">{question.text}</p>
+                        <p className="ai-question-context">{question.context}</p>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-              <div className="ai-question-input-row">
+                  <div className="ai-question-input-row">
                 <input
                   type="text"
                   value={customQuestion}
@@ -563,22 +619,31 @@ const AISuggestions: React.FC<AISuggestionsProps> = ({
                     <ChevronDown size={14} />
                   </button>
                 </div>
-                <button
-                  type="button"
-                  className="ai-cta"
-                  onClick={handleAddCustomQuestion}
-                >
-                  <Plus size={16} />
-                  Add
-                </button>
-              </div>
-              {focusAreas.length > 0 && (
-                <div className="ai-focus-chips">
-                  {focusAreas.map((focus) => (
-                    <span key={focus} className="ai-focus-chip">
-                      {focus}
-                    </span>
-                  ))}
+                    <button
+                      type="button"
+                      className="ai-cta"
+                      onClick={handleAddCustomQuestion}
+                    >
+                      <Plus size={16} />
+                      Add
+                    </button>
+                  </div>
+                  {focusAreas.length > 0 && (
+                    <div className="ai-focus-chips">
+                      {focusAreas.map((focus) => (
+                        <span key={focus} className="ai-focus-chip">
+                          {focus}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="ai-empty-state">
+                  <p className="ai-empty-title">No questions yet</p>
+                  <p className="ai-empty-subtext" style={{ color: "#6b7280", fontStyle: "italic" }}>
+                    Click Generate to create AI-powered questions based on the session data.
+                  </p>
                 </div>
               )}
               {priorityMenuOpen &&
@@ -636,74 +701,98 @@ const AISuggestions: React.FC<AISuggestionsProps> = ({
                 onClick={handleGenerateFocusAreas}
                 disabled={isLoading || isFocusGenerating}
               >
-                <Sparkles size={16} />
+                <AmazonNovaIcon size={16} />
                 {isFocusGenerating ? "Generating..." : "Generate"}
               </button>
             </div>
             <div className="ai-panel-body">
-              {activeGaps.length > 0 && (
+              {isFocusGenerating ? (
                 <div className="ai-gap-grid">
-                  {activeGaps.map((gap) => (
-                    <div
-                      key={gap.id}
-                      className={`ai-gap-card ${gap.resolved ? "ai-gap-resolved" : ""} severity-${gap.severity}`}
-                    >
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="ai-gap-card skeleton" aria-hidden="true">
                       <div className="ai-gap-top">
-                        <div className="ai-gap-title-row">
-                          <h4>{gap.title}</h4>
-                          <span
-                            className={`ai-gap-severity severity-${gap.severity}`}
-                          >
-                            <AlertCircle size={14} />
-                            {gap.severity.toUpperCase()}
-                          </span>
-                        </div>
-                        <button
-                          type="button"
-                          className="ai-cta subtle"
-                          onClick={() => handleToggleGapResolved(gap.id)}
-                        >
-                          Mark resolved
-                        </button>
+                        <div style={{ width: "60%", height: 16, backgroundColor: "#e5e7eb", borderRadius: 4, marginBottom: 8 }} />
+                        <div style={{ width: 50, height: 20, backgroundColor: "#f3f4f6", borderRadius: 4 }} />
                       </div>
-                      <p className="ai-gap-description">{gap.description}</p>
+                      <div style={{ width: "100%", height: 12, backgroundColor: "#f3f4f6", borderRadius: 4, marginBottom: 6 }} />
+                      <div style={{ width: "85%", height: 12, backgroundColor: "#f3f4f6", borderRadius: 4 }} />
                     </div>
                   ))}
                 </div>
-              )}
-
-              {resolvedGaps.length > 0 && (
-                <div className="ai-gap-resolved-section">
-                  <div className="ai-gap-resolved-header">
-                    <div>
-                      <p className="ai-gap-resolved-label">Resolved</p>
-                      <p className="ai-gap-resolved-subtext">
-                        Completed focus areas appear here for quick reference.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="ai-gap-grid">
-                    {resolvedGaps.map((gap) => (
-                      <div
-                        key={gap.id}
-                        className="ai-gap-card ai-gap-resolved"
-                      >
-                        <div className="ai-gap-top">
-                          <div className="ai-gap-title-row">
-                            <h4>{gap.title}</h4>
+              ) : hasFocusAreas ? (
+                <>
+                  {activeGaps.length > 0 && (
+                    <div className="ai-gap-grid">
+                      {activeGaps.map((gap) => (
+                        <div
+                          key={gap.id}
+                          className={`ai-gap-card ${gap.resolved ? "ai-gap-resolved" : ""} severity-${gap.severity}`}
+                        >
+                          <div className="ai-gap-top">
+                            <div className="ai-gap-title-row">
+                              <h4>{gap.title}</h4>
+                              <span
+                                className={`ai-gap-severity severity-${gap.severity}`}
+                              >
+                                <AlertCircle size={14} />
+                                {gap.severity.toUpperCase()}
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              className="ai-cta subtle"
+                              onClick={() => handleToggleGapResolved(gap.id)}
+                            >
+                              Mark resolved
+                            </button>
                           </div>
-                          <button
-                            type="button"
-                            className="ai-cta subtle"
-                            onClick={() => handleToggleGapResolved(gap.id)}
-                          >
-                            Mark unresolved
-                          </button>
+                          <p className="ai-gap-description">{gap.description}</p>
                         </div>
-                        <p className="ai-gap-description">{gap.description}</p>
+                      ))}
+                    </div>
+                  )}
+
+                  {resolvedGaps.length > 0 && (
+                    <div className="ai-gap-resolved-section">
+                      <div className="ai-gap-resolved-header">
+                        <div>
+                          <p className="ai-gap-resolved-label">Resolved</p>
+                          <p className="ai-gap-resolved-subtext">
+                            Completed focus areas appear here for quick reference.
+                          </p>
+                        </div>
                       </div>
-                    ))}
-                  </div>
+                      <div className="ai-gap-grid">
+                        {resolvedGaps.map((gap) => (
+                          <div
+                            key={gap.id}
+                            className="ai-gap-card ai-gap-resolved"
+                          >
+                            <div className="ai-gap-top">
+                              <div className="ai-gap-title-row">
+                                <h4>{gap.title}</h4>
+                              </div>
+                              <button
+                                type="button"
+                                className="ai-cta subtle"
+                                onClick={() => handleToggleGapResolved(gap.id)}
+                              >
+                                Mark unresolved
+                              </button>
+                            </div>
+                            <p className="ai-gap-description">{gap.description}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="ai-empty-state">
+                  <p className="ai-empty-title">No focus areas yet</p>
+                  <p className="ai-empty-subtext" style={{ color: "#6b7280", fontStyle: "italic" }}>
+                    Click Generate to identify key investigation focus areas based on the session data.
+                  </p>
                 </div>
               )}
             </div>
