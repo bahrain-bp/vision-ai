@@ -6,7 +6,7 @@ import React, {
   useRef,
   useEffect,
 } from "react";
-import { RecordingStatus, sessionType,SaveTranscriptionRequest } from "../types/";
+import { RecordingStatus, sessionType,SaveTranscriptionRequest,LanguagePreferences } from "../types/";
 import { TranscriptionResult,TranscriptionStatus } from "../types";
 import TranscribeService from "../services/LiveTranscription/TranscribeService";
 import StreamManager from "../services/LiveTranscription/StreamManager";
@@ -16,12 +16,19 @@ export interface TranscriptionContextType {
   recordingStatus: RecordingStatus;
   startRecording: (
     setSessionState?: (state: RecordingStatus) => void,
-    selectedLanguage?: string,
+    languagePreferences?: LanguagePreferences,
     sessionType?: sessionType,
     detectionLanguages?: string
   ) => Promise<TranscriptionStatus>;
   stopRecording: (setSessionState?: (state: RecordingStatus) => void) => void;
   getFullTranscript: string;
+  getTranscriptSegments: () => getFormatedTranscript[];
+}
+
+interface getFormatedTranscript {
+  speaker: string;
+  formattedTranscript: string;
+  timeStamp?: string;
 }
 
 export const TranscriptionContext = createContext<
@@ -32,22 +39,26 @@ export const TranscriptionProvider: React.FC<{ children: ReactNode }> = ({
   children,
 }) => {
   const [audioStatus, setAudioStatus] = useState(false);
-  const [onTranscriptUpdate, setTranscriptUpdate] = useState<TranscriptionResult | null>(null);
+  const [onTranscriptUpdate, setTranscriptUpdate] =
+    useState<TranscriptionResult | null>(null);
   const [fullTranscript, setFullTranscript] = useState<string>("");
+  const [transcriptSegments, setTranscriptSegments] = useState<
+    getFormatedTranscript[]
+  >([]); 
 
   const [recordingStatus, setRecordingStatus] =
     useState<RecordingStatus>("off");
+
   const isStartingRef = useRef(false);
 
-  const { currentCase,currentSession } = useCaseContext();
-
+  const { currentCase, currentSession } = useCaseContext();
 
   const startRecording = useCallback(
     async (
       setSessionState?: (state: RecordingStatus) => void,
-      selectedLanguage?: string,
+      languagePreferences?: LanguagePreferences,
       sessionType?: sessionType,
-      detectionLanguages?:string,
+      detectionLanguages?: string
     ): Promise<TranscriptionStatus> => {
       if (isStartingRef.current) {
         return {
@@ -64,11 +75,13 @@ export const TranscriptionProvider: React.FC<{ children: ReactNode }> = ({
       isStartingRef.current = true;
 
       try {
+              setTranscriptSegments([]);
+              setFullTranscript("");
         const result = await TranscribeService.startRecording(
           setTranscriptUpdate,
-          selectedLanguage,
+          languagePreferences,
           sessionType,
-          detectionLanguages,
+          detectionLanguages
         );
 
         if (result.success) {
@@ -81,7 +94,7 @@ export const TranscriptionProvider: React.FC<{ children: ReactNode }> = ({
           if (setSessionState) {
             setSessionState(newStatus);
           }
-        }else{
+        } else {
           StreamManager.stopStreams();
         }
         return result;
@@ -92,16 +105,31 @@ export const TranscriptionProvider: React.FC<{ children: ReactNode }> = ({
     []
   );
 
-    useEffect(() => {
-      const newText = onTranscriptUpdate?.formattedTranscript;
-      if (newText && newText.trim()) {
-        setFullTranscript((prev) => prev + newText);
-      }
-    }, [onTranscriptUpdate]);
+  useEffect(() => {
+     const newSpeaker = onTranscriptUpdate?.speaker || "N/A";
+    const newText = onTranscriptUpdate?.formattedTranscript;
+
+    const textOnlyTranscript = onTranscriptUpdate?.sentences || "N/A";
+    const newTimeStamp = onTranscriptUpdate?.timeStamp || "N/A"
+    if (newText && newText.trim()) {
+      setFullTranscript((prev) => prev + newText);
+
+      setTranscriptSegments((prev) => [
+        ...prev,
+        {
+          speaker: newSpeaker,
+          formattedTranscript: textOnlyTranscript,
+          timeStamp: newTimeStamp,
+        },
+      ]);
+    }
+    
+  }, [onTranscriptUpdate]);
 
 
-    const getFullTranscript = fullTranscript; ;
-
+  const getTranscriptSegments = useCallback((): getFormatedTranscript[] => {
+    return transcriptSegments;
+  }, [transcriptSegments]);
 
   const stopRecording = useCallback(
     (setSessionState?: (state: RecordingStatus) => void) => {
@@ -113,14 +141,14 @@ export const TranscriptionProvider: React.FC<{ children: ReactNode }> = ({
       setRecordingStatus(newStatus);
       setAudioStatus(newAudioStatus);
 
-      console.log("🔍 Saving transcript, length:", fullTranscript.length); // Debug
+      //console.log("🔍 Saving transcript, length:", fullTranscript.length); // Debug
 
       const transcriptionData: SaveTranscriptionRequest = {
         caseId: currentCase?.caseId || "",
         sessionId:
           currentSession?.sessionId ||
           currentCase?.caseId + "_" + crypto.randomUUID(),
-        transcription: fullTranscript, 
+        transcription: fullTranscript || "N/A",
       };
 
       TranscribeService.saveTranscription(transcriptionData);
@@ -129,7 +157,7 @@ export const TranscriptionProvider: React.FC<{ children: ReactNode }> = ({
         setSessionState(newStatus);
       }
     },
-    [fullTranscript, currentCase, currentSession] 
+    [fullTranscript, currentCase, currentSession]
   );
 
   return (
@@ -139,7 +167,8 @@ export const TranscriptionProvider: React.FC<{ children: ReactNode }> = ({
         recordingStatus,
         startRecording,
         stopRecording,
-        getFullTranscript,
+        getFullTranscript: fullTranscript,
+        getTranscriptSegments,
       }}
     >
       {children}

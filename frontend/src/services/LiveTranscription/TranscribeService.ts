@@ -14,6 +14,7 @@ import {
   TranscriptionError,
   sessionType,
   SaveTranscriptionRequest,
+  LanguagePreferences,
 } from "../../types";
 import { LanguageCode } from "@aws-sdk/client-transcribe-streaming";
 import StreamManager from "./StreamManager";
@@ -70,7 +71,7 @@ class TranscribeService {
 
   async startRecording(
     onTranscriptUpdate?: (text: TranscriptionResult) => void,
-    selectedLanguage?: string,
+    languagePreferences?: LanguagePreferences,
     sessionType?: sessionType,
     detectionLanguages?: string
   ): Promise<TranscriptionStatus> {
@@ -144,7 +145,9 @@ class TranscribeService {
       transcribeClient,
       audio.audioStream,
       this.microphoneAttempts,
-      selectedLanguage,
+      languagePreferences?.languageMode === "unified"
+        ? languagePreferences.sharedLanguage
+        : languagePreferences?.investigatorLanguage,
       "standard",
       detectionLanguages
     );
@@ -157,13 +160,15 @@ class TranscribeService {
         error: micResult,
       };
     }
-
+    
     const displayResult = await this.attemptConnection(
       "display",
       transcribeClient,
       display.displayStream,
       this.displayAttempts,
-      selectedLanguage,
+      languagePreferences?.languageMode === "unified"
+        ? languagePreferences.sharedLanguage
+        : languagePreferences?.witnessLanguage,
       sessionType,
       detectionLanguages
     );
@@ -302,9 +307,12 @@ class TranscribeService {
         MediaSampleRateHertz: sampleRate,
         IdentifyMultipleLanguages: selectedLanguage === "auto",
         LanguageOptions:
-          selectedLanguage === "auto"
-            ? detectionLanguages ??
-              "ar-SA,en-US,fr-FR,es-ES,de-DE,hi-IN,pt-BR,zh-CN,ja-JP,ko-KR"
+          selectedLanguage === "auto" &&
+          detectionLanguages &&
+          detectionLanguages.length > 0
+            ? detectionLanguages
+            : selectedLanguage === "auto"
+            ? "ar-SA,en-US,fr-FR,es-ES,de-DE,hi-IN,pt-BR,zh-CN,ja-JP,ko-KR"
             : undefined,
         ShowSpeakerLabel: source === "display" && speakerMode === "multi",
         AudioStream: this.getAudioStream(microphoneStream, sampleRate),
@@ -365,15 +373,12 @@ class TranscribeService {
           let speaker: string;
 
           if (source === "microphone") {
-            // Microphone is ALWAYS Investigator
             speaker = "Investigator";
           } else {
             // Display audio
             if (speakerMode === "standard") {
-              // 1-on-1: Just one fixed label
               speaker = "Witness";
             } else {
-              // Multiple: Use AWS speaker detection
               const awsSpeakerLabel = transcriptWords[0]?.speaker || "0";
               speaker = `Speaker ${awsSpeakerLabel}`;
             }
@@ -389,6 +394,7 @@ class TranscribeService {
 
           const fullDetailTranscript: TranscriptionResult = {
             words: transcriptWords,
+            sentences: transcriptWords.map((item) => item.content).join(" "),
             speaker,
             timeStamp: timeStamp,
             formattedTranscript:
@@ -406,16 +412,11 @@ class TranscribeService {
       console.error(`${source}: Stream processing error`, error);
     }
   }
-  async saveTranscription(
-    data: SaveTranscriptionRequest,
-  ) {
+  async saveTranscription(data: SaveTranscriptionRequest) {
     try {
       const endPoint =
         process.env.REACT_APP_API_ENDPOINT + "/transcription/save";
 
-            console.log("🔍 Full endpoint URL:", endPoint);
-            console.log("🔍 Sending data:", data);
-    
       const response = await fetch(endPoint, {
         method: "POST",
         headers: {
