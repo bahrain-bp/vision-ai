@@ -72,7 +72,7 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
   sessionId,
   personType,
 }) => {
-  const { setCurrentPersonName } = useCaseContext();
+  const { setCurrentPersonName, setCurrentPersonType } = useCaseContext();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const documentInputRef = useRef<HTMLInputElement>(null);
 
@@ -316,6 +316,7 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
         onIdentityDataChange("isVerified", true);
         if (result.personName) {
           setCurrentPersonName(result.personName);
+          setCurrentPersonType(personType);
           console.log("Person name stored in context:", result.personName);
         }
         setShowManualOverride(false);
@@ -484,6 +485,7 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
       console.log("Manual override completed:", result);
 
       setCurrentPersonName(manualParticipantName.trim());
+      setCurrentPersonType(personType);
       onIdentityDataChange("isVerified", true);
 
       setVerificationState((prev) => ({
@@ -610,8 +612,22 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
     setShowEndSessionPopup(false);
   }, []);
   const toggleDocumentType = useCallback(() => {
-    setDocumentType((prev) => (prev === "cpr" ? "passport" : "cpr"));
-  }, []);
+    const newDocumentType = documentType === "cpr" ? "passport" : "cpr";
+
+    // Only clear the OLD document type if it exists
+    if (documentType === "cpr" && identityData.cpr) {
+      onIdentityDataChange("cpr", null);
+    } else if (documentType === "passport" && identityData.passport) {
+      onIdentityDataChange("passport", null);
+    }
+
+    setDocumentType(newDocumentType);
+  }, [
+    documentType,
+    identityData.cpr,
+    identityData.passport,
+    onIdentityDataChange,
+  ]);
 
   const isVerificationDisabled = useMemo(() => {
     return (
@@ -759,9 +775,7 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
                 onClick={toggleDocumentType}
                 className="toggle-document-btn"
                 type="button"
-                disabled={
-                  verificationState.isVerifying || identityData.isVerified
-                }
+                disabled={verificationState.isVerifying}
               >
                 {documentType === "passport" && (
                   <div className="passport-disclaimer text-sm text-yellow-700 bg-yellow-100 p-2 rounded mb-4">

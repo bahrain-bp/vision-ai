@@ -15,6 +15,7 @@ interface SessionInfoProps {
 
 const SessionInfo: React.FC<SessionInfoProps> = ({ sessionData }) => {
   const { currentPersonName } = useCaseContext();
+
   const participantName =
     currentPersonName || sessionData.participant || "Not verified yet";
   return (
