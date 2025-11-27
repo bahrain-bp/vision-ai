@@ -148,65 +148,58 @@ export const QuestionProvider: React.FC<{ children: ReactNode }> = ({ children }
   /**
    * Confirm current attempt and save selected questions
    */
-  const confirmAttempt = useCallback(() => {
+ const confirmAttempt = useCallback(() => {
   if (!currentAttempt) {
     console.warn('⚠️ No current attempt to confirm');
     return;
   }
 
-  // SMART LOGIC: If nothing selected, treat as "all confirmed"
-  const effectiveSelections = selectedQuestionIds.length === 0 
-    ? currentAttempt.questions.map(q => q.id)  // Select all if none selected
-    : selectedQuestionIds;
+  // SAFETY CHECK: Confirm should only work with NO selections
+  // (UI prevents this, but adding guard for safety)
+  if (selectedQuestionIds.length > 0) {
+    console.error('❌ DESIGN VIOLATION: Cannot confirm with active selections');
+    setError('Cannot confirm with selections. Please use "Retry Selected" instead.');
+    return;
+  }
 
-  // 1. Mark selected questions as confirmed, unselected as rejected
+  // SIMPLE LOGIC: Confirm always means "all questions are good"
   const updatedQuestions = currentAttempt.questions.map(q => ({
     ...q,
-    status: (effectiveSelections.includes(q.id) ? 'confirmed' : 'rejected') as 'confirmed' | 'rejected',
+    status: 'confirmed' as const,
   }));
 
-  // 2. Create finalized attempt
+  // Create finalized attempt
   const confirmedAttempt: QuestionAttempt = {
     ...currentAttempt,
     questions: updatedQuestions,
-    isConfirmed: true, // Lock this attempt
+    isConfirmed: true,
   };
 
-  // 3. Update attempts array
+  // Update attempts array
   setAttempts(prev => prev.map(a => 
     a.attemptId === currentAttempt.attemptId ? confirmedAttempt : a
   ));
 
-  // 4. Calculate metrics for this confirmation
-  const confirmedCount = effectiveSelections.length;
-  const rejectedCount = updatedQuestions.length - confirmedCount;
+  // Calculate metrics - all questions confirmed, none rejected
+  const confirmedCount = updatedQuestions.length;
 
-  // 5. Update session-wide metrics
+  // Update session-wide metrics
   setMetrics(prev => ({
     confirmedCount: prev.confirmedCount + confirmedCount,
-    rejectedCount: prev.rejectedCount + rejectedCount,
+    rejectedCount: prev.rejectedCount, // No new rejections
     retryCount: prev.retryCount,
   }));
 
-  // 6. Clear selections (ready for next attempt)
+  // Clear selections (ready for next attempt)
   setSelectedQuestionIds([]);
 
-  // 7. TODO: Phase 3 - Save to S3
-  // const saveRequest: SaveQuestionsRequest = {
-  //   caseId: confirmedAttempt.caseId,
-  //   sessionId: confirmedAttempt.sessionId,
-  //   attempts: [confirmedAttempt],
-  //   metadata: { /* ... */ }
-  // };
-  // await questionService.saveToS3(saveRequest);
-
+  // TODO: Phase 3 - Save to S3
   console.log('✅ Attempt confirmed and ready for S3 save', {
     attemptId: confirmedAttempt.attemptId,
     confirmedQuestions: confirmedCount,
-    rejectedQuestions: rejectedCount,
-    smartLogicApplied: selectedQuestionIds.length === 0 ? 'Yes (all confirmed)' : 'No',
+    rejectedQuestions: 0,
     totalSessionConfirmed: metrics.confirmedCount + confirmedCount,
-    totalSessionRejected: metrics.rejectedCount + rejectedCount,
+    totalSessionRejected: metrics.rejectedCount,
   });
 }, [currentAttempt, selectedQuestionIds, metrics]);
 
@@ -412,7 +405,6 @@ const updatedAttempt: QuestionAttempt = {
     clearError,
     resetSession,
   };
-
   return (
     <QuestionContext.Provider value={value}>
       {children}
