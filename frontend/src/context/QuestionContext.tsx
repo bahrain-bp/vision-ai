@@ -1,6 +1,7 @@
 // React Context for managing AI Question Generation state and logic
 
-import React, { createContext, useState, useCallback, ReactNode } from 'react';
+import React, { createContext, useState, useCallback, useMemo, useContext, ReactNode } from 'react';
+import { TranscriptionContext } from './TranscriptionContext';
 import {
   Question,
   QuestionAttempt,
@@ -21,6 +22,7 @@ export interface QuestionContextType {        // This basically shows what this 
   metrics: QuestionMetrics;                 // Session-wide metrics
   isLoading: boolean;                       // Is API call in progress?
   error: string | null;                     // Error message if generation failed
+  canGenerate: boolean;                     // Can questions be generated right now?
 
   // ========== ACTIONS ==========
   generateQuestions: (context: QuestionGenerationContext) => Promise<void>;
@@ -43,6 +45,15 @@ const QuestionContext = createContext<QuestionContextType | undefined>(undefined
 // ============================================
 
 export const QuestionProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+
+  // ========== TRANSCRIPTION CONTEXT ==========
+  // ← NEW: Access transcription state for prerequisites check
+  const transcriptionContext = useContext(TranscriptionContext);
+if (!transcriptionContext) {
+  throw new Error('QuestionProvider must be used within TranscriptionProvider');
+}
+const { recordingStatus, getFullTranscript } = transcriptionContext;
+
   
   // ========== STATE ==========
   const [attempts, setAttempts] = useState<QuestionAttempt[]>([]);
@@ -58,6 +69,45 @@ export const QuestionProvider: React.FC<{ children: ReactNode }> = ({ children }
 
   // ========== COMPUTED VALUES ==========
   const currentAttempt = currentAttemptIndex >= 0 ? attempts[currentAttemptIndex] : null;
+
+  /**
+   * Prerequisites check for question generation
+   * 
+   * UPDATED FOR PAUSE BUTTON SUPPORT:
+   * Questions can be generated when:
+   * 1. Session exists (currentSession from case context - checked in UI)
+   * 2. Transcript has content (testimony has been captured)
+   * 3. Recording is either 'on' or 'paused' (not completely 'off')
+   * 
+   * This allows generation during:
+   * - Active recording: questions from real-time transcript
+   * - Paused recording: questions from "snapshot" up to pause point
+   * 
+   * This prevents generation when:
+   * - Recording never initiated (status = 'off')
+   * - No testimony captured yet (empty transcript)
+   * - Recording fully stopped (even if transcript exists in memory)
+   */
+
+  const canGenerate = useMemo((): boolean => {
+  // Check if transcript exists and has content
+  const hasTranscript = !!(getFullTranscript && getFullTranscript.trim().length > 0);
+  
+  // Check if recording is active or paused (not completely off)
+  const isRecordingActiveOrPaused = recordingStatus !== 'off';
+  
+  const result = hasTranscript && isRecordingActiveOrPaused;
+  
+  console.log('🔍 Prerequisites check:', {
+    hasTranscript,
+    transcriptLength: getFullTranscript?.length || 0,
+    recordingStatus,
+    isRecordingActiveOrPaused,
+    canGenerate: result,
+  });
+  
+  return Boolean(result); // ← Explicitly convert to boolean
+}, [getFullTranscript, recordingStatus]);
 
   // ========== HELPER FUNCTIONS ==========
 
@@ -92,6 +142,15 @@ export const QuestionProvider: React.FC<{ children: ReactNode }> = ({ children }
    */
   const generateQuestions = useCallback(
     async (context: QuestionGenerationContext) => {
+      // ← NEW: Early validation using prerequisites
+      if (!canGenerate) {
+        const errorMsg = recordingStatus === 'off' 
+          ? 'Cannot generate questions: Recording not started'
+          : 'Cannot generate questions: No transcript available';
+        setError(errorMsg);
+        console.error('❌ Generation blocked:', errorMsg);
+        return;
+      }
       setIsLoading(true);
       setError(null);
 
@@ -132,6 +191,7 @@ export const QuestionProvider: React.FC<{ children: ReactNode }> = ({ children }
           questionCount: mockQuestions.length,
           language: context.language,
           transcriptLength: context.currentTranscript.length, // ← Log transcript length for debugging
+          recordingStatus, //Log recording status for debugging
 
         });
       } catch (err) {
@@ -142,7 +202,8 @@ export const QuestionProvider: React.FC<{ children: ReactNode }> = ({ children }
         setIsLoading(false);
       }
     },
-    [attempts.length]
+    [attempts.length, canGenerate, recordingStatus, generateQuestionId] // UPDATED: Added dependencies
+
   );
 
   /**
@@ -207,6 +268,16 @@ export const QuestionProvider: React.FC<{ children: ReactNode }> = ({ children }
   async (context: QuestionGenerationContext) => {
     if (!currentAttempt) {
       console.warn('⚠️ No current attempt to retry');
+      return;
+    }
+
+    // Early validation using prerequisites
+    if (!canGenerate) {
+      const errorMsg = recordingStatus === 'off' 
+        ? 'Cannot retry: Recording not started'
+        : 'Cannot retry: No transcript available';
+      setError(errorMsg);
+      console.error('❌ Retry blocked:', errorMsg);
       return;
     }
 
@@ -315,7 +386,8 @@ const updatedAttempt: QuestionAttempt = {
       setIsLoading(false);
     }
   },
-  [currentAttempt, selectedQuestionIds, generateQuestionId]
+    [currentAttempt, selectedQuestionIds, generateQuestionId, canGenerate, recordingStatus] // UPDATED: Added dependencies
+
 );
 
   /**
@@ -395,6 +467,7 @@ const updatedAttempt: QuestionAttempt = {
     metrics,
     isLoading,
     error,
+    canGenerate, // ← NEW: Expose prerequisites check to UI
 
     // Actions
     generateQuestions,
