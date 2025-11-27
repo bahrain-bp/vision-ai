@@ -13,6 +13,7 @@
     "lucide-react": "^0.548.0",
     "microphone-stream": "^6.0.1",
     "multiselect-react-dropdown": "^2.0.25",
+    "node": "^25.2.1",
     "primeicons": "^7.0.0",
     "primereact": "^10.9.7",
     "process": "^0.11.10",

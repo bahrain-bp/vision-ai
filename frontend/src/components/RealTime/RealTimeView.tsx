@@ -24,8 +24,12 @@ import QuestionGenerator from './AIAssistant/QuestionGenerator';
 
 
 import { TranslationProvider } from '../../context/TranslationContext';
-import { RecordingStatus, sessionType } from "../../types/";
 
+import {
+  RecordingStatus,
+  sessionType,
+  LanguagePreferences,
+} from "../../types/";
 
 interface SessionData {
   sessionId: string;
@@ -103,9 +107,16 @@ const RealTimeView: React.FC<RealTimeViewProps> = ({
   const [aiExpanded, setAiExpanded] = useState(false);
   const [isIdentityVerified, setIsIdentityVerified] = useState(false);
   const [startRecording, setStartRecording] = useState(false);
-  const [selectedLanguage, setSelectedLanguage] = useState<string>("en-US");
   const [sessionType, setSessionType] = useState<sessionType>("standard");
-  const [detectionLanguages,setDetectionLanguages] = useState([]);
+  const [detectionLanguages, setDetectionLanguages] = useState([]);
+
+  const [languagePreferences, setLanguagePreferences] =
+    useState<LanguagePreferences>({
+      languageMode: "unified",
+      sharedLanguage: "ar-SA",
+      investigatorLanguage: "",
+      witnessLanguage: "",
+    });
 
   const handleStartInvestigation = (investigationData: InvestigationData) => {
     console.log("Starting investigation with data:", investigationData);
@@ -226,8 +237,8 @@ const mockQuestion = {
         {sessionState === "off" && activeTab === "transcription" && (
           <>
             <TranscriptionSessionSetup
-              selectedLanguage={selectedLanguage}
-              setSelectedLanguage={setSelectedLanguage}
+              languagePreferences={languagePreferences}
+              setLanguagePreferences={setLanguagePreferences}
               detectionLanguages={detectionLanguages}
               setDetectionLanguages={setDetectionLanguages}
               sessionType={sessionType}
@@ -246,7 +257,7 @@ const mockQuestion = {
                 <LiveTranscription
                   startRecordingProp={startRecording}
                   setSessionState={setSessionState}
-                  selectedLanguage={selectedLanguage}
+                  languagePreferences={languagePreferences}
                   detectionLanguages={detectionLanguages}
                   setSessionType={setSessionType}
                   sessionType={sessionType}

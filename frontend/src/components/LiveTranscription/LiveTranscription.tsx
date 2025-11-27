@@ -5,6 +5,7 @@ import {
   RecordingStatus,
   TranscriptionStatus,
   sessionType,
+  LanguagePreferences
 } from "../../types/";
 import PDFExporter from "./PDFExporter";
 import ErrorDisplay from "./ErrorDisplay";
@@ -13,7 +14,7 @@ import { useState } from "react";
 interface LiveTranscriptionProps {
   startRecordingProp: boolean;
   setSessionState: (state: RecordingStatus) => void;
-  selectedLanguage: string;
+  languagePreferences: LanguagePreferences;
   detectionLanguages?:string[];
   setSessionType: (sesType: sessionType) => void;
   sessionType: sessionType;
@@ -22,7 +23,7 @@ interface LiveTranscriptionProps {
 const LiveTranscription: React.FC<LiveTranscriptionProps> = ({
   startRecordingProp,
   setSessionState,
-  selectedLanguage,
+  languagePreferences,
   detectionLanguages,
   //setSessionType,
   sessionType,
@@ -34,7 +35,6 @@ const LiveTranscription: React.FC<LiveTranscriptionProps> = ({
   const [isStarting, setIsStarting] = useState(false);
 
   const hasStarted = useRef(false);
-
 
   useEffect(() => {
     if (
@@ -48,16 +48,16 @@ const LiveTranscription: React.FC<LiveTranscriptionProps> = ({
         setIsStarting(true);
         setError(null);
         try {
-              const detectionLangString =
-                detectionLanguages && detectionLanguages.length > 0
-                  ? detectionLanguages.join(",")
-                  : undefined;
-            const result: TranscriptionStatus = await startRecording(
-              setSessionState,
-              selectedLanguage,
-              sessionType,
-              detectionLangString
-            );
+          const detectionLangString =
+            detectionLanguages && detectionLanguages.length > 0
+              ? detectionLanguages.join(",")
+              : undefined;
+          const result: TranscriptionStatus = await startRecording(
+            setSessionState,
+            languagePreferences,
+            sessionType,
+            detectionLangString
+          );
 
           if (!result.success) {
             console.error("Failed to start recording: ", result.error);
@@ -75,7 +75,7 @@ const LiveTranscription: React.FC<LiveTranscriptionProps> = ({
 
       start();
     }
-  }, [startRecordingProp, recordingStatus, selectedLanguage]);
+  }, [startRecordingProp, recordingStatus, languagePreferences]);
 
   if (error) {
     return (
