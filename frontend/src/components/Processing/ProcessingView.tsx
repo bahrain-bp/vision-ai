@@ -7,7 +7,7 @@ import Classification from "./processing-tabs/Classification";
 import Rewrite from "./processing-tabs/Rewrite";
 import CameraFootage from "./processing-tabs/CameraFootage";
 import AISuggestions from "./processing-tabs/AISuggestions/AISuggestions";
-import Contradictions from "./processing-tabs/Contradictions";
+import Contradictions from "./processing-tabs/Contradiction/Contradictions";
 import Outcome from "./processing-tabs/Outcome";
 
 export interface SessionData {
@@ -45,7 +45,7 @@ const ProcessingView: React.FC<ProcessingViewProps> = ({ sessionData }) => {
     {
       id: "Rewrite",
       label: "Rewrite",
-      render: () => <Rewrite />,
+      render: () => <Rewrite sessionData={sessionData} />,
     },
     {
       id: "CameraFootage",
@@ -100,6 +100,8 @@ const ProcessingView: React.FC<ProcessingViewProps> = ({ sessionData }) => {
     return activeTabConfig ? activeTabConfig.render() : null;
   };
   
+  const isAISuggestionsActive = !isProcessing && activeTab === "AISuggestions";
+
   // dynamic tab render 
   return (
     <div className="processing-view">
@@ -117,7 +119,7 @@ const ProcessingView: React.FC<ProcessingViewProps> = ({ sessionData }) => {
         ))}
       </div>
 
-      <div className="tab-content">
+      <div className={`tab-content ${isAISuggestionsActive ? "ai-tab-content" : ""}`}>
         {renderTabContent()}
       </div>
     </div>
