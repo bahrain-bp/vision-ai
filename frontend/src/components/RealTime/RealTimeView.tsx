@@ -292,7 +292,8 @@ const mockQuestion = {
             onClick={() => setActiveTab("transcription")}
             className={`sidebar-btn ${
               activeTab === "transcription" ? "active" : ""
-            }`}
+            } ${!isIdentityVerified ? "disabled" : ""}`}
+            disabled={!isIdentityVerified}
           >
             <User className="btn-icon" />
             <span>Transcription & Translation</span>
