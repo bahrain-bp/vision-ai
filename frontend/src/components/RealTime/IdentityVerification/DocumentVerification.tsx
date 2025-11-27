@@ -75,7 +75,8 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
   const { setCurrentPersonName, setCurrentPersonType } = useCaseContext();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const documentInputRef = useRef<HTMLInputElement>(null);
-
+  const [fileInputKey, setFileInputKey] = useState<number>(0);
+  const [documentInputKey, setDocumentInputKey] = useState<number>(0);
   const [documentType, setDocumentType] = useState<DocumentType>("cpr");
   const [verificationAttempts, setVerificationAttempts] = useState<number>(0);
   const [manualOverrideReason, setManualOverrideReason] = useState<string>("");
@@ -158,10 +159,16 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
     [identityData]
   );
 
-  const handleFileUpload = useCallback(
+  const handleDocumentUpload = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
+      setVerificationState((prev) => ({ ...prev, error: null }));
+
       const file = event.target.files?.[0];
-      if (!file) return;
+
+      if (!file) {
+        setDocumentInputKey((prev) => prev + 1);
+        return;
+      }
 
       const validation = IdentityVerificationService.validateFile(file);
       if (!validation.valid) {
@@ -169,6 +176,43 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
           ...prev,
           error: validation.error || "Invalid file",
         }));
+        setDocumentInputKey((prev) => prev + 1);
+        return;
+      }
+
+      if (!validateFileSelection(file, documentType)) {
+        onIdentityDataChange(documentType, null);
+        setDocumentInputKey((prev) => prev + 1);
+        return;
+      }
+
+      onIdentityDataChange(documentType, file);
+      setVerificationState((prev) => ({ ...prev, error: null }));
+      console.log(
+        `${documentType.toUpperCase()} document uploaded:`,
+        file.name
+      );
+      setDocumentInputKey((prev) => prev + 1);
+    },
+    [documentType, onIdentityDataChange, validateFileSelection]
+  );
+
+  const handleFileUpload = useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      setVerificationState((prev) => ({ ...prev, error: null }));
+      const file = event.target.files?.[0];
+      if (!file) {
+        setFileInputKey((prev) => prev + 1);
+        return;
+      }
+
+      const validation = IdentityVerificationService.validateFile(file);
+      if (!validation.valid) {
+        setVerificationState((prev) => ({
+          ...prev,
+          error: validation.error || "Invalid file",
+        }));
+        setFileInputKey((prev) => prev + 1);
         return;
       }
 
@@ -178,10 +222,15 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
           error:
             "Person photo must be an image (JPG or PNG), not a PDF document. Please upload a photo.",
         }));
+        setFileInputKey((prev) => prev + 1);
         return;
       }
 
-      if (!validateFileSelection(file, "referencePhoto")) return;
+      if (!validateFileSelection(file, "referencePhoto")) {
+        onIdentityDataChange("referencePhoto", null);
+        setFileInputKey((prev) => prev + 1);
+        return;
+      }
 
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -191,35 +240,10 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
 
       onIdentityDataChange("referencePhoto", file);
       setVerificationState((prev) => ({ ...prev, error: null }));
-      console.log("Person photo uploaded:", file.name);
+
+      setFileInputKey((prev) => prev + 1);
     },
     [onIdentityDataChange, validateFileSelection]
-  );
-
-  const handleDocumentUpload = useCallback(
-    (event: React.ChangeEvent<HTMLInputElement>) => {
-      const file = event.target.files?.[0];
-      if (!file) return;
-
-      const validation = IdentityVerificationService.validateFile(file);
-      if (!validation.valid) {
-        setVerificationState((prev) => ({
-          ...prev,
-          error: validation.error || "Invalid file",
-        }));
-        return;
-      }
-
-      if (!validateFileSelection(file, documentType)) return;
-
-      onIdentityDataChange(documentType, file);
-      setVerificationState((prev) => ({ ...prev, error: null }));
-      console.log(
-        `${documentType.toUpperCase()} document uploaded:`,
-        file.name
-      );
-    },
-    [documentType, onIdentityDataChange, validateFileSelection]
   );
 
   const handleCompleteVerification = useCallback(async () => {
@@ -730,6 +754,7 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
             >
               <input
                 type="file"
+                key={fileInputKey}
                 ref={fileInputRef}
                 onChange={handleFileUpload}
                 accept=".jpg,.jpeg,.png"
@@ -808,6 +833,7 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
             >
               <input
                 type="file"
+                key={documentInputKey}
                 ref={documentInputRef}
                 onChange={handleDocumentUpload}
                 accept=".jpg,.jpeg,.png,.pdf"
