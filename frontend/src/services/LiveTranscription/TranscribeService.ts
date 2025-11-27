@@ -394,6 +394,7 @@ class TranscribeService {
 
           const fullDetailTranscript: TranscriptionResult = {
             words: transcriptWords,
+            sentences: transcriptWords.map((item) => item.content).join(" "),
             speaker,
             timeStamp: timeStamp,
             formattedTranscript:
@@ -415,9 +416,6 @@ class TranscribeService {
     try {
       const endPoint =
         process.env.REACT_APP_API_ENDPOINT + "/transcription/save";
-
-      console.log("🔍 Full endpoint URL:", endPoint);
-      console.log("🔍 Sending data:", data);
 
       const response = await fetch(endPoint, {
         method: "POST",

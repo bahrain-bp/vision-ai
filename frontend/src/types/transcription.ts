@@ -7,6 +7,7 @@ export interface TranscribedWord {
 
 export interface TranscriptionResult {
   words: TranscribedWord[];
+  sentences: string;
   speaker: string;
   formattedTranscript: string;
   timeStamp: string;
