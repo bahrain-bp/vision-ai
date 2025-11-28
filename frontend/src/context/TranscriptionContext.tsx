@@ -115,6 +115,9 @@ export const TranscriptionProvider: React.FC<{ children: ReactNode }> = ({
   );
 
   useEffect(() => {
+      if (recordingStatus !== "on") {
+        return;
+      }
      const newSpeaker = onTranscriptUpdate?.speaker || "N/A";
     const newText = onTranscriptUpdate?.formattedTranscript;
 

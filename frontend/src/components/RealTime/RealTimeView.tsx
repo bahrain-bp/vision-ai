@@ -150,8 +150,8 @@ const RealTimeView: React.FC<RealTimeViewProps> = ({
                   setSessionType={setSessionType}
                   sessionType={sessionType}
                 />
-                <TranslationProvider 
-                  investigatorLanguage="en" 
+                <TranslationProvider
+                  investigatorLanguage="en"
                   witnessLanguage="ar"
                 >
                   <Translation />
@@ -160,7 +160,7 @@ const RealTimeView: React.FC<RealTimeViewProps> = ({
             )}
           </div>
         )}
-        
+
         {activeTab === "summarization" && (
           <div className="recording-content">
             <SummarizationReport sessionData={sessionData} />
@@ -185,13 +185,12 @@ const RealTimeView: React.FC<RealTimeViewProps> = ({
             onClick={() => setActiveTab("transcription")}
             className={`sidebar-btn ${
               activeTab === "transcription" ? "active" : ""
-            } ${!isIdentityVerified ? "disabled" : ""}`}
-            disabled={!isIdentityVerified}
+            }`}
           >
             <User className="btn-icon" />
             <span>Transcription & Translation</span>
           </button>
-
+          
           <button
             onClick={() => setActiveTab("summarization")}
             className={`sidebar-btn ${

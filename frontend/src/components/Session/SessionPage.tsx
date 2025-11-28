@@ -6,6 +6,8 @@ import SessionSummaryModal from "../RealTime/SessionSummaryModal";
 import { User, RecordingStatus } from "../../types/";
 import { useTranscription } from "../../hooks/useTranscription";
 import { useCaseContext } from "../../hooks/useCaseContext";
+import {getTimeString} from "../common/Timer/Timer"; 
+
 interface ParticipantData {
   fullName: string;
   idNumber: string;
@@ -68,7 +70,10 @@ const SessionPage: React.FC<SessionPageProps> = ({
   const [showSummaryModal, setShowSummaryModal] = useState<boolean>(false);
   const [triggerSummarization, setTriggerSummarization] = useState<boolean>(false);
   const { stopRecording,toggleRecordingPause,toggleReset} = useTranscription();
-  const [isPaused, setIsPaused] = useState(false);
+  
+const [isPaused, setIsPaused] = useState(false);
+ const [timerMs, setTimerMs] = useState(0);
+ const [timerString, setTimerString] = useState("00:00:00");
 
   const [setupData, setSetupData] = useState<SetupData>({
     witnessData: {
@@ -87,17 +92,36 @@ const SessionPage: React.FC<SessionPageProps> = ({
     },
   });
 
-  const getInvestigatorName = () => {
-    if (user?.username) return user.username;
-    return "Unknown Investigator";
-  };
+    const getInvestigatorName = () => {
+      if (user?.username) return user.username;
+      return "Unknown Investigator";
+    };
+    
+  useEffect(() => {
+    let intervalId: any;
+
+    if (sessionState === "on" && !isPaused) {
+      intervalId = setInterval(() => {
+        setTimerMs((prev) => prev + 10);
+      }, 10);
+    }
+
+    return () => clearInterval(intervalId);
+  }, [sessionState, isPaused]);
+
+  useEffect(() => {
+    const formatted = getTimeString(timerMs);
+    setTimerString(formatted);
+  }, [timerMs]);
+
+
 
   const currentSessionData: SessionData = currentSession
     ? {
         sessionId: currentSession.sessionId,
         investigator: currentSession.investigator || getInvestigatorName(),
         language: "Arabic",
-        duration: currentSession.duration,
+        duration: timerString,
         participant: setupData.witnessData.fullName || "Not set",
         status: currentSession.status,
       }
@@ -105,7 +129,7 @@ const SessionPage: React.FC<SessionPageProps> = ({
         sessionId: "#2025-INV-0042",
         investigator: getInvestigatorName(),
         language: "Arabic",
-        duration: "00:00",
+        duration: timerString,
         participant: "Not set",
         status: "Active",
       };
