@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, {  useRef } from 'react';
 import { useRealTimeTranslation } from '../../hooks/useRealTimeTranslation';
 import { Globe, Trash2, Eye } from 'lucide-react';
 import TranslationSettings from './TranslationSettings';
@@ -20,9 +20,9 @@ const RealTimeTranslation: React.FC = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom when new translations arrive
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [translations]);
+ // useEffect(() => {
+   // messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  //}, [translations]);
 
   // Generate transcript text for PDF export 
   const generateTranscriptText = () => {

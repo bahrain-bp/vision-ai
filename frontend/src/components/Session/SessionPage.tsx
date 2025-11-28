@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from "react";
-import { ArrowLeft, Clock } from "lucide-react";
+import { ArrowLeft, Clock, Pause, Play, RotateCcw } from "lucide-react";
 import RealTimeView from "../RealTime/RealTimeView";
 import ProcessingView from "../Processing/ProcessingView";
 import SessionSummaryModal from "../RealTime/SessionSummaryModal";
 import { User, RecordingStatus } from "../../types/";
 import { useTranscription } from "../../hooks/useTranscription";
 import { useCaseContext } from "../../hooks/useCaseContext";
-
 interface ParticipantData {
   fullName: string;
   idNumber: string;
@@ -67,7 +66,9 @@ const SessionPage: React.FC<SessionPageProps> = ({
   const [activeMainTab, setActiveMainTab] = useState<MainTab>("real-time");
   const [sessionState, setSessionState] = useState<RecordingStatus>("off");
   const [showSummaryModal, setShowSummaryModal] = useState<boolean>(false);
-  const { stopRecording } = useTranscription();
+  const { stopRecording,toggleRecordingPause,toggleReset} = useTranscription();
+  const [isPaused, setIsPaused] = useState(false);
+
   const [setupData, setSetupData] = useState<SetupData>({
     witnessData: {
       fullName: sessionData?.participantData?.fullName || "",
@@ -271,9 +272,64 @@ const SessionPage: React.FC<SessionPageProps> = ({
                 <span>{currentSessionData.duration}</span>
               </div>
               {sessionState === "on" && (
-                <button onClick={handleEndSession} className="end-session-btn">
-                  End Session
-                </button>
+                <>
+                  <button
+                    onClick={() => {
+                      const newPausedState = !isPaused;
+                      setIsPaused(newPausedState);
+                      toggleRecordingPause(newPausedState);
+                    }}
+                    className="pause-btn"
+                    style={{
+                      padding: "10px 20px",
+                      backgroundColor: isPaused ? "#3b82f6" : "#f59e0b",
+                      color: "white",
+                      border: "none",
+                      borderRadius: "8px",
+                      cursor: "pointer",
+                      marginRight: "12px",
+                      fontWeight: "500",
+                      fontSize: "14px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      transition: "all 0.2s ease",
+                    }}
+                  >
+                    {isPaused ? <Play size={16} /> : <Pause size={16} />}
+                    {isPaused ? "Resume" : "Pause"}
+                  </button>
+
+                  <button
+                    onClick={()=> toggleReset()}
+                    className="reset-btn"
+                    style={{
+                      padding: "10px 20px",
+                      backgroundColor: "#6366f1",
+                      color: "white",
+                      border: "none",
+                      borderRadius: "8px",
+                      cursor: "pointer",
+                      marginRight: "12px",
+                      fontWeight: "500",
+                      fontSize: "14px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      transition: "all 0.2s ease",
+                    }}
+                  >
+                    <RotateCcw size={16} />
+                    Reset
+                  </button>
+
+                  <button
+                    onClick={handleEndSession}
+                    className="end-session-btn"
+                  >
+                    End Session
+                  </button>
+                </>
               )}
             </div>
           </div>

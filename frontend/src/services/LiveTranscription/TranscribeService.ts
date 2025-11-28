@@ -160,7 +160,7 @@ class TranscribeService {
         error: micResult,
       };
     }
-    
+
     const displayResult = await this.attemptConnection(
       "display",
       transcribeClient,
@@ -246,7 +246,7 @@ class TranscribeService {
         };
   }
 
-  private getAudioStream = async function* (
+  private async *getAudioStream(
     microphoneStream: MicrophoneStream,
     sampleRate: number
   ) {
@@ -263,6 +263,9 @@ class TranscribeService {
     };
 
     for await (const chunk of microphoneStream) {
+      if (this.recordingStatus === "paused") {
+        continue;
+      }
       if (chunk.length <= sampleRate) {
         yield {
           AudioEvent: {
@@ -271,7 +274,7 @@ class TranscribeService {
         };
       }
     }
-  };
+  }
 
   private async startTranscriptionStream(
     transcribeClient: TranscribeStreamingClient,
@@ -353,6 +356,9 @@ class TranscribeService {
     try {
       for await (const event of stream) {
         const results = event.TranscriptEvent?.Transcript?.Results;
+        if (this.recordingStatus === "paused") {
+          continue;
+        }
         if (!results) continue;
 
         for (const result of results) {
@@ -441,6 +447,9 @@ class TranscribeService {
   stopRecording(): void {
     this.mediaManager.stopStreams();
     this.recordingStatus = "off";
+  }
+  toggleRecordingPause(isPaused: boolean): void {
+    this.recordingStatus = isPaused ? "paused" : "on";
   }
 
   getRecordingStatus(): RecordingStatus {

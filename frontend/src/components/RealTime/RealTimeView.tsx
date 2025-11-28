@@ -113,7 +113,7 @@ const RealTimeView: React.FC<RealTimeViewProps> = ({
   const [languagePreferences, setLanguagePreferences] =
     useState<LanguagePreferences>({
       languageMode: "unified",
-      sharedLanguage: "ar-SA",
+      sharedLanguage: "en-US",
       investigatorLanguage: "",
       witnessLanguage: "",
     });

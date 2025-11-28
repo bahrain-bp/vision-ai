@@ -36,6 +36,8 @@ const LiveTranscription: React.FC<LiveTranscriptionProps> = ({
 
   const hasStarted = useRef(false);
 
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
   useEffect(() => {
     if (
       startRecordingProp &&
@@ -76,6 +78,12 @@ const LiveTranscription: React.FC<LiveTranscriptionProps> = ({
       start();
     }
   }, [startRecordingProp, recordingStatus, languagePreferences]);
+
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.scrollTop = textareaRef.current.scrollHeight;
+    }
+  }, [getFullTranscript]);
 
   if (error) {
     return (
@@ -126,6 +134,7 @@ const LiveTranscription: React.FC<LiveTranscriptionProps> = ({
       <textarea
         value={getFullTranscript}
         readOnly
+        ref={textareaRef}
         placeholder="Transcript will appear here..."
         style={{
           width: "100%",
