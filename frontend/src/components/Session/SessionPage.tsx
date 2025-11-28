@@ -66,6 +66,7 @@ const SessionPage: React.FC<SessionPageProps> = ({
   const [activeMainTab, setActiveMainTab] = useState<MainTab>("real-time");
   const [sessionState, setSessionState] = useState<RecordingStatus>("off");
   const [showSummaryModal, setShowSummaryModal] = useState<boolean>(false);
+  const [triggerSummarization, setTriggerSummarization] = useState<boolean>(false);
   const { stopRecording,toggleRecordingPause,toggleReset} = useTranscription();
   const [isPaused, setIsPaused] = useState(false);
 
@@ -117,8 +118,7 @@ const SessionPage: React.FC<SessionPageProps> = ({
 
   const handleEndSession = async () => {
     stopRecording(setSessionState);
-
-
+    
     if (currentSession && currentCase) {
       try {
         await updateSessionStatus(
@@ -133,8 +133,8 @@ const SessionPage: React.FC<SessionPageProps> = ({
     setCurrentSession(null);
     setCurrentPersonName(null);
 
-
-    setShowSummaryModal(true);
+    // Trigger switch to summarization tab
+    setTriggerSummarization(true);
   };
 
   const handleCloseSummary = () => {
@@ -368,6 +368,7 @@ const SessionPage: React.FC<SessionPageProps> = ({
             onIdentityDataChange={updateIdentityData}
             onTranslationSettingsChange={updateTranslationSettings}
             onVerifyIdentity={handleVerifyIdentity}
+            triggerSummarization={triggerSummarization}
           />
         ) : (
           <ProcessingView sessionData={currentSessionData} />
@@ -378,6 +379,10 @@ const SessionPage: React.FC<SessionPageProps> = ({
         <SessionSummaryModal
           sessionData={currentSessionData}
           onClose={handleCloseSummary}
+          onGenerateSummary={() => {
+            setShowSummaryModal(false);
+            setTriggerSummarization(true);
+          }}
         />
       )}
     </div>

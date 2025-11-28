@@ -4,7 +4,6 @@ import { useCaseContext } from "../../hooks/useCaseContext";
 interface SessionData {
   sessionId: string;
   participant: string;
-  language: string;
   duration: string;
   status: string;
   investigator?: string;
@@ -16,6 +15,7 @@ interface SessionInfoProps {
 
 const SessionInfo: React.FC<SessionInfoProps> = ({ sessionData }) => {
   const { currentPersonName } = useCaseContext();
+
   const participantName =
     currentPersonName || sessionData.participant || "Not verified yet";
   return (
@@ -34,11 +34,6 @@ const SessionInfo: React.FC<SessionInfoProps> = ({ sessionData }) => {
         <div className="info-item">
           <p className="info-label">Session ID:</p>
           <p className="info-value">{sessionData.sessionId}</p>
-        </div>
-
-        <div className="info-item">
-          <p className="info-label">Language:</p>
-          <p className="info-value">{sessionData.language}</p>
         </div>
 
         <div className="info-item">
