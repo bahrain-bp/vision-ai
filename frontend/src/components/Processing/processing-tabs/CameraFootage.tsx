@@ -559,6 +559,7 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
               <div className="analysis-results">
                 {/* Video Summary Section */}
                 {analysisResult.chapters &&
+                analysisResult.chapters.length > 1 &&
                 analysisResult.chapters.some(
                   (chapter) => chapter.segmentIndex
                 ) ? (
