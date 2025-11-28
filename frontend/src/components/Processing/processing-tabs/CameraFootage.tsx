@@ -691,7 +691,7 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
                                     <div className="detail-header">
                                       <span className="detail-title">
                                         {language === "ar"
-                                          ? "تم اكتشاف نشاط"
+                                          ? "تم اكتشاف حدث"
                                           : "Activity Detected"}
                                       </span>
                                       <div className="detail-header-badges">
@@ -744,7 +744,7 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
                                     <div className="detail-header">
                                       <span className="detail-title">
                                         {language === "ar"
-                                          ? "تم التعرف على شخص"
+                                          ? "تم اكتشاف أشخاص"
                                           : "Person Identified"}
                                       </span>
                                       {chapter.person.confidence && (
@@ -791,7 +791,7 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
                                     <div className="detail-header">
                                       <span className="detail-title">
                                         {language === "ar"
-                                          ? "تم اكتشاف كائن"
+                                          ? "تم اكتشاف شيء"
                                           : "Object Detected"}
                                       </span>
                                       <div className="detail-header-badges">
