@@ -23,6 +23,12 @@ export interface TranscriptionContextType {
   stopRecording: (setSessionState?: (state: RecordingStatus) => void) => void;
   getFullTranscript: string;
   getTranscriptSegments: () => getFormatedTranscript[];
+  toggleRecordingPause: (isPaused: boolean) => void;
+
+  toggleReset: () => void;
+
+  //Used to change state if reset not to track it
+  resetTrigger: boolean;
 }
 
 interface getFormatedTranscript {
@@ -45,6 +51,9 @@ export const TranscriptionProvider: React.FC<{ children: ReactNode }> = ({
   const [transcriptSegments, setTranscriptSegments] = useState<
     getFormatedTranscript[]
   >([]); 
+
+
+  const [isResetTrigger, setIsResetTrigger] = useState(false);
 
   const [recordingStatus, setRecordingStatus] =
     useState<RecordingStatus>("off");
@@ -106,6 +115,9 @@ export const TranscriptionProvider: React.FC<{ children: ReactNode }> = ({
   );
 
   useEffect(() => {
+      if (recordingStatus !== "on") {
+        return;
+      }
      const newSpeaker = onTranscriptUpdate?.speaker || "N/A";
     const newText = onTranscriptUpdate?.formattedTranscript;
 
@@ -160,6 +172,18 @@ export const TranscriptionProvider: React.FC<{ children: ReactNode }> = ({
     [fullTranscript, currentCase, currentSession]
   );
 
+  const toggleRecordingPause = (isPaused: boolean) => {
+      TranscribeService.toggleRecordingPause(isPaused);
+  };
+
+  const toggleReset =()=>{
+    setFullTranscript("");
+    setTranscriptSegments([]);
+    setIsResetTrigger((prev) => !prev);
+  };
+
+  const resetTrigger = isResetTrigger;
+
   return (
     <TranscriptionContext.Provider
       value={{
@@ -169,6 +193,9 @@ export const TranscriptionProvider: React.FC<{ children: ReactNode }> = ({
         stopRecording,
         getFullTranscript: fullTranscript,
         getTranscriptSegments,
+        toggleRecordingPause,
+        toggleReset,
+        resetTrigger,
       }}
     >
       {children}

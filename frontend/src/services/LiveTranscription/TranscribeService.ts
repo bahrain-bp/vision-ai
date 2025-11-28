@@ -15,10 +15,12 @@ import {
   sessionType,
   SaveTranscriptionRequest,
   LanguagePreferences,
+  sourceSettings,
 } from "../../types";
 import { LanguageCode } from "@aws-sdk/client-transcribe-streaming";
 import StreamManager from "./StreamManager";
 import { StartStreamTranscriptionCommandOutput } from "@aws-sdk/client-transcribe-streaming";
+
 
 class TranscribeService {
   private displayStatus: RecordingStatus = "off";
@@ -29,14 +31,20 @@ class TranscribeService {
 
   private mediaManager = StreamManager;
 
-  private microphoneAttempts: number = 8;
+  private microphoneAttempts: number = 15;
 
-  private displayAttempts: number = 8;
+  private displayAttempts: number = 15;
 
-  private static instance: TranscribeService;
+  private transcribeClient: TranscribeStreamingClient | null = null;
+
+  private micSettings: sourceSettings | null = null;
+
+  private displaySettings: sourceSettings | null = null;
 
   private transcriptCallback: ((result: TranscriptionResult) => void) | null =
     null;
+
+  private static instance: TranscribeService;
 
   constructor() {}
 
@@ -123,9 +131,8 @@ class TranscribeService {
     this.audioStatus = "on";
     this.displayStatus = "on";
 
-    let transcribeClient;
     try {
-      transcribeClient = await this.createTranscribeClient();
+      this.transcribeClient = await this.createTranscribeClient();
     } catch (error) {
       return {
         success: false,
@@ -140,17 +147,20 @@ class TranscribeService {
       };
     }
 
-    const micResult = await this.attemptConnection(
-      "microphone",
-      transcribeClient,
-      audio.audioStream,
-      this.microphoneAttempts,
-      languagePreferences?.languageMode === "unified"
-        ? languagePreferences.sharedLanguage
-        : languagePreferences?.investigatorLanguage,
-      "standard",
-      detectionLanguages
-    );
+    this.micSettings = {
+      source: "microphone",
+      transcribeClient: this.transcribeClient,
+      stream: audio.audioStream,
+      maxAttempts: this.microphoneAttempts,
+      selectedLanguage:
+        languagePreferences?.languageMode === "unified"
+          ? languagePreferences.sharedLanguage
+          : languagePreferences?.investigatorLanguage,
+      speakerMode: "standard",
+      detectionLanguages: detectionLanguages,
+    };
+
+    const micResult = await this.attemptConnection(this.micSettings);
 
     if (!micResult.success) {
       return {
@@ -160,18 +170,21 @@ class TranscribeService {
         error: micResult,
       };
     }
-    
-    const displayResult = await this.attemptConnection(
-      "display",
-      transcribeClient,
-      display.displayStream,
-      this.displayAttempts,
-      languagePreferences?.languageMode === "unified"
-        ? languagePreferences.sharedLanguage
-        : languagePreferences?.witnessLanguage,
-      sessionType,
-      detectionLanguages
-    );
+
+    this.displaySettings = {
+      source: "display",
+      transcribeClient: this.transcribeClient,
+      stream: display.displayStream,
+      maxAttempts: this.displayAttempts,
+      selectedLanguage:
+        languagePreferences?.languageMode === "unified"
+          ? languagePreferences.sharedLanguage
+          : languagePreferences?.witnessLanguage,
+      speakerMode: sessionType,
+      detectionLanguages: detectionLanguages,
+    };
+
+    const displayResult = await this.attemptConnection(this.displaySettings);
 
     if (!displayResult.success) {
       this.mediaManager.stopStreams();
@@ -188,15 +201,9 @@ class TranscribeService {
   }
 
   async attemptConnection(
-    source: "display" | "microphone",
-    transcribeClient: TranscribeStreamingClient,
-    stream: MediaStream,
-    maxAttempts: number,
-    selectedLanguage?: string,
-    speakerMode?: sessionType,
-    detectionLanguages?: string
+    settings: sourceSettings
   ): Promise<TranscriptionError> {
-    let attempts = maxAttempts;
+    let attempts = settings.maxAttempts;
 
     let connected = false;
 
@@ -207,17 +214,19 @@ class TranscribeService {
 
     while (attempts > 0 && !connected) {
       console.log(
-        `${source} attempt ${maxAttempts - attempts + 1}/${maxAttempts}`
+        `${settings.source} attempt ${settings.maxAttempts - attempts + 1}/${
+          settings.maxAttempts
+        }`
       );
 
       result = await this.startTranscriptionStream(
-        transcribeClient,
-        stream,
-        source,
+        settings.transcribeClient,
+        settings.stream,
+        settings.source,
         this.mediaManager.getSampleRate(),
-        selectedLanguage,
-        speakerMode,
-        detectionLanguages
+        settings.selectedLanguage,
+        settings.speakerMode,
+        settings.detectionLanguages
       );
 
       console.log(`📊 Result:`, result);
@@ -233,20 +242,20 @@ class TranscribeService {
       }
     }
     return connected
-      ? { success: true, message: `${source} connected` }
+      ? { success: true, message: `${settings.source} connected` }
       : {
           success: false,
           type: "network",
           message:
             result.message ||
-            (source === "microphone"
+            (settings.source === "microphone"
               ? "Unable to connect microphone to transcription service. Please try again."
               : "Unable to connect screen audio to transcription service. Please try again."),
           rawError: result.rawError,
         };
   }
 
-  private getAudioStream = async function* (
+  private async *getAudioStream(
     microphoneStream: MicrophoneStream,
     sampleRate: number
   ) {
@@ -271,7 +280,7 @@ class TranscribeService {
         };
       }
     }
-  };
+  }
 
   private async startTranscriptionStream(
     transcribeClient: TranscribeStreamingClient,
@@ -352,12 +361,15 @@ class TranscribeService {
   ) {
     try {
       for await (const event of stream) {
-        const results = event.TranscriptEvent?.Transcript?.Results;
+        let results = event.TranscriptEvent?.Transcript?.Results;
+        if (this.recordingStatus === "paused") {
+          continue;
+        }
         if (!results) continue;
 
         for (const result of results) {
           if (!result?.Alternatives || result.IsPartial) continue;
-          console.log("Partial ", result);
+          //console.log("Partial ", result);
           const Items = result.Alternatives[0]?.Items;
           if (!Items || Items.length === 0) continue;
 
@@ -399,7 +411,10 @@ class TranscribeService {
             timeStamp: timeStamp,
             formattedTranscript:
               `[${timeStamp}] ${speaker}: ` +
-              transcriptWords.map((item) => item.content).join(" ") +
+              transcriptWords
+                .map((item) => item.content)
+                .join(" ")
+                .trim() +
               `\n`,
           };
 
@@ -441,6 +456,9 @@ class TranscribeService {
   stopRecording(): void {
     this.mediaManager.stopStreams();
     this.recordingStatus = "off";
+  }
+  toggleRecordingPause(isPaused: boolean) {
+    this.recordingStatus = isPaused ? "paused" : "on";
   }
 
   getRecordingStatus(): RecordingStatus {
