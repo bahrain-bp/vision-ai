@@ -9,6 +9,27 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 s3 = boto3.client("s3")
+translate = boto3.client("translate")
+
+
+def translate_text(text: str, target_language: str = "ar") -> str:
+    """
+    Translate text to the target language using Amazon Translate.
+    """
+    # Handle None or empty strings
+    if not text or not isinstance(text, str) or not text.strip():
+        return text if text else ""
+    try:
+        response = translate.translate_text(
+            Text=text,
+            SourceLanguageCode="en",  # English is the source language
+            TargetLanguageCode=target_language,  # Arabic is the target language
+        )
+        return response["TranslatedText"]
+    except Exception as e:
+        logger.error(f"Translation failed: {e}")
+        return text  # Fallback to the original text if translation fails
+
 
 # Configuration
 RESULTS_BUCKET = os.environ.get("RESULTS_BUCKET")
@@ -211,6 +232,13 @@ def merge_bda_outputs(
 
         # Global video summary
         result["summary"] = standard_data.get("video", {}).get("summary", "").strip()
+        if result["summary"]:
+            result["translations"] = {
+                "en": result["summary"],  # Original English text
+                "ar": translate_text(
+                    result["summary"], "ar"
+                ),  # Arabic is the target language
+            }
         logger.info(f"Extracted video summary: {result['summary'][:100]}...")
 
         # Extract chapters from STANDARD OUTPUT (has absolute timestamps)
@@ -236,6 +264,10 @@ def merge_bda_outputs(
                 "summary": ch.get("summary", "").strip(),
                 "confidence": ch.get("confidence", 0),
                 "type": "chapter",
+                "translations": {
+                    "en": ch.get("summary", "").strip(),
+                    "ar": translate_text(ch.get("summary", "").strip(), "ar"),
+                },
             }
 
             result["chapters"].append(chapter_data)
@@ -267,6 +299,25 @@ def merge_bda_outputs(
                         "description": event.get("event_description", "").strip(),
                         "type": event.get("event_type"),
                         "confidence": event.get("event_confidence"),
+                        "translations": {
+                            "en": {
+                                "description": event.get(
+                                    "event_description", ""
+                                ).strip(),
+                                "type": event.get("event_type"),
+                                "confidence": f"Confidence: {event.get('event_confidence')}%",
+                            },
+                            "ar": {
+                                "description": translate_text(
+                                    event.get("event_description", "").strip() or "",
+                                    "ar",
+                                ),
+                                "type": translate_text(
+                                    event.get("event_type") or "", "ar"
+                                ),
+                                "confidence": f"الثقة: {event.get('event_confidence')}%",
+                            },
+                        },
                     }
 
                 # Add person information
@@ -276,6 +327,21 @@ def merge_bda_outputs(
                         "id": person.get("person_id"),
                         "description": person.get("person_description", "").strip(),
                         "confidence": person.get("person_confidence"),
+                        "translations": {
+                            "en": {
+                                "description": person.get(
+                                    "person_description", ""
+                                ).strip(),
+                                "confidence": f"Confidence: {person.get('person_confidence')}%",
+                            },
+                            "ar": {
+                                "description": translate_text(
+                                    person.get("person_description", "").strip() or "",
+                                    "ar",
+                                ),
+                                "confidence": f"الثقة: {person.get('person_confidence')}%",
+                            },
+                        },
                     }
 
                 # Add object information
@@ -287,6 +353,21 @@ def merge_bda_outputs(
                         "is_abandoned": obj.get("is_abandoned"),
                         "suspicious": obj.get("suspicious"),
                         "confidence": obj.get("object_confidence"),
+                        "translations": {
+                            "en": {
+                                "description": obj.get(
+                                    "object_description", ""
+                                ).strip(),
+                                "confidence": f"Confidence: {obj.get('object_confidence')}%",
+                            },
+                            "ar": {
+                                "description": translate_text(
+                                    obj.get("object_description", "").strip() or "",
+                                    "ar",
+                                ),
+                                "confidence": f"الثقة: {obj.get('object_confidence')}%",
+                            },
+                        },
                     }
 
     # Create events list from chapters
@@ -383,12 +464,17 @@ def merge_all_segments(segment_results: List[Dict[str, Any]]) -> Dict[str, Any]:
         "\n\n".join(summary_parts) if summary_parts else "Video analysis complete"
     )
 
+    translated_summary = {
+        "en": combined_summary,
+        "ar": translate_text(combined_summary, "ar"),
+    }
+
     logger.info(
         f"Aggregated {len(all_chapters)} chapters from {len(segment_results)} segment(s)"
     )
 
     return {
-        "summary": combined_summary,
+        "summary": translated_summary,
         "chapters": all_chapters,
         "events": all_events,
         "metadata": metadata,

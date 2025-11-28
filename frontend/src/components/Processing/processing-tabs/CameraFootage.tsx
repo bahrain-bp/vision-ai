@@ -6,6 +6,24 @@ interface CameraFootageProps {
   sessionData: SessionData;
 }
 
+interface TranslatedText {
+  en: string;
+  ar: string;
+}
+
+interface TranslatedFields {
+  en: {
+    description: string;
+    type?: string;
+    confidence?: string;
+  };
+  ar: {
+    description: string;
+    type?: string;
+    confidence?: string;
+  };
+}
+
 interface Event {
   id: string;
   timestamp: number;
@@ -27,6 +45,7 @@ interface ChapterData {
   end_seconds: number;
   duration_seconds: number;
   summary: string;
+  translations?: TranslatedText;
   risk_score?: number;
   confidence?: number;
   type: string;
@@ -38,6 +57,7 @@ interface ChapterData {
     timestamp?: number;
     start_millis?: number;
     end_millis?: number;
+    translations?: TranslatedFields;
   };
   person?: {
     id: string;
@@ -45,6 +65,7 @@ interface ChapterData {
     confidence: number;
     first_seen?: number;
     last_seen?: number;
+    translations?: TranslatedFields;
   };
   object?: {
     id: string;
@@ -54,12 +75,13 @@ interface ChapterData {
     confidence: number;
     first_seen?: number;
     last_seen?: number;
+    translations?: TranslatedFields;
   };
 }
 
 interface AnalysisResult {
   events: Event[];
-  summary: string;
+  summary: string | TranslatedText;
   chapters?: ChapterData[];
   metadata?: {
     duration_seconds: number;
@@ -85,12 +107,82 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
   //const [jobId, setJobId] = useState<string>("");
   const [pollingStatus, setPollingStatus] = useState<string>("");
   const [videoDuration, setVideoDuration] = useState<number | null>(null);
+  const [language, setLanguage] = useState<"en" | "ar">("en"); // Add language state
 
   const videoRef = useRef<HTMLVideoElement>(null);
 
   const isValidSessionId = (sessionId: string): boolean => {
     const pattern = /^session-\d{14}-[a-fA-F0-9]{8}$/;
     return pattern.test(sessionId);
+  };
+
+  // Helper function to get summary text based on language
+  const getSummaryText = (summary: string | TranslatedText): string => {
+    if (typeof summary === "string") {
+      return summary;
+    }
+    return summary[language] || summary.en || "";
+  };
+
+  // Helper function to get chapter summary based on language
+  const getChapterSummary = (chapter: ChapterData): string => {
+    if (chapter.translations && chapter.translations[language]) {
+      return chapter.translations[language];
+    }
+    return chapter.summary;
+  };
+
+  // Helper function to get event fields based on language
+  const getEventText = (
+    event: ChapterData["event"],
+    field: "description" | "type" | "confidence"
+  ): string => {
+    if (!event) return "";
+
+    if (event.translations?.[language]?.[field]) {
+      return event.translations[language][field] || "";
+    }
+
+    // Fallback to original fields
+    if (field === "description") return event.description || "";
+    if (field === "type") return event.type || "";
+    if (field === "confidence")
+      return event.confidence ? `${event.confidence}% confidence` : "";
+    return "";
+  };
+
+  // Helper function to get person fields based on language
+  const getPersonText = (
+    person: ChapterData["person"],
+    field: "description" | "confidence"
+  ): string => {
+    if (!person) return "";
+
+    if (person.translations?.[language]?.[field]) {
+      return person.translations[language][field] || "";
+    }
+
+    if (field === "description") return person.description || "";
+    if (field === "confidence")
+      return person.confidence ? `${person.confidence}% confidence` : "";
+    return "";
+  };
+
+  // Helper function to get object fields based on language
+  const getObjectText = (
+    object: ChapterData["object"],
+    field: "description" | "confidence"
+  ): string => {
+    if (!object) return "";
+
+    if (object.translations?.[language]?.[field]) {
+      return object.translations[language][field] || "";
+    }
+
+    if (field === "description") return object.description || "";
+    if (field === "confidence")
+      return object.confidence ? `${object.confidence}% confidence` : "";
+    return "";
   };
 
   // Handle video upload
@@ -466,19 +558,48 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
             {analysisResult ? (
               <div className="analysis-results">
                 {/* Video Summary Section */}
-                <div className="video-summary-section">
-                  <h3 className="section-header">Video Summary</h3>
-                  <div className="summary-card">
-                    <p className="summary-text">{analysisResult.summary}</p>
+                {analysisResult.chapters &&
+                analysisResult.chapters.some(
+                  (chapter) => chapter.segmentIndex
+                ) ? (
+                  <div className="video-summary-section">
+                    <h3 className="section-header">
+                      {language === "ar" ? "ملخص الفيديو" : "Video Summary"}
+                    </h3>
+                    <div className="summary-card">
+                      <p
+                        className="summary-text"
+                        dir={language === "ar" ? "rtl" : "ltr"}
+                      >
+                        {language === "ar"
+                          ? "تم تقسيم هذا الفيديو إلى أجزاء. يتم عرض الملخصات لكل فصل أدناه."
+                          : "This video has been segmented. Summaries are displayed for each chapter below."}
+                      </p>
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="video-summary-section">
+                    <h3 className="section-header">
+                      {language === "ar" ? "ملخص الفيديو" : "Video Summary"}
+                    </h3>
+                    <div className="summary-card">
+                      <p
+                        className="summary-text"
+                        dir={language === "ar" ? "rtl" : "ltr"}
+                      >
+                        {getSummaryText(analysisResult.summary)}
+                      </p>
+                    </div>
+                  </div>
+                )}
 
                 {/* Video Chapters Section */}
                 {analysisResult.chapters &&
                   analysisResult.chapters.length > 0 && (
                     <div className="chapters-section">
                       <h3 className="section-header">
-                        Video Chapters ({analysisResult.chapters.length})
+                        {language === "ar" ? "فصول الفيديو" : "Video Chapters"}{" "}
+                        ({analysisResult.chapters.length})
                       </h3>
                       <div className="chapters-list">
                         {analysisResult.chapters.map((chapter: ChapterData) => (
@@ -497,13 +618,14 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
                                 </span>
                                 <div className="chapter-info">
                                   <div className="chapter-title">
-                                    Chapter {chapter.displayIndex}
+                                    {language === "ar" ? "الفصل" : "Chapter"}{" "}
+                                    {chapter.displayIndex}
                                   </div>
                                   <div className="chapter-time">
                                     {formatTime(chapter.start_seconds)} -{" "}
                                     {formatTime(chapter.end_seconds)} (
                                     {formatTime(chapter.duration_seconds)}{" "}
-                                    duration)
+                                    {language === "ar" ? "المدة" : "duration"})
                                   </div>
                                 </div>
                               </div>
@@ -517,12 +639,19 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
                                       ),
                                     }}
                                   >
-                                    Risk: {chapter.risk_score}
+                                    {language === "ar" ? "المخاطر" : "Risk"}:{" "}
+                                    {chapter.risk_score}
                                   </span>
                                 )}
                                 {chapter.confidence !== undefined && (
                                   <span className="confidence-badge">
-                                    {Math.round(chapter.confidence)}% confidence
+                                    {language === "ar"
+                                      ? `الثقة: ${Math.round(
+                                          chapter.confidence
+                                        )}%`
+                                      : `${Math.round(
+                                          chapter.confidence
+                                        )}% confidence`}
                                   </span>
                                 )}
                               </div>
@@ -530,7 +659,9 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
 
                             {/* Chapter Summary */}
                             <div className="chapter-summary">
-                              <p>{chapter.summary}</p>
+                              <p dir={language === "ar" ? "rtl" : "ltr"}>
+                                {getChapterSummary(chapter)}
+                              </p>
                             </div>
 
                             {/* Expanded Chapter Details */}
@@ -559,36 +690,39 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
                                   >
                                     <div className="detail-header">
                                       <span className="detail-title">
-                                        Activity Detected
+                                        {language === "ar"
+                                          ? "تم اكتشاف نشاط"
+                                          : "Activity Detected"}
                                       </span>
                                       <div className="detail-header-badges">
-                                        <span className="event-type-badge">
-                                          {chapter.event.type}
-                                        </span>
+                                        {chapter.event.type && (
+                                          <span className="event-type-badge">
+                                            {getEventText(
+                                              chapter.event,
+                                              "type"
+                                            )}
+                                          </span>
+                                        )}
                                         {chapter.event.confidence && (
                                           <span className="confidence-badge">
-                                            {Math.round(
-                                              chapter.event.confidence
+                                            {getEventText(
+                                              chapter.event,
+                                              "confidence"
                                             )}
-                                            % confidence
                                           </span>
                                         )}
                                       </div>
                                     </div>
                                     <div className="detail-content">
-                                      <p className="detail-description">
-                                        {chapter.event.description}
-                                      </p>
-                                      <div className="detail-meta">
-                                        {chapter.event.timestamp !==
-                                          undefined && (
-                                          <span>
-                                            {formatTime(
-                                              chapter.event.timestamp
-                                            )}
-                                          </span>
+                                      <p
+                                        className="detail-description"
+                                        dir={language === "ar" ? "rtl" : "ltr"}
+                                      >
+                                        {getEventText(
+                                          chapter.event,
+                                          "description"
                                         )}
-                                      </div>
+                                      </p>
                                     </div>
                                   </div>
                                 )}
@@ -609,41 +743,29 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
                                   >
                                     <div className="detail-header">
                                       <span className="detail-title">
-                                        Person Identified
+                                        {language === "ar"
+                                          ? "تم التعرف على شخص"
+                                          : "Person Identified"}
                                       </span>
                                       {chapter.person.confidence && (
                                         <span className="confidence-badge">
-                                          {Math.round(
-                                            chapter.person.confidence
+                                          {getPersonText(
+                                            chapter.person,
+                                            "confidence"
                                           )}
-                                          % confidence
                                         </span>
                                       )}
                                     </div>
                                     <div className="detail-content">
-                                      <p className="detail-description">
-                                        {chapter.person.description}
+                                      <p
+                                        className="detail-description"
+                                        dir={language === "ar" ? "rtl" : "ltr"}
+                                      >
+                                        {getPersonText(
+                                          chapter.person,
+                                          "description"
+                                        )}
                                       </p>
-                                      <div className="detail-meta">
-                                        {chapter.person.first_seen !==
-                                          undefined && (
-                                          <span>
-                                            First seen:{" "}
-                                            {formatTime(
-                                              chapter.person.first_seen
-                                            )}
-                                          </span>
-                                        )}
-                                        {chapter.person.last_seen !==
-                                          undefined && (
-                                          <span>
-                                            Last seen:{" "}
-                                            {formatTime(
-                                              chapter.person.last_seen
-                                            )}
-                                          </span>
-                                        )}
-                                      </div>
                                     </div>
                                   </div>
                                 )}
@@ -668,54 +790,53 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
                                   >
                                     <div className="detail-header">
                                       <span className="detail-title">
-                                        Object Detected
+                                        {language === "ar"
+                                          ? "تم اكتشاف كائن"
+                                          : "Object Detected"}
                                       </span>
                                       <div className="detail-header-badges">
                                         {chapter.object.suspicious && (
                                           <span className="suspicious-badge">
-                                            Suspicious
+                                            {language === "ar"
+                                              ? "مشبوه"
+                                              : "Suspicious"}
                                           </span>
                                         )}
                                         {chapter.object.confidence && (
                                           <span className="confidence-badge">
-                                            {Math.round(
-                                              chapter.object.confidence
+                                            {getObjectText(
+                                              chapter.object,
+                                              "confidence"
                                             )}
-                                            % confidence
                                           </span>
                                         )}
                                       </div>
                                     </div>
                                     <div className="detail-content">
-                                      <p className="detail-description">
-                                        {chapter.object.description}
+                                      <p
+                                        className="detail-description"
+                                        dir={language === "ar" ? "rtl" : "ltr"}
+                                      >
+                                        {getObjectText(
+                                          chapter.object,
+                                          "description"
+                                        )}
                                       </p>
                                       {chapter.object.risk_relevance && (
-                                        <p className="risk-relevance">
-                                          <strong>Risk Assessment:</strong>{" "}
+                                        <p
+                                          className="risk-relevance"
+                                          dir={
+                                            language === "ar" ? "rtl" : "ltr"
+                                          }
+                                        >
+                                          <strong>
+                                            {language === "ar"
+                                              ? "تقييم المخاطر:"
+                                              : "Risk Assessment:"}
+                                          </strong>{" "}
                                           {chapter.object.risk_relevance}
                                         </p>
                                       )}
-                                      <div className="detail-meta">
-                                        {chapter.object.first_seen !==
-                                          undefined && (
-                                          <span>
-                                            First seen:{" "}
-                                            {formatTime(
-                                              chapter.object.first_seen
-                                            )}
-                                          </span>
-                                        )}
-                                        {chapter.object.last_seen !==
-                                          undefined && (
-                                          <span>
-                                            Last seen:{" "}
-                                            {formatTime(
-                                              chapter.object.last_seen
-                                            )}
-                                          </span>
-                                        )}
-                                      </div>
                                     </div>
                                   </div>
                                 )}
@@ -727,10 +848,39 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
                     </div>
                   )}
 
+                {/* Language Toggle */}
+                <div className="language-toggle">
+                  <span className="language-toggle-label">
+                    {language === "ar" ? "اللغة:" : "Language:"}
+                  </span>
+                  <button
+                    className={`language-btn ${
+                      language === "en" ? "active" : ""
+                    }`}
+                    onClick={() => setLanguage("en")}
+                  >
+                    English
+                  </button>
+                  <button
+                    className={`language-btn ${
+                      language === "ar" ? "active" : ""
+                    }`}
+                    onClick={() => setLanguage("ar")}
+                  >
+                    العربية
+                  </button>
+                </div>
+
                 <div className="export-actions">
-                  <button className="continue-btn">Export Report</button>
+                  <button className="continue-btn">
+                    {language === "ar"
+                      ? "تصدير التقرير PDF"
+                      : "Export Report ad PDF"}
+                  </button>
                   <button className="continue-btn secondary">
-                    Download Evidence Package
+                    {language === "ar"
+                      ? "تحميل حزمة الأدلة"
+                      : "Download Evidence Package"}
                   </button>
                 </div>
               </div>

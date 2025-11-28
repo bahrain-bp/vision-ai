@@ -183,7 +183,7 @@
 }
 
 .tab-section-title {
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 600;
   color: var(--text-dark);
   margin-bottom: 1rem;
@@ -1631,6 +1631,45 @@
     text-align: center;
   }
 }
+/* Language Toggle */
+.language-toggle {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+  margin-bottom: 15px;
+  justify-content: center;
+  padding: 15px;
+  background-color: #f5f5f5;
+  border-radius: 8px;
+}
+
+.language-toggle-label {
+  margin-right: 10px;
+  font-weight: 500;
+  align-self: center;
+}
+
+.language-btn {
+  padding: 8px 20px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background-color: #fff;
+  cursor: pointer;
+  font-weight: normal;
+  transition: all 0.2s ease;
+}
+
+.language-btn:hover {
+  background-color: #f0f0f0;
+}
+
+.language-btn.active {
+  border: 2px solid #0066cc;
+  background-color: #e6f2ff;
+  font-weight: bold;
+}
+
+/*End of Camera Footage Specific Styles*/
 
 .outcome-integrated-shell {
   position: relative;

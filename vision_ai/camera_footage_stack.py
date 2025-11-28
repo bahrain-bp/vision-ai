@@ -93,6 +93,17 @@ class CameraFootageAnalysisStack(Stack):
             )
         )
 
+        # ---------- AMAZON TRANSLATE PERMISSIONS ----------
+        lambda_role.add_to_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "translate:TranslateText",
+                ],
+                resources=["*"],
+            )
+        )
+
         # ---------- BEDROCK DATA AUTOMATION PERMISSIONS ----------
         lambda_role.add_to_policy(
             iam.PolicyStatement(
