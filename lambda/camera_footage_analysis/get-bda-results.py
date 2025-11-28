@@ -2,7 +2,7 @@ import os
 import json
 import boto3
 import logging
-from typing import Dict, List, Any, Optional, Tuple
+from typing import Dict, List, Any, Optional
 
 # Initialize logging
 logger = logging.getLogger()
@@ -17,79 +17,160 @@ if not RESULTS_BUCKET:
     logger.error("RESULTS_BUCKET environment variable not set")
 
 
-def find_result_json_keys(
-    bucket: str, job_id: str
-) -> Tuple[Optional[str], Optional[str]]:
+def extract_video_folder_from_s3key(s3_key: str) -> str:
     """
-    Find both standard_output and custom_output result.json files for a job.
+    Extract video folder name from the uploaded video S3 key.
+
+    Example:
+        s3_key: "camera-footage/videos/footage_20251125-104623_925b19fa818e.mp4"
+        returns: "footage_20251125-104623_925b19fa818e"
+    """
+    filename = os.path.basename(s3_key)  # "footage_20251125-104623_925b19fa818e.mp4"
+    video_folder = os.path.splitext(filename)[0]  # Remove .mp4 extension
+    logger.info(f"Extracted video folder: {video_folder} from s3_key: {s3_key}")
+    return video_folder
+
+
+def find_all_segment_results(bucket: str, video_folder: str) -> List[Dict[str, Any]]:
+    """
+    Find ALL segment result.json files for a video by searching its output folder.
+
+    S3 Structure:
+    camera-footage/output/{video_folder}/
+        segment-1/{job_id}/0/standard_output/0/result.json
+        segment-1/{job_id}/0/custom_output/0/result.json
+        segment-2/{job_id}/0/standard_output/0/result.json
+        segment-2/{job_id}/0/custom_output/0/result.json
+        ...
+
+    Args:
+        bucket: S3 bucket name
+        video_folder: Video folder name (e.g., "footage_20251125-104623_925b19fa818e")
 
     Returns:
-        Tuple of (standard_output_key, custom_output_key)
+        List of dicts with segment info: [
+            {
+                "segmentIndex": 1,
+                "standardKey": "camera-footage/output/.../standard_output/0/result.json",
+                "customKey": "camera-footage/output/.../custom_output/0/result.json"
+            },
+            ...
+        ]
     """
-    logger.info(
-        f"Searching for result.json files in bucket: {bucket}, job_id: {job_id}"
-    )
+    logger.info(f"Searching for segment results in video folder: {video_folder}")
 
-    clean_job_id = job_id.strip("/")
-    prefix = "camera-footage/output/"
+    # Search within this specific video's output folder
+    prefix = f"camera-footage/output/{video_folder}/"
+    logger.info(f"Searching S3 with prefix: {prefix}")
 
-    standard_key = None
-    custom_key = None
+    segment_results = {}  # {segment_index: {'standard': key, 'custom': key}}
 
     paginator = s3.get_paginator("list_objects_v2")
 
     try:
-        for page in paginator.paginate(Bucket=bucket, Prefix=prefix):
-            for obj in page.get("Contents", []):
+        # Use explicit pagination config
+        page_iterator = paginator.paginate(
+            Bucket=bucket,
+            Prefix=prefix,
+            PaginationConfig={
+                "PageSize": 100
+            },  # Smaller page size to ensure we get everything
+        )
+
+        total_objects_found = 0
+        result_json_count = 0
+        segments_found_list = []
+
+        for page_num, page in enumerate(page_iterator):
+            if "Contents" not in page:
+                logger.warning(f"Page {page_num} has no Contents")
+                continue
+
+            page_objects = page.get("Contents", [])
+            total_objects_found += len(page_objects)
+            logger.info(
+                f"Page {page_num}: Processing {len(page_objects)} objects (total so far: {total_objects_found})"
+            )
+
+            for obj in page_objects:
                 key = obj["Key"]
 
-                # Check if this key contains our job_id AND ends with result.json
-                if clean_job_id in key and key.endswith("result.json"):
-                    if "standard_output" in key:
-                        standard_key = key
-                        logger.info(f"Found standard_output result.json at: {key}")
-                    elif "custom_output" in key:
-                        custom_key = key
-                        logger.info(f"Found custom_output result.json at: {key}")
+                # Check if this key contains result.json
+                if key.endswith("result.json"):
+                    result_json_count += 1
 
-                # Break if we found both
-                if standard_key and custom_key:
-                    break
+                    # Extract segment index from path: .../segment-X/...
+                    try:
+                        if "/segment-" in key:
+                            # Handle double slash
+                            segment_part = key.split("/segment-")[1]
+                            segment_part = segment_part.lstrip("/")
+                            segment_idx = int(segment_part.split("/")[0])
 
-            if standard_key and custom_key:
-                break
+                            if segment_idx not in segment_results:
+                                segment_results[segment_idx] = {}
+                                if segment_idx not in segments_found_list:
+                                    segments_found_list.append(segment_idx)
+
+                            # Determine if this is standard or custom output
+                            if "/standard_output/" in key:
+                                segment_results[segment_idx]["standard"] = key
+                                logger.info(
+                                    f"✓ Segment {segment_idx} STANDARD: ...{key[-60:]}"
+                                )
+                            elif "/custom_output/" in key:
+                                segment_results[segment_idx]["custom"] = key
+                                logger.info(
+                                    f"✓ Segment {segment_idx} CUSTOM: ...{key[-60:]}"
+                                )
+                        else:
+                            logger.warning(f"No '/segment-' in key: {key}")
+
+                    except (IndexError, ValueError) as e:
+                        logger.warning(f"Parse error for key: {key}, error: {e}")
+                        continue
 
     except Exception as e:
-        logger.error(f"Error searching for result.json files: {str(e)}")
+        logger.error(f"Error searching for segment results: {str(e)}", exc_info=True)
+        raise
 
-    if not standard_key and not custom_key:
-        logger.warning(f"No result.json files found for job_id: {job_id}")
-        # Log debugging info
-        try:
-            logger.info("Listing first 20 objects for debugging:")
-            count = 0
-            for page in paginator.paginate(Bucket=bucket, Prefix=prefix, MaxKeys=20):
-                for obj in page.get("Contents", []):
-                    count += 1
-                    logger.info(f"  {obj['Key']}")
-                    if count >= 20:
-                        break
-                if count >= 20:
-                    break
-        except Exception as e:
-            logger.error(f"Failed to list objects for debugging: {str(e)}")
+    # Log summary
+    logger.info(f"=== SEARCH SUMMARY ===")
+    logger.info(f"Total objects scanned: {total_objects_found}")
+    logger.info(f"Total result.json files found: {result_json_count}")
+    logger.info(f"Unique segments found: {sorted(segments_found_list)}")
 
-    return standard_key, custom_key
+    for seg_idx in sorted(segment_results.keys()):
+        has_standard = "standard" in segment_results[seg_idx]
+        has_custom = "custom" in segment_results[seg_idx]
+        logger.info(
+            f"  Segment {seg_idx}: standard={has_standard}, custom={has_custom}"
+        )
+
+    # Convert to list of dicts, sorted by segment index
+    results = []
+    for idx in sorted(segment_results.keys()):
+        standard = segment_results[idx].get("standard")
+        custom = segment_results[idx].get("custom")
+
+        if standard or custom:  # At least one output exists
+            results.append(
+                {"segmentIndex": idx, "standardKey": standard, "customKey": custom}
+            )
+
+    logger.info(f"Returning {len(results)} segment(s) with results")
+
+    return results
 
 
 def load_json_from_s3(bucket: str, key: str) -> Dict[str, Any]:
     """Load and parse JSON from S3."""
-    logger.info(f"Loading JSON from S3: s3://{bucket}/{key}")
+    logger.info(f"Loading JSON from s3://{bucket}/{key}")
     try:
         resp = s3.get_object(Bucket=bucket, Key=key)
         body = resp["Body"].read()
         data = json.loads(body.decode("utf-8"))
-        logger.info(f"Successfully loaded JSON from S3")
+        logger.info(f"Successfully loaded JSON ({len(body)} bytes)")
         return data
     except Exception as e:
         logger.error(f"Failed to load JSON from S3: {str(e)}")
@@ -97,21 +178,10 @@ def load_json_from_s3(bucket: str, key: str) -> Dict[str, Any]:
 
 
 def merge_bda_outputs(
-    standard_data: Optional[Dict], custom_data: Optional[Dict]
+    standard_data: Optional[Dict], custom_data: Optional[Dict], segment_idx: int = 1
 ) -> Dict[str, Any]:
     """
     Merge standard_output and custom_output into a unified structure.
-
-    From standard_output:
-    - video.summary (global video summary)
-    - metadata (duration, format, etc.)
-
-    From custom_output:
-    - chapters[].inference_result containing:
-      - chapter_summary
-      - event (event_description, event_type, etc.)
-      - person (person_description, person_confidence, etc.)
-      - object (object_description, suspicious, etc.)
     """
     logger.info("Merging standard and custom BDA outputs")
 
@@ -143,117 +213,204 @@ def merge_bda_outputs(
         result["summary"] = standard_data.get("video", {}).get("summary", "").strip()
         logger.info(f"Extracted video summary: {result['summary'][:100]}...")
 
-    # --- Extract from CUSTOM OUTPUT ---
-    if custom_data:
-        logger.info("Processing custom_output data")
-
-        chapters = custom_data.get("chapters", [])
-        logger.info(f"Found {len(chapters)} chapters in custom_output")
+        # Extract chapters from STANDARD OUTPUT (has absolute timestamps)
+        chapters = standard_data.get("chapters", [])
+        logger.info(f"Found {len(chapters)} chapters in standard_output")
 
         for idx, ch in enumerate(chapters):
-            inference = ch.get("inference_result", {})
+            # Use absolute timestamps from standard output
+            start_millis = ch.get("start_timestamp_millis", 0)
+            end_millis = ch.get("end_timestamp_millis", 0)
 
-            # Extract chapter timing
-            chapter_start = inference.get("chapter_start", 0)
-            chapter_end = inference.get("chapter_end", 0)
+            chapter_start = start_millis / 1000.0
+            chapter_end = end_millis / 1000.0
 
             chapter_data = {
                 "id": f"chapter-{idx}",
+                "segmentIndex": segment_idx,
+                "displayIndex": 0,
                 "timestamp": chapter_start,
                 "start_seconds": chapter_start,
                 "end_seconds": chapter_end,
                 "duration_seconds": chapter_end - chapter_start,
-                "summary": inference.get("chapter_summary", "").strip(),
-                "risk_score": inference.get("chapter_risk_score"),
-                "confidence": inference.get("chapter_confidence"),
+                "summary": ch.get("summary", "").strip(),
+                "confidence": ch.get("confidence", 0),
                 "type": "chapter",
             }
 
-            # Extract event information
-            event = inference.get("event", {})
-            if event:
-                chapter_data["event"] = {
-                    "id": event.get("event_id"),
-                    "timestamp": event.get("event_timestamp"),
-                    "start_millis": event.get("event_start_millis"),
-                    "end_millis": event.get("event_end_millis"),
-                    "description": event.get("event_description", "").strip(),
-                    "type": event.get("event_type"),
-                    "confidence": event.get("event_confidence"),
-                }
-                logger.debug(f"Chapter {idx} event: {event.get('event_type')}")
-
-            # Extract person information
-            person = inference.get("person", {})
-            if person:
-                chapter_data["person"] = {
-                    "id": person.get("person_id"),
-                    "first_seen": person.get("first_seen"),
-                    "last_seen": person.get("last_seen"),
-                    "description": person.get("person_description", "").strip(),
-                    "confidence": person.get("person_confidence"),
-                }
-                logger.debug(f"Chapter {idx} person detected")
-
-            # Extract object information
-            obj = inference.get("object", {})
-            if obj:
-                chapter_data["object"] = {
-                    "id": obj.get("object_id"),
-                    "description": obj.get("object_description", "").strip(),
-                    "first_seen": obj.get("first_seen"),
-                    "last_seen": obj.get("last_seen"),
-                    "x": obj.get("x"),
-                    "y": obj.get("y"),
-                    "width": obj.get("width"),
-                    "height": obj.get("height"),
-                    "is_abandoned": obj.get("is_abandoned"),
-                    "suspicious": obj.get("suspicious"),
-                    "risk_relevance": obj.get("risk_relevance", "").strip(),
-                    "confidence": obj.get("object_confidence"),
-                }
-                logger.debug(
-                    f"Chapter {idx} object: suspicious={obj.get('suspicious')}"
-                )
-
             result["chapters"].append(chapter_data)
 
-        # Also create events list from chapters for timeline view
-        for ch_data in result["chapters"]:
-            result["events"].append(
-                {
-                    "id": ch_data["id"],
-                    "timestamp": ch_data["start_seconds"],
-                    "start_millis": ch_data["start_seconds"] * 1000,
-                    "end_millis": ch_data["end_seconds"] * 1000,
-                    "duration_seconds": ch_data["duration_seconds"],
-                    "description": ch_data["summary"],
-                    "type": ch_data["type"],
-                    "confidence": ch_data.get("confidence"),
-                    "risk_score": ch_data.get("risk_score"),
-                }
-            )
+    # --- Extract from CUSTOM OUTPUT (for enrichment) ---
+    if custom_data:
+        logger.info("Processing custom_output data for enrichment")
 
-        logger.info(f"Extracted {len(result['chapters'])} chapters with inference data")
+        custom_chapters = custom_data.get("chapters", [])
 
-    # Sort events by timestamp
-    result["events"] = sorted(result["events"], key=lambda e: e["timestamp"])
+        # Map custom data to standard chapters by index
+        for idx, custom_ch in enumerate(custom_chapters):
+            if idx < len(result["chapters"]):
+                inference = custom_ch.get("inference_result", {})
+
+                # Add risk and confidence from custom output
+                result["chapters"][idx]["risk_score"] = inference.get(
+                    "chapter_risk_score"
+                )
+                result["chapters"][idx]["confidence"] = inference.get(
+                    "chapter_confidence"
+                )
+
+                # Add event information
+                event = inference.get("event", {})
+                if event:
+                    result["chapters"][idx]["event"] = {
+                        "id": event.get("event_id"),
+                        "description": event.get("event_description", "").strip(),
+                        "type": event.get("event_type"),
+                        "confidence": event.get("event_confidence"),
+                    }
+
+                # Add person information
+                person = inference.get("person", {})
+                if person:
+                    result["chapters"][idx]["person"] = {
+                        "id": person.get("person_id"),
+                        "description": person.get("person_description", "").strip(),
+                        "confidence": person.get("person_confidence"),
+                    }
+
+                # Add object information
+                obj = inference.get("object", {})
+                if obj:
+                    result["chapters"][idx]["object"] = {
+                        "id": obj.get("object_id"),
+                        "description": obj.get("object_description", "").strip(),
+                        "is_abandoned": obj.get("is_abandoned"),
+                        "suspicious": obj.get("suspicious"),
+                        "confidence": obj.get("object_confidence"),
+                    }
+
+    # Create events list from chapters
+    for ch_data in result["chapters"]:
+        result["events"].append(
+            {
+                "id": ch_data["id"],
+                "timestamp": ch_data["start_seconds"],
+                "start_millis": ch_data["start_seconds"] * 1000,
+                "end_millis": ch_data["end_seconds"] * 1000,
+                "duration_seconds": ch_data["duration_seconds"],
+                "description": ch_data["summary"],
+                "type": ch_data["type"],
+                "confidence": ch_data.get("confidence"),
+                "risk_score": ch_data.get("risk_score"),
+            }
+        )
 
     logger.info("Merge complete")
     return result
 
 
+def merge_all_segments(segment_results: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """
+    Load and merge ALL segment results into unified structure.
+    Treat each segment as a separate "chapter" for UI display.
+    """
+    all_chapters = []
+    all_events = []
+    metadata = {}
+    summary_parts = []
+    global_chapter_counter = 1
+
+    for segment_info in segment_results:
+        seg_idx = segment_info["segmentIndex"]
+        standard_key = segment_info.get("standardKey")
+        custom_key = segment_info.get("customKey")
+
+        logger.info(f"Processing segment {seg_idx}")
+
+        standard_data = None
+        custom_data = None
+
+        # Load standard output
+        if standard_key:
+            try:
+                standard_data = load_json_from_s3(RESULTS_BUCKET, standard_key)
+            except Exception as e:
+                logger.error(
+                    f"Failed to load standard output for segment {seg_idx}: {e}"
+                )
+
+        # Load custom output
+        if custom_key:
+            try:
+                custom_data = load_json_from_s3(RESULTS_BUCKET, custom_key)
+            except Exception as e:
+                logger.error(f"Failed to load custom output for segment {seg_idx}: {e}")
+
+        # Merge segment
+        if standard_data or custom_data:
+            segment_result = merge_bda_outputs(
+                standard_data, custom_data, segment_idx=seg_idx
+            )
+
+            # Accumulate chapters and events
+            for chapter in segment_result.get("chapters", []):
+                chapter["id"] = f"chapter-{global_chapter_counter}"
+                chapter["displayIndex"] = global_chapter_counter
+                all_chapters.append(chapter)
+                global_chapter_counter += 1
+
+            all_events.extend(segment_result.get("events", []))
+
+            # Collect summary parts
+            if segment_result.get("summary"):
+                if len(segment_results) > 1:
+                    summary_parts.append(
+                        f"Segment {seg_idx}: {segment_result['summary']}"
+                    )
+                else:
+                    summary_parts.append(segment_result["summary"])
+
+            # Use metadata from first segment
+            if not metadata and segment_result.get("metadata"):
+                metadata = segment_result["metadata"]
+
+    # Sort by timestamp
+    all_chapters = sorted(all_chapters, key=lambda c: c["start_seconds"])
+    all_events = sorted(all_events, key=lambda e: e["timestamp"])
+
+    # Combine summaries
+    combined_summary = (
+        "\n\n".join(summary_parts) if summary_parts else "Video analysis complete"
+    )
+
+    logger.info(
+        f"Aggregated {len(all_chapters)} chapters from {len(segment_results)} segment(s)"
+    )
+
+    return {
+        "summary": combined_summary,
+        "chapters": all_chapters,
+        "events": all_events,
+        "metadata": metadata,
+        "totalSegments": len(segment_results),
+    }
+
+
 def lambda_handler(event, context):
     """
-    Lambda handler to fetch and merge BDA standard and custom outputs.
+    Lambda handler to fetch and merge BDA results.
+
+    requires:
+    - s3Key: The original video S3 key (to derive video folder name)
+    - expectedSegments: Number of segments expected (for multi-segment videos)
     """
-    logger.info("Lambda handler invoked")
+    logger.info("=== get-bda-results Lambda invoked ===")
 
     # CORS headers
     cors_headers = {
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Headers": "Content-Type,Authorization",
-        "Access-Control-Allow-Methods": "GET,OPTIONS",
+        "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
         "Content-Type": "application/json",
     }
 
@@ -271,76 +428,119 @@ def lambda_handler(event, context):
     if event.get("httpMethod") == "OPTIONS":
         return {"statusCode": 200, "headers": cors_headers, "body": ""}
 
-    # Get jobId from query parameters
+    # Get parameters from query string OR body (support both GET and POST)
     params = event.get("queryStringParameters") or {}
-    job_id = params.get("jobId") or params.get("sessionId")
+    s3_key = params.get("s3Key")
+    expected_segments = int(params.get("expectedSegments", 1))
 
-    if not job_id:
-        logger.error("Missing jobId query parameter")
+    # check body for POST requests
+    if not s3_key and event.get("body"):
+        try:
+            body = json.loads(event.get("body", "{}"))
+            s3_key = body.get("s3Key")
+            expected_segments = int(body.get("expectedSegments", 1))
+        except json.JSONDecodeError:
+            pass
+
+    if not s3_key:
+        logger.error("Missing s3Key query parameter")
         return {
             "statusCode": 400,
             "headers": cors_headers,
-            "body": json.dumps({"error": "Missing jobId query parameter"}),
-        }
-
-    # Step 1: Find both result.json files
-    logger.info(f"Fetching results for job_id: {job_id}")
-    standard_key, custom_key = find_result_json_keys(RESULTS_BUCKET, job_id)
-
-    if not standard_key and not custom_key:
-        logger.error(f"No result.json files found for job_id: {job_id}")
-        return {
-            "statusCode": 404,
-            "headers": cors_headers,
             "body": json.dumps(
                 {
-                    "error": "Results not found for job",
-                    "jobId": job_id,
-                    "message": "Results are not ready yet. Please try again in a few moments.",
+                    "error": "Missing s3Key query parameter. Example: ?s3Key=camera-footage/videos/footage_20251125-104623_925b19fa818e.mp4"
                 }
             ),
         }
 
-    # Step 2: Load JSON files
-    standard_data = None
-    custom_data = None
+    logger.info(f"s3Key: {s3_key}, expectedSegments: {expected_segments}")
+
+    # Extract video folder name from s3Key
+    try:
+        video_folder = extract_video_folder_from_s3key(s3_key)
+    except Exception as e:
+        logger.error(f"Failed to extract video folder from s3Key: {e}")
+        return {
+            "statusCode": 400,
+            "headers": cors_headers,
+            "body": json.dumps({"error": f"Invalid s3Key format: {str(e)}"}),
+        }
+
+    # Find all segment results for this video
+    logger.info(f"Fetching results for video folder: {video_folder}")
 
     try:
-        if standard_key:
-            standard_data = load_json_from_s3(RESULTS_BUCKET, standard_key)
-            logger.info("Loaded standard_output successfully")
-        else:
-            logger.warning("standard_output not found")
-
-        if custom_key:
-            custom_data = load_json_from_s3(RESULTS_BUCKET, custom_key)
-            logger.info("Loaded custom_output successfully")
-        else:
-            logger.warning("custom_output not found")
-
+        segment_results = find_all_segment_results(RESULTS_BUCKET, video_folder)
     except Exception as e:
-        logger.error(f"Failed to load result files: {str(e)}")
+        logger.error(f"Error finding segment results: {e}", exc_info=True)
         return {
             "statusCode": 500,
             "headers": cors_headers,
+            "body": json.dumps({"error": f"Failed to search for results: {str(e)}"}),
+        }
+
+    segments_found = len(segment_results)
+
+    # Check if no segments found yet
+    if not segment_results:
+        logger.warning(f"No results found yet for video folder: {video_folder}")
+        return {
+            "statusCode": 202,  # 202 = Still processing
+            "headers": cors_headers,
             "body": json.dumps(
-                {"error": "Failed to load result files", "message": str(e)}
+                {
+                    "status": "processing",
+                    "message": "Analysis still in progress. No segments completed yet.",
+                    "segmentsCompleted": 0,
+                    "segmentsExpected": expected_segments,
+                }
             ),
         }
 
-    # Step 3: Merge the outputs
+    # Check if all segments are complete
+    if segments_found < expected_segments:
+        logger.info(
+            f"Only {segments_found}/{expected_segments} segments complete. Waiting for more..."
+        )
+        return {
+            "statusCode": 202,  # 202 = Still processing
+            "headers": cors_headers,
+            "body": json.dumps(
+                {
+                    "status": "processing",
+                    "message": f"Analysis in progress. {segments_found}/{expected_segments} segments completed.",
+                    "segmentsCompleted": segments_found,
+                    "segmentsExpected": expected_segments,
+                }
+            ),
+        }
+
+    # All segments complete - merge and return
+    logger.info(f"All {segments_found} segments complete. Merging results...")
+
+    # Merge all segments
     try:
-        merged_result = merge_bda_outputs(standard_data, custom_data)
-        logger.info(f"Successfully merged results for job_id: {job_id}")
+        merged_result = merge_all_segments(segment_results)
+        logger.info(
+            f"Successfully merged {len(segment_results)} segment(s) for video: {video_folder}"
+        )
 
         return {
             "statusCode": 200,
             "headers": cors_headers,
-            "body": json.dumps(merged_result),
+            "body": json.dumps(
+                {
+                    "status": "complete",
+                    "results": merged_result,
+                    "segmentsCompleted": segments_found,
+                    "segmentsExpected": expected_segments,
+                }
+            ),
         }
 
     except Exception as e:
-        logger.error(f"Failed to merge results: {str(e)}")
+        logger.error(f"Failed to merge segment results: {str(e)}", exc_info=True)
         return {
             "statusCode": 500,
             "headers": cors_headers,

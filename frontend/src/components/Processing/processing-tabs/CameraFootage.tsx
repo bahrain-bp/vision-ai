@@ -20,6 +20,8 @@ interface Event {
 
 interface ChapterData {
   id: string;
+  displayIndex: number;
+  segmentIndex: number;
   timestamp: number;
   start_seconds: number;
   end_seconds: number;
@@ -80,8 +82,9 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
   );
   const [expandedChapter, setExpandedChapter] = useState<string | null>(null);
   const [videoS3Key, setVideoS3Key] = useState<string>("");
-  const [jobId, setJobId] = useState<string>("");
+  //const [jobId, setJobId] = useState<string>("");
   const [pollingStatus, setPollingStatus] = useState<string>("");
+  const [videoDuration, setVideoDuration] = useState<number | null>(null);
 
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -159,8 +162,22 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
     }
   };
 
-  // Poll for analysis results
-  const pollForResults = async (jobId: string, maxAttempts: number = 60) => {
+  // Extract and store video duration from frontend video element
+  const handleVideoLoaded = (e: React.SyntheticEvent<HTMLVideoElement>) => {
+    const duration = e.currentTarget.duration;
+    console.log("Loaded metadata → duration:", duration);
+
+    if (!isNaN(duration) && duration > 0) {
+      setVideoDuration(duration);
+    } else {
+      console.warn("Video duration not ready yet");
+    }
+  };
+
+  // Poll for analysis results - UPDATED to use s3Key
+  const pollForResults = async (s3Key: string, expectedSegments: number) => {
+    const maxAttempts = 120; // 20 minutes max
+    const pollInterval = 10000; // 10 seconds
     let attempts = 0;
 
     const poll = async () => {
@@ -169,44 +186,67 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
 
       try {
         const response = await fetch(
-          `${process.env.REACT_APP_API_ENDPOINT}/footage/results?jobId=${jobId}`,
+          `${process.env.REACT_APP_API_ENDPOINT}/footage/results`,
           {
-            method: "GET",
+            method: "POST",
             headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              s3Key,
+              expectedSegments, // Pass expected segments
+            }),
           }
         );
 
-        if (response.ok) {
-          const result = await response.json();
-          console.log("Analysis results received:", result);
+        const data = await response.json();
 
+        // Handle 202 - Still processing
+        if (response.status === 202) {
+          setPollingStatus(
+            `Analysis in progress: ${data.segmentsCompleted || 0}/${
+              data.segmentsExpected || expectedSegments
+            } segments completed...`
+          );
+          if (attempts < maxAttempts) {
+            setTimeout(poll, pollInterval);
+          } else {
+            setIsAnalyzing(false);
+            setPollingStatus("Analysis timed out");
+            setAnalysisResult({
+              summary: "Analysis timed out after 20 minutes",
+              events: [],
+              chapters: [],
+              processedAt: new Date(),
+            });
+          }
+          return;
+        }
+
+        // Handle 200 - Complete
+        if (response.status === 200 && data.status === "complete") {
+          console.log("Analysis complete:", data);
           setAnalysisResult({
-            summary: result.summary || "No summary available",
-            events: result.events || [],
-            chapters: result.chapters || [],
-            metadata: result.metadata,
+            summary: data.results.summary || "No summary available",
+            events: data.results.events || [],
+            chapters: data.results.chapters || [],
+            metadata: data.results.metadata,
             processedAt: new Date(),
           });
           setIsAnalyzing(false);
-          setPollingStatus("Analysis complete!");
+          setPollingStatus(
+            `Analysis complete! (${data.segmentsCompleted} segment(s) processed)`
+          );
           return;
-        } else if (response.status === 404) {
-          // Results not ready yet
-          if (attempts < maxAttempts) {
-            setTimeout(poll, 10000); // Poll every 10 seconds
-          } else {
-            throw new Error("Analysis timeout - results not available");
-          }
-        } else {
-          throw new Error("Failed to fetch results");
         }
+
+        // Handle other status codes
+        throw new Error(`Unexpected status: ${response.status}`);
       } catch (error: any) {
         console.error("Polling error:", error);
         if (attempts < maxAttempts) {
-          setTimeout(poll, 10000);
+          setTimeout(poll, pollInterval);
         } else {
           setIsAnalyzing(false);
-          setPollingStatus("Failed to get results");
+          setPollingStatus("Analysis failed or timed out");
           setAnalysisResult({
             summary: error.message || "Analysis failed",
             events: [],
@@ -236,6 +276,8 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
           body: JSON.stringify({
             sessionId,
             s3Key: videoS3Key,
+            segmentLengthSeconds: 300,
+            videoDurationSeconds: videoDuration ?? 0,
           }),
         }
       );
@@ -247,18 +289,16 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
       }
 
       console.log("Analysis job started:", result);
-      const extractedJobId =
-        result.jobId || result.invocationArn?.split("/").pop();
-      setJobId(extractedJobId);
-      console.log("Job ID set:", jobId);
+      console.log(`${result.segmentsStarted} segment job(s) created`);
 
-      // Start polling for results
-      if (extractedJobId) {
-        setPollingStatus("Analysis in progress...");
-        pollForResults(extractedJobId);
-      } else {
-        throw new Error("No job ID returned from analysis");
-      }
+      // Use expected_segments from backend response
+      const expectedSegments =
+        result.expected_segments || result.segmentsStarted;
+      console.log("Using expectedSegments:", expectedSegments);
+      setPollingStatus(
+        `Analysis in progress (${expectedSegments} segment(s))...`
+      );
+      pollForResults(videoS3Key, expectedSegments);
     } catch (error: any) {
       console.error("Analysis error:", error);
       setIsAnalyzing(false);
@@ -291,11 +331,7 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
   };
 
   const getVideoDuration = (): number => {
-    return (
-      analysisResult?.metadata?.duration_seconds ||
-      videoRef.current?.duration ||
-      0
-    );
+    return videoDuration || analysisResult?.metadata?.duration_seconds || 0;
   };
 
   const getRiskScoreColor = (score?: number): string => {
@@ -394,6 +430,7 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
                     src={videoUrl}
                     controls
                     className="video-player"
+                    onLoadedMetadata={handleVideoLoaded}
                   >
                     Your browser does not support the video tag.
                   </video>
@@ -405,7 +442,7 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
                   </div>
                   <button
                     onClick={startAnalysis}
-                    disabled={isAnalyzing}
+                    disabled={isAnalyzing || videoDuration === null}
                     className={`continue-btn ${isAnalyzing ? "analyzing" : ""}`}
                   >
                     {isAnalyzing ? (
@@ -460,8 +497,7 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
                                 </span>
                                 <div className="chapter-info">
                                   <div className="chapter-title">
-                                    Chapter{" "}
-                                    {parseInt(chapter.id.split("-")[1]) + 1}
+                                    Chapter {chapter.displayIndex}
                                   </div>
                                   <div className="chapter-time">
                                     {formatTime(chapter.start_seconds)} -{" "}
@@ -523,7 +559,7 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
                                   >
                                     <div className="detail-header">
                                       <span className="detail-title">
-                                        Event Detected
+                                        Activity Detected
                                       </span>
                                       <div className="detail-header-badges">
                                         <span className="event-type-badge">

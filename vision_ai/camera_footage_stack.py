@@ -229,19 +229,20 @@ class CameraFootageAnalysisStack(Stack):
         # 3. Fetching BDA results resource
         results_resource = footage_resource.add_resource("results")
         results_resource.add_method(
-            "GET",
+            "POST",
             apigateway.LambdaIntegration(get_bda_results_lambda),
             method_responses=[
                 apigateway.MethodResponse(status_code="200"),
                 apigateway.MethodResponse(status_code="404"),
                 apigateway.MethodResponse(status_code="500"),
+                apigateway.MethodResponse(status_code="202"),
             ],
         )
 
         # enable CORS for resource 3
         results_resource.add_cors_preflight(
             allow_origins=["*"],
-            allow_methods=["OPTIONS", "GET"],
+            allow_methods=["OPTIONS", "GET", "POST"],
             allow_headers=["Content-Type", "Authorization"],
         )
 
