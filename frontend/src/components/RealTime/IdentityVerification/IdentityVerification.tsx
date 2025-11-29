@@ -13,7 +13,7 @@ const IdentityVerification: React.FC<IdentityVerificationProps> = ({
 }) => {
   const { currentCase, currentSession } = useCaseContext();
   const [personType, setPersonType] = useState<PersonType>("witness");
-
+  const [documentType, setDocumentType] = useState<"cpr" | "passport">("cpr");
   const [identityData, setIdentityData] = useState<IdentityData>({
     referencePhoto: null,
     cpr: null,
@@ -33,11 +33,6 @@ const IdentityVerification: React.FC<IdentityVerificationProps> = ({
 
   const handleStartInvestigation = useCallback(
     (extractedPersonName?: string) => {
-      if (!identityData.isVerified) {
-        alert("Please complete identity verification first.");
-        return;
-      }
-
       const investigationData: InvestigationData = {
         witness: extractedPersonName || "Name to be extracted",
         idNumber: "To be extracted",
@@ -77,6 +72,17 @@ const IdentityVerification: React.FC<IdentityVerificationProps> = ({
               </div>
             </div>
           </div>
+          <div style={{ marginTop: 12, fontSize: "0.9rem", color: "#555" }}>
+            {/* Disclaimer when Passport is selected */}
+            {documentType === "passport" && (
+              <div>
+                ⚠️ Note: Passport verification is optimized for Bahraini
+                passports only. Other nationalities may not yield optimal
+                extraction results. For best results with other nationalities,
+                please use CPR card verification.
+              </div>
+            )}
+          </div>
         </div>
 
         <DocumentVerification
@@ -86,6 +92,8 @@ const IdentityVerification: React.FC<IdentityVerificationProps> = ({
           caseId={currentCase?.caseId || ""}
           sessionId={currentSession?.sessionId || ""}
           personType={personType}
+          documentType={documentType}
+          setDocumentType={setDocumentType}
         />
       </div>
     </div>

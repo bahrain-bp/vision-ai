@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from "react";
-import { ArrowLeft, Clock } from "lucide-react";
+import { ArrowLeft, Clock, Pause, Play, RotateCcw } from "lucide-react";
 import RealTimeView from "../RealTime/RealTimeView";
 import ProcessingView from "../Processing/ProcessingView";
 import SessionSummaryModal from "../RealTime/SessionSummaryModal";
 import { User, RecordingStatus } from "../../types/";
 import { useTranscription } from "../../hooks/useTranscription";
 import { useCaseContext } from "../../hooks/useCaseContext";
+import {getTimeString} from "../common/Timer/Timer"; 
 
 interface ParticipantData {
   fullName: string;
@@ -67,7 +68,13 @@ const SessionPage: React.FC<SessionPageProps> = ({
   const [activeMainTab, setActiveMainTab] = useState<MainTab>("real-time");
   const [sessionState, setSessionState] = useState<RecordingStatus>("off");
   const [showSummaryModal, setShowSummaryModal] = useState<boolean>(false);
-  const { stopRecording } = useTranscription();
+  const [triggerSummarization, setTriggerSummarization] = useState<boolean>(false);
+  const { stopRecording,toggleRecordingPause,toggleReset} = useTranscription();
+  
+const [isPaused, setIsPaused] = useState(false);
+ const [timerMs, setTimerMs] = useState(0);
+ const [timerString, setTimerString] = useState("00:00:00");
+
   const [setupData, setSetupData] = useState<SetupData>({
     witnessData: {
       fullName: sessionData?.participantData?.fullName || "",
@@ -85,17 +92,36 @@ const SessionPage: React.FC<SessionPageProps> = ({
     },
   });
 
-  const getInvestigatorName = () => {
-    if (user?.username) return user.username;
-    return "Unknown Investigator";
-  };
+    const getInvestigatorName = () => {
+      if (user?.username) return user.username;
+      return "Unknown Investigator";
+    };
+    
+  useEffect(() => {
+    let intervalId: any;
+
+    if (sessionState === "on" && !isPaused) {
+      intervalId = setInterval(() => {
+        setTimerMs((prev) => prev + 10);
+      }, 10);
+    }
+
+    return () => clearInterval(intervalId);
+  }, [sessionState, isPaused]);
+
+  useEffect(() => {
+    const formatted = getTimeString(timerMs);
+    setTimerString(formatted);
+  }, [timerMs]);
+
+
 
   const currentSessionData: SessionData = currentSession
     ? {
         sessionId: currentSession.sessionId,
         investigator: currentSession.investigator || getInvestigatorName(),
         language: "Arabic",
-        duration: currentSession.duration,
+        duration: timerString,
         participant: setupData.witnessData.fullName || "Not set",
         status: currentSession.status,
       }
@@ -103,7 +129,7 @@ const SessionPage: React.FC<SessionPageProps> = ({
         sessionId: "#2025-INV-0042",
         investigator: getInvestigatorName(),
         language: "Arabic",
-        duration: "00:00",
+        duration: timerString,
         participant: "Not set",
         status: "Active",
       };
@@ -116,8 +142,7 @@ const SessionPage: React.FC<SessionPageProps> = ({
 
   const handleEndSession = async () => {
     stopRecording(setSessionState);
-
-
+    
     if (currentSession && currentCase) {
       try {
         await updateSessionStatus(
@@ -132,8 +157,8 @@ const SessionPage: React.FC<SessionPageProps> = ({
     setCurrentSession(null);
     setCurrentPersonName(null);
 
-
-    setShowSummaryModal(true);
+    // Trigger switch to summarization tab
+    setTriggerSummarization(true);
   };
 
   const handleCloseSummary = () => {
@@ -271,9 +296,64 @@ const SessionPage: React.FC<SessionPageProps> = ({
                 <span>{currentSessionData.duration}</span>
               </div>
               {sessionState === "on" && (
-                <button onClick={handleEndSession} className="end-session-btn">
-                  End Session
-                </button>
+                <>
+                  <button
+                    onClick={() => {
+                      const newPausedState = !isPaused;
+                      setIsPaused(newPausedState);
+                      toggleRecordingPause(newPausedState);
+                    }}
+                    className="pause-btn"
+                    style={{
+                      padding: "10px 20px",
+                      backgroundColor: isPaused ? "#3b82f6" : "#f59e0b",
+                      color: "white",
+                      border: "none",
+                      borderRadius: "8px",
+                      cursor: "pointer",
+                      marginRight: "12px",
+                      fontWeight: "500",
+                      fontSize: "14px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      transition: "all 0.2s ease",
+                    }}
+                  >
+                    {isPaused ? <Play size={16} /> : <Pause size={16} />}
+                    {isPaused ? "Resume" : "Pause"}
+                  </button>
+
+                  <button
+                    onClick={()=> toggleReset()}
+                    className="reset-btn"
+                    style={{
+                      padding: "10px 20px",
+                      backgroundColor: "#6366f1",
+                      color: "white",
+                      border: "none",
+                      borderRadius: "8px",
+                      cursor: "pointer",
+                      marginRight: "12px",
+                      fontWeight: "500",
+                      fontSize: "14px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      transition: "all 0.2s ease",
+                    }}
+                  >
+                    <RotateCcw size={16} />
+                    Reset
+                  </button>
+
+                  <button
+                    onClick={handleEndSession}
+                    className="end-session-btn"
+                  >
+                    End Session
+                  </button>
+                </>
               )}
             </div>
           </div>
@@ -312,6 +392,7 @@ const SessionPage: React.FC<SessionPageProps> = ({
             onIdentityDataChange={updateIdentityData}
             onTranslationSettingsChange={updateTranslationSettings}
             onVerifyIdentity={handleVerifyIdentity}
+            triggerSummarization={triggerSummarization}
           />
         ) : (
           <ProcessingView sessionData={currentSessionData} />
@@ -322,6 +403,10 @@ const SessionPage: React.FC<SessionPageProps> = ({
         <SessionSummaryModal
           sessionData={currentSessionData}
           onClose={handleCloseSummary}
+          onGenerateSummary={() => {
+            setShowSummaryModal(false);
+            setTriggerSummarization(true);
+          }}
         />
       )}
     </div>

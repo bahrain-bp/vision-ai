@@ -1,0 +1,318 @@
+.witness-page {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 20px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+}
+
+.witness-page .witness-container {
+  background: white;
+  border-radius: 12px;
+  padding: 0;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  max-width: 900px;
+  margin: 0 auto;
+  min-height: calc(100vh - 40px);
+  overflow: hidden;
+}
+
+/* Witness Header */
+.witness-header {
+  background: var(--primary-color);
+  color: white;
+  padding: 24px;
+  text-align: center;
+  border-radius: 12px 12px 0 0;
+}
+
+.witness-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.logo-icon {
+  color: white;
+}
+
+.witness-title {
+  font-size: 28px;
+  font-weight: bold;
+  margin: 0;
+  color: white;
+}
+
+.witness-subtitle {
+  margin-top: 16px;
+}
+
+.arabic-title {
+  font-size: 20px;
+  font-weight: 600;
+  margin: 0 0 12px 0;
+  direction: rtl;
+}
+
+.witness-notice {
+  font-size: 14px;
+  margin: 8px 0;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.arabic-notice {
+  font-size: 14px;
+  margin: 8px 0;
+  color: rgba(255, 255, 255, 0.9);
+  direction: rtl;
+}
+
+/* Witness Content */
+.witness-content {
+  padding: 24px;
+  min-height: 500px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Conversation Container */
+.conversation-container {
+  flex: 1;
+  background: var(--background-light);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+/* Empty State */
+.empty-witness {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text-light);
+}
+
+.empty-icon {
+  color: var(--border-dark);
+  margin-bottom: 16px;
+}
+
+.empty-witness h3 {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 8px 0;
+  color: var(--text-dark);
+}
+
+.arabic-text {
+  direction: rtl;
+  margin: 8px 0;
+}
+
+.instruction {
+  font-size: 14px;
+  color: var(--text-light);
+  margin: 16px 0 0 0;
+}
+
+/* Conversation Messages */
+.conversation-messages {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Message Styles */
+.message {
+  border-radius: 12px;
+  padding: 16px;
+  max-width: 80%;
+  position: relative;
+}
+
+.message.investigator {
+  background: #e0e7ff;
+  border: 1px solid #c7d2fe;
+  align-self: flex-start;
+  margin-right: auto;
+}
+
+.message.witness {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  align-self: flex-end;
+  margin-left: auto;
+}
+
+/* RTL Support for Arabic Messages */
+.message.witness[dir="rtl"],
+.message.witness .message-text[dir="rtl"] {
+  direction: rtl;
+  text-align: right;
+}
+
+.message.investigator[dir="ltr"],
+.message.investigator .message-text[dir="ltr"] {
+  direction: ltr;
+  text-align: left;
+}
+
+.message-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+
+.speaker-badge {
+  font-weight: 600;
+  color: var(--text-medium);
+}
+
+.timestamp {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-light);
+}
+
+.message-text {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-dark);
+  word-wrap: break-word;
+}
+
+.witness-text {
+  /* Default to RTL for witness (Arabic) */
+  direction: rtl;
+  text-align: right;
+}
+
+/* Original Note */
+.original-note {
+  font-size: 11px;
+  color: var(--text-light);
+  font-style: italic;
+  margin-top: 8px;
+  direction: ltr; /* Keep note in LTR */
+  text-align: left;
+}
+
+/* Witness Status */
+.witness-status {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  background: var(--background-light);
+  border-radius: 8px;
+  border: 1px solid var(--border-light);
+}
+
+.status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--success-color);
+}
+
+.live-dot {
+  width: 8px;
+  height: 8px;
+  background: var(--success-color);
+  border-radius: 50%;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.1);
+  }
+}
+
+.message-count {
+  font-size: 14px;
+  color: var(--text-light);
+  font-weight: 500;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .witness-page {
+    padding: 12px;
+  }
+  
+  .witness-container {
+    min-height: calc(100vh - 24px);
+  }
+  
+  .witness-content {
+    padding: 16px;
+  }
+  
+  .witness-header {
+    padding: 20px 16px;
+  }
+  
+  .witness-title {
+    font-size: 24px;
+  }
+  
+  .arabic-title {
+    font-size: 18px;
+  }
+  
+  .message {
+    max-width: 90%;
+  }
+  
+  .witness-status {
+    flex-direction: column;
+    gap: 12px;
+    text-align: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .witness-logo {
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .witness-title {
+    font-size: 20px;
+  }
+  
+  .conversation-container {
+    padding: 12px;
+  }
+  
+  .message {
+    padding: 12px;
+  }
+  
+  .message-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+  
+  .message.investigator .message-header {
+    align-items: flex-start;
+  }
+  
+  .message.witness .message-header {
+    align-items: flex-end;
+  }
+}
