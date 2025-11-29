@@ -118,42 +118,48 @@ def build_prompt(case_id, transcript, cross_transcripts, reports):
         return s[:n]
     cross_text = "\n---\n".join([f"[{wid}] {clip(txt, 4000)}" for wid, txt in cross_transcripts.items()])
     report_text = "\n---\n".join([f"[{r['key']}] {clip(r['text'], 4000)}" for r in reports])
+
     return f"""
-You are an AI contradiction detection system.
+أنت نظام ذكاء اصطناعي متخصص في كشف التناقضات في التحقيقات.
 
-Task:
-- Identify internal inconsistencies within the witness transcript.
-- Identify contradictions with other witnesses.
-- Identify statements contradicted or supported by police reports.
+المهمة:
+- اكتشف التناقضات الداخلية داخل شهادة الشاهد نفسه.
+- اكتشف التناقضات مع شهادات الشهود الآخرين.
+- تحقق من التناقضات أو الدعم مع تقارير الشرطة والأدلة.
+- لا تكرر نفس التناقض أكثر من مرة. إذا ظهر نفس التناقض مع عدة مصادر، اجمعها في عنصر واحد مع ذكر جميع المصادر في الحقل "source".
 
-Output:
-Return ONLY a JSON array. No commentary, no code fences.
+المخرجات:
+- يجب أن تكون النتيجة مصفوفة JSON فقط، بدون أي تعليق إضافي أو نص خارج المصفوفة.
+- يجب أن تكون جميع النصوص باللغة العربية الفصحى الواضحة.
+- يجب ترتيب النتائج حسب اللون (الخطورة): الأحمر أولاً، ثم الأصفر، ثم الأخضر.
+- يجب أن تكون صياغة الحقل "text" جملة كاملة تصف التناقض بشكل واضح، وليس مجرد مقتطف قصير.
+- لا تكرر التناقضات؛ اجمعها في عنصر واحد مع قائمة المصادر.
 
-Schema:
+المخطط (Schema):
 [
   {{
-    "text": "Quoted or paraphrased statement",
-    "source": "witness|cross|report",
-    "evidence": "Short explanation referencing exact lines or report keys",
-    "severity": "green|yellow|red"
+    "text": "النص المقتبس أو الملخص",
+    "source": "witness|cross|report (يمكن أن تكون قائمة مثل witness+report)",
+    "evidence": "تفسير قصير يشير إلى السطر أو التقرير",
+    "severity": "red|yellow|green"
   }}
 ]
 
-Definitions:
-- green: consistent or supported by other sources
-- yellow: ambiguous or potentially contradictory; needs review
-- red: directly contradicts other witnesses or reports
+التعريفات:
+- الأحمر (red): تناقض مباشر مع شاهد آخر أو تقرير رسمي.
+- الأصفر (yellow): غامض أو يحتمل التناقض ويحتاج مراجعة.
+- الأخضر (green): متسق أو مدعوم من مصادر أخرى.
 
-WITNESS TRANSCRIPT:
+نص الشاهد:
 {clip(transcript, 12000)}
 
-OTHER WITNESSES:
+شهادات أخرى:
 {cross_text}
 
-POLICE REPORTS:
+تقارير الشرطة:
 {report_text}
 
-Return ONLY the JSON array per schema. If no findings, return [].
+أعد فقط مصفوفة JSON حسب المخطط أعلاه. إذا لم توجد نتائج، أعد [].
 """
 
 def extract_json(text):
@@ -168,17 +174,25 @@ def extract_json(text):
     try:
         data = json.loads(text[start:end])
         normalized = []
+        seen = set()
         for item in data:
             if isinstance(item, dict):
-                normalized.append({
-                    "text": item.get("text", ""),
-                    "source": item.get("source", "witness"),
-                    "evidence": item.get("evidence", ""),
-                    "severity": item.get("severity", "").lower(),
-                })
+                key = (item.get("text", ""), item.get("severity", "").lower())
+                if key not in seen:
+                    normalized.append({
+                        "text": item.get("text", ""),
+                        "source": item.get("source", "witness"),
+                        "evidence": item.get("evidence", ""),
+                        "severity": item.get("severity", "").lower(),
+                    })
+                    seen.add(key)
+        # enforce ordering: red → yellow → green
+        order = {"red": 0, "yellow": 1, "green": 2}
+        normalized.sort(key=lambda x: order.get(x["severity"], 3))
         return normalized
     except Exception:
         return []
+
 
 def ok(body):
     return {

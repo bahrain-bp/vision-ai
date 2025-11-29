@@ -85,14 +85,46 @@ class ContradictionStack(Stack):
 
         # GET /contradictions/witnesses
         witnesses_resource = contradictions_resource.add_resource("witnesses")
+
+        witnesses_resource.add_cors_preflight(
+            allow_origins=apigw.Cors.ALL_ORIGINS,
+            allow_methods=["GET", "OPTIONS"],
+            allow_headers=[
+                "Content-Type",
+                "X-Amz-Date",
+                "Authorization",
+                "X-Api-Key",
+                "X-Amz-Security-Token",
+                "Content-Length"
+            ],
+            allow_credentials=False,
+            max_age=Duration.days(1)
+        )
         witnesses_resource.add_method(
             "GET",
-            apigw.LambdaIntegration(get_witnesses_lambda),
+            apigw.LambdaIntegration(get_witnesses_lambda, proxy=True),
+            authorization_type=apigw.AuthorizationType.NONE
         )
 
         # POST /contradictions/analyze
         analyze_resource = contradictions_resource.add_resource("analyze")
+        
+        analyze_resource.add_cors_preflight(
+            allow_origins=apigw.Cors.ALL_ORIGINS,
+            allow_methods=["POST", "OPTIONS"],
+            allow_headers=[
+                "Content-Type",
+                "X-Amz-Date",
+                "Authorization",
+                "X-Api-Key",
+                "X-Amz-Security-Token",
+                "Content-Length"
+            ],
+            allow_credentials=False,
+            max_age=Duration.days(1)
+        )
         analyze_resource.add_method(
             "POST",
-            apigw.LambdaIntegration(analyze_lambda),
+            apigw.LambdaIntegration(analyze_lambda, proxy=True),
+            authorization_type=apigw.AuthorizationType.NONE
         )

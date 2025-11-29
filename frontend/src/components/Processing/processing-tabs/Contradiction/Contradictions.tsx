@@ -19,7 +19,7 @@ const severityIcons: Record<string, string> = {
   green: "✅",
 };
 
-const API_BASE_URL = "https://hvjlr6aa2m.execute-api.us-east-1.amazonaws.com/prod";
+const API_BASE_URL = process.env.REACT_APP_API_ENDPOINT;
 
 const BUCKET_NAME = "vision-investigation-system-052904446370";
 
@@ -30,6 +30,9 @@ const Contradictions: React.FC = () => {
   const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadingWitnesses, setLoadingWitnesses] = useState(false);
+
+  const [s3Path, setS3Path] = useState<string | null>(null);
+
 
   useEffect(() => {
     const loadWitnesses = async () => {
@@ -88,6 +91,8 @@ const Contradictions: React.FC = () => {
 
       console.log("Parsed analysis:", parsed);
       setAnalysis(parsed);
+      setS3Path(`s3://${BUCKET_NAME}/${parsed.storedAt}`); 
+
     } catch (err) {
       console.error("Error analyzing contradictions:", err);
     }
@@ -143,9 +148,7 @@ const Contradictions: React.FC = () => {
       {/* RESULTS */}
       {analysis && (
         <div className="results-container">
-          <h3 className="results-heading">
-            Results – {analysis.witnessId}
-          </h3>
+          <h3 className="results-heading">Results – {analysis.witnessId}</h3>
 
           <div className="contradiction-cards">
             {analysis.results.map((item, index) => (
@@ -157,14 +160,14 @@ const Contradictions: React.FC = () => {
               </div>
             ))}
           </div>
-
-          {/* TO Show the full S3 path */}
-          <div className="save-path">
-            <p>
-              <strong>Saved S3 Path:</strong>{" "}
-              s3://{BUCKET_NAME}/{analysis.storedAt}
-            </p>
-          </div>
+          {s3Path && (
+            <button 
+              onClick={() => console.log("S3 Path:", s3Path)}
+              style={{ fontSize: "12px", padding: "4px 8px" }}
+            >
+              Download S3 Path
+            </button>
+          )}
         </div>
       )}
     </div>
