@@ -12,6 +12,7 @@ from vision_ai.rewrite_stack import RewriteStack
 from vision_ai.summarization_stack import SummarizationStack
 from vision_ai.api_deployment_stack import APIDeploymentStack
 from vision_ai.transcription_stack import TranscriptionStack
+from vision_ai.camera_footage_stack import CameraFootageAnalysisStack
 
 load_dotenv()
 app = cdk.App()
@@ -158,6 +159,23 @@ summarization_stack = SummarizationStack(
 # Ensure summarization stack depends on shared stack
 summarization_stack.add_dependency(shared_stack)
 
+# ==========================================
+# 9. CAMERA FOOTAGE ANALYSIS STACK
+# Uses shared API by ID
+# ==========================================
+camera_footage_stack = CameraFootageAnalysisStack(
+    app,
+    f"{app_name}-camera-footage-stack",
+    env=env,
+    investigation_bucket=shared_stack.investigation_bucket,
+    shared_api_id=shared_stack.shared_api.rest_api_id,
+    shared_api_root_resource_id=shared_stack.shared_api.rest_api_root_resource_id,
+    description="Camera Footage Analysis: Video upload and Bedrock analysis integration",
+)
+
+# Ensure camera footage stack depends on shared stack
+camera_footage_stack.add_dependency(shared_stack)
+
 
 # ==========================================
 # 9. API DEPLOYMENT STACK
@@ -181,6 +199,7 @@ deployment_stack.add_dependency(advanced_analysis_stack)
 deployment_stack.add_dependency(rewrite_stack)
 deployment_stack.add_dependency(transcription_stack)
 deployment_stack.add_dependency(summarization_stack)
+deployment_stack.add_dependency(camera_footage_stack)
 
 # Add tags
 cdk.Tags.of(app).add("Project", "VisionAI")
