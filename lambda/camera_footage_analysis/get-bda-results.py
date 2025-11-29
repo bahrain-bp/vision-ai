@@ -231,18 +231,18 @@ def merge_bda_outputs(
         }
 
         # Global video summary
-        result["summary"] = standard_data.get("video", {}).get("summary", "").strip()
-        if result["summary"]:
-            result["translations"] = {
-                "en": result["summary"],  # Original English text
-                "ar": translate_text(
-                    result["summary"], "ar"
-                ),  # Arabic is the target language
+        summary_text = standard_data.get("video", {}).get("summary", "").strip()
+        if summary_text:
+            result["summary"] = {
+                "en": summary_text,
+                "ar": translate_text(summary_text, "ar"),
             }
-        logger.info(f"Extracted video summary: {result['summary'][:100]}...")
 
-        # Extract chapters from STANDARD OUTPUT (has absolute timestamps)
+        logger.info(f"Extracted video summary: {result['summary']}...")
+
+        # Extract chapters from STANDARD OUTPUT (timestamps) and CUSTOM OUTPUT (summaries)
         chapters = standard_data.get("chapters", [])
+        custom_chapters = custom_data.get("chapters", []) if custom_data else []
         logger.info(f"Found {len(chapters)} chapters in standard_output")
 
         for idx, ch in enumerate(chapters):
@@ -253,6 +253,15 @@ def merge_bda_outputs(
             chapter_start = start_millis / 1000.0
             chapter_end = end_millis / 1000.0
 
+            # Get summary from custom output if available, otherwise from standard
+            custom_ch = custom_chapters[idx] if idx < len(custom_chapters) else {}
+            custom_summary = custom_ch.get("inference_result", {}).get(
+                "chapter_summary", ""
+            )
+            chapter_summary = (
+                custom_summary if custom_summary else ch.get("summary", "").strip()
+            )
+
             chapter_data = {
                 "id": f"chapter-{idx}",
                 "segmentIndex": segment_idx,
@@ -261,12 +270,12 @@ def merge_bda_outputs(
                 "start_seconds": chapter_start,
                 "end_seconds": chapter_end,
                 "duration_seconds": chapter_end - chapter_start,
-                "summary": ch.get("summary", "").strip(),
+                "summary": chapter_summary,
                 "confidence": ch.get("confidence", 0),
                 "type": "chapter",
                 "translations": {
-                    "en": ch.get("summary", "").strip(),
-                    "ar": translate_text(ch.get("summary", "").strip(), "ar"),
+                    "en": chapter_summary,
+                    "ar": translate_text(chapter_summary, "ar"),
                 },
             }
 
@@ -444,12 +453,13 @@ def merge_all_segments(segment_results: List[Dict[str, Any]]) -> Dict[str, Any]:
 
             # Collect summary parts
             if segment_result.get("summary"):
+                summary_text = segment_result["summary"]
+                if isinstance(summary_text, dict):
+                    summary_text = summary_text.get("en", "")
                 if len(segment_results) > 1:
-                    summary_parts.append(
-                        f"Segment {seg_idx}: {segment_result['summary']}"
-                    )
+                    summary_parts.append(f"Segment {seg_idx}: {summary_text}")
                 else:
-                    summary_parts.append(segment_result["summary"])
+                    summary_parts.append(summary_text)
 
             # Use metadata from first segment
             if not metadata and segment_result.get("metadata"):
