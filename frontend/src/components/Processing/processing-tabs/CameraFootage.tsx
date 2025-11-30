@@ -2,6 +2,7 @@ import React, { useRef, useState } from "react";
 import { Pencil, Check, X } from "lucide-react";
 import "../../../ProcessingView.css";
 import { SessionData } from "../ProcessingView";
+import { exportAnalysisResultsAsPDF } from "../../../services/CamFootageAnalysis/AnalysisPdfExportService";
 
 interface CameraFootageProps {
   sessionData: SessionData;
@@ -122,6 +123,8 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
     null
   );
 
+  const [isExporting, setIsExporting] = useState(false);
+
   // Use edited results if available, otherwise use original
   const displayResults = editedResults || analysisResult;
 
@@ -148,6 +151,25 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
   const isValidSessionId = (sessionId: string): boolean => {
     const pattern = /^session-\d{14}-[a-fA-F0-9]{8}$/;
     return pattern.test(sessionId);
+  };
+
+  // Helper function to automatically export results with expanded chapters
+  const exportWithExpandedChapters = async () => {
+    setIsExporting(true);
+
+    // Wait for re-render with all chapters expanded
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
+    exportAnalysisResultsAsPDF(
+      videoFile?.name || "video-analysis",
+      _sessionData?.sessionId || "unknown",
+      language
+    );
+
+    // Reset after export
+    setTimeout(() => {
+      setIsExporting(false);
+    }, 500);
   };
 
   // Helper function to get summary text based on language
@@ -664,640 +686,695 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
           <div className="tab-section-title">Analysis Results</div>
           <div className="tab-section-content">
             {analysisResult ? (
-              <div className="analysis-results">
-                {/* Video Summary Section */}
-                {displayResults?.chapters &&
-                displayResults.chapters.length > 1 &&
-                displayResults.chapters.some(
-                  (chapter) => chapter.segmentIndex
-                ) ? (
-                  <div className="video-summary-section">
-                    <h3 className="section-header">
-                      {language === "ar" ? "ملخص الفيديو" : "Video Summary"}
-                    </h3>
-                    <div className="summary-card">
-                      <p
-                        className="summary-text"
-                        dir={language === "ar" ? "rtl" : "ltr"}
-                      >
-                        {language === "ar"
-                          ? "تم تقسيم هذا الفيديو إلى أجزاء. يتم عرض الملخصات لكل فصل أدناه."
-                          : "This video has been segmented. Summaries are displayed for each chapter below."}
-                      </p>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="video-summary-section">
-                    <h3 className="section-header">
-                      {language === "ar" ? "ملخص الفيديو" : "Video Summary"}
-                    </h3>
-                    <div className="summary-card">
-                      {editingField?.chapterId === "global-summary" &&
-                      editingField?.field === "summary" ? (
-                        <div className="edit-mode">
-                          <textarea
-                            value={editValue}
-                            onChange={(e) => setEditValue(e.target.value)}
-                            className="edit-textarea"
-                            dir={language === "ar" ? "rtl" : "ltr"}
-                            rows={4}
-                            autoFocus
-                          />
-                          <div className="edit-actions">
-                            <button
-                              className="save-btn"
-                              onClick={() => {
-                                if (!editingField || !displayResults) return;
-                                const updatedResults = JSON.parse(
-                                  JSON.stringify(displayResults)
-                                );
-
-                                // Update both the summary and its translations
-                                if (
-                                  typeof updatedResults.summary === "string"
-                                ) {
-                                  updatedResults.summary = {
-                                    en:
-                                      language === "en"
-                                        ? editValue
-                                        : updatedResults.summary,
-                                    ar:
-                                      language === "ar"
-                                        ? editValue
-                                        : updatedResults.summary,
-                                  };
-                                } else {
-                                  updatedResults.summary[language] = editValue;
-                                }
-
-                                setEditedResults(updatedResults);
-                                setEditingField(null);
-                                setEditValue("");
-                              }}
-                              title={language === "ar" ? "حفظ" : "Save"}
-                            >
-                              <Check size={16} />
-                              {language === "ar" ? "حفظ" : "Save"}
-                            </button>
-                            <button
-                              className="cancel-btn"
-                              onClick={cancelEditing}
-                              title={language === "ar" ? "إلغاء" : "Cancel"}
-                            >
-                              <X size={16} />
-                              {language === "ar" ? "إلغاء" : "Cancel"}
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="view-mode">
-                          <p
-                            className="summary-text"
-                            dir={language === "ar" ? "rtl" : "ltr"}
-                          >
-                            {getSummaryText(displayResults?.summary || "")}
-                          </p>
-                          <EditButton
-                            onClick={() =>
-                              startEditing(
-                                "global-summary",
-                                "summary",
-                                getSummaryText(displayResults?.summary || "")
-                              )
-                            }
-                            isEditing={
-                              editingField?.chapterId === "global-summary" &&
-                              editingField?.field === "summary"
-                            }
-                          />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Video Chapters Section */}
-                {displayResults?.chapters &&
-                  displayResults.chapters.length > 0 && (
-                    <div className="chapters-section">
+              <div id="analysis-content">
+                <div className="analysis-results">
+                  {/* Video Summary Section */}
+                  {displayResults?.chapters &&
+                  displayResults.chapters.length > 1 &&
+                  displayResults.chapters.some(
+                    (chapter) => chapter.segmentIndex
+                  ) ? (
+                    <div className="video-summary-section">
                       <h3 className="section-header">
-                        {language === "ar" ? "فصول الفيديو" : "Video Chapters"}{" "}
-                        ({displayResults.chapters.length})
+                        {language === "ar" ? "ملخص الفيديو" : "Video Summary"}
                       </h3>
-                      <div className="chapters-list">
-                        {displayResults.chapters.map((chapter: ChapterData) => (
-                          <div key={chapter.id} className="chapter-card">
-                            {/* Chapter Header - Clickable */}
-                            <div
-                              className="chapter-header"
-                              onClick={() => {
-                                toggleChapter(chapter.id);
-                                handleTimelineClick(chapter.start_seconds);
-                              }}
-                            >
-                              <div className="chapter-header-left">
-                                <span className="chapter-icon">
-                                  {expandedChapter === chapter.id ? "▼" : "▶"}
-                                </span>
-                                <div className="chapter-info">
-                                  <div className="chapter-title">
-                                    {language === "ar" ? "الفصل" : "Chapter"}{" "}
-                                    {chapter.displayIndex}
-                                  </div>
-                                  <div className="chapter-time">
-                                    {formatTime(chapter.start_seconds)} -{" "}
-                                    {formatTime(chapter.end_seconds)} (
-                                    {formatTime(chapter.duration_seconds)}{" "}
-                                    {language === "ar" ? "المدة" : "duration"})
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="chapter-header-right">
-                                {chapter.risk_score !== undefined && (
-                                  <span
-                                    className="risk-badge"
-                                    style={{
-                                      backgroundColor: getRiskScoreColor(
-                                        chapter.risk_score
-                                      ),
-                                    }}
-                                  >
-                                    {language === "ar" ? "المخاطر" : "Risk"}:{" "}
-                                    {chapter.risk_score}
-                                  </span>
-                                )}
-                                {chapter.confidence !== undefined && (
-                                  <span className="confidence-badge">
-                                    {language === "ar"
-                                      ? `الثقة: ${Math.round(
-                                          chapter.confidence
-                                        )}%`
-                                      : `${Math.round(
-                                          chapter.confidence
-                                        )}% confidence`}
-                                  </span>
-                                )}
-                              </div>
+                      <div className="summary-card">
+                        <p
+                          className="summary-text"
+                          dir={language === "ar" ? "rtl" : "ltr"}
+                        >
+                          {language === "ar"
+                            ? "تم تقسيم هذا الفيديو إلى أجزاء. يتم عرض الملخصات لكل فصل أدناه."
+                            : "This video has been segmented. Summaries are displayed for each chapter below."}
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="video-summary-section">
+                      <h3 className="section-header">
+                        {language === "ar" ? "ملخص الفيديو" : "Video Summary"}
+                      </h3>
+                      <div className="summary-card">
+                        {editingField?.chapterId === "global-summary" &&
+                        editingField?.field === "summary" ? (
+                          <div className="edit-mode">
+                            <textarea
+                              value={editValue}
+                              onChange={(e) => setEditValue(e.target.value)}
+                              className="edit-textarea"
+                              dir={language === "ar" ? "rtl" : "ltr"}
+                              rows={4}
+                              autoFocus
+                            />
+                            <div className="edit-actions">
+                              <button
+                                className="save-btn"
+                                onClick={() => {
+                                  if (!editingField || !displayResults) return;
+                                  const updatedResults = JSON.parse(
+                                    JSON.stringify(displayResults)
+                                  );
+
+                                  // Update both the summary and its translations
+                                  if (
+                                    typeof updatedResults.summary === "string"
+                                  ) {
+                                    updatedResults.summary = {
+                                      en:
+                                        language === "en"
+                                          ? editValue
+                                          : updatedResults.summary,
+                                      ar:
+                                        language === "ar"
+                                          ? editValue
+                                          : updatedResults.summary,
+                                    };
+                                  } else {
+                                    updatedResults.summary[language] =
+                                      editValue;
+                                  }
+
+                                  setEditedResults(updatedResults);
+                                  setEditingField(null);
+                                  setEditValue("");
+                                }}
+                                title={language === "ar" ? "حفظ" : "Save"}
+                              >
+                                <Check size={16} />
+                                {language === "ar" ? "حفظ" : "Save"}
+                              </button>
+                              <button
+                                className="cancel-btn"
+                                onClick={cancelEditing}
+                                title={language === "ar" ? "إلغاء" : "Cancel"}
+                              >
+                                <X size={16} />
+                                {language === "ar" ? "إلغاء" : "Cancel"}
+                              </button>
                             </div>
-
-                            {/* Chapter Summary */}
-                            <div className="chapter-summary">
-                              {editingField?.chapterId === chapter.id &&
-                              editingField?.field === "summary" ? (
-                                <div className="edit-mode">
-                                  <textarea
-                                    value={editValue}
-                                    onChange={(e) =>
-                                      setEditValue(e.target.value)
-                                    }
-                                    className="edit-textarea"
-                                    dir={language === "ar" ? "rtl" : "ltr"}
-                                    rows={4}
-                                    autoFocus
-                                  />
-                                  <div className="edit-actions">
-                                    <button
-                                      className="save-btn"
-                                      onClick={saveEdit}
-                                      title={language === "ar" ? "حفظ" : "Save"}
-                                    >
-                                      <Check size={16} />
-                                      {language === "ar" ? "حفظ" : "Save"}
-                                    </button>
-                                    <button
-                                      className="cancel-btn"
-                                      onClick={cancelEditing}
-                                      title={
-                                        language === "ar" ? "إلغاء" : "Cancel"
-                                      }
-                                    >
-                                      <X size={16} />
-                                      {language === "ar" ? "إلغاء" : "Cancel"}
-                                    </button>
-                                  </div>
-                                </div>
-                              ) : (
-                                <div className="view-mode">
-                                  <p dir={language === "ar" ? "rtl" : "ltr"}>
-                                    {getChapterSummary(chapter)}
-                                  </p>
-                                  <EditButton
-                                    onClick={() =>
-                                      startEditing(
-                                        chapter.id,
-                                        "summary",
-                                        getChapterSummary(chapter)
-                                      )
-                                    }
-                                    isEditing={
-                                      editingField?.chapterId === chapter.id &&
-                                      editingField?.field === "summary"
-                                    }
-                                  />
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Expanded Chapter Details */}
-                            {expandedChapter === chapter.id && (
-                              <div className="chapter-details">
-                                {/* Event Detection */}
-                                {chapter.event && (
-                                  <div
-                                    className="detail-card event-card"
-                                    onClick={() => {
-                                      if (
-                                        chapter.event?.timestamp !== undefined
-                                      ) {
-                                        handleTimelineClick(
-                                          chapter.event.timestamp
-                                        );
-                                      } else if (
-                                        chapter.event?.start_millis !==
-                                        undefined
-                                      ) {
-                                        handleTimelineClick(
-                                          chapter.event.start_millis / 1000
-                                        );
-                                      }
-                                    }}
-                                  >
-                                    <div className="detail-header">
-                                      <span className="detail-title">
-                                        {language === "ar"
-                                          ? "تم اكتشاف حدث"
-                                          : "Activity Detected"}
-                                      </span>
-                                      <div className="detail-header-badges">
-                                        {chapter.event.type && (
-                                          <span className="event-type-badge">
-                                            {getEventText(
-                                              chapter.event,
-                                              "type"
-                                            )}
-                                          </span>
-                                        )}
-                                        {chapter.event.confidence && (
-                                          <span className="confidence-badge">
-                                            {getEventText(
-                                              chapter.event,
-                                              "confidence"
-                                            )}
-                                          </span>
-                                        )}
-                                      </div>
-                                    </div>
-                                    <div className="detail-content">
-                                      {editingField?.chapterId === chapter.id &&
-                                      editingField?.field === "event" &&
-                                      editingField?.subfield ===
-                                        "description" ? (
-                                        <div className="edit-mode">
-                                          <textarea
-                                            value={editValue}
-                                            onChange={(e) =>
-                                              setEditValue(e.target.value)
-                                            }
-                                            className="edit-textarea"
-                                            dir={
-                                              language === "ar" ? "rtl" : "ltr"
-                                            }
-                                            rows={3}
-                                            autoFocus
-                                          />
-                                          <div className="edit-actions">
-                                            <button
-                                              className="save-btn"
-                                              onClick={saveEdit}
-                                            >
-                                              <Check size={16} />
-                                              {language === "ar"
-                                                ? "حفظ"
-                                                : "Save"}
-                                            </button>
-                                            <button
-                                              className="cancel-btn"
-                                              onClick={cancelEditing}
-                                            >
-                                              <X size={16} />
-                                              {language === "ar"
-                                                ? "إلغاء"
-                                                : "Cancel"}
-                                            </button>
-                                          </div>
-                                        </div>
-                                      ) : (
-                                        <div className="view-mode">
-                                          <p
-                                            className="detail-description"
-                                            dir={
-                                              language === "ar" ? "rtl" : "ltr"
-                                            }
-                                          >
-                                            {getEventText(
-                                              chapter.event,
-                                              "description"
-                                            )}
-                                          </p>
-                                          <EditButton
-                                            onClick={() =>
-                                              startEditing(
-                                                chapter.id,
-                                                "event",
-                                                getEventText(
-                                                  chapter.event!,
-                                                  "description"
-                                                ),
-                                                "description"
-                                              )
-                                            }
-                                            isEditing={
-                                              editingField?.chapterId ===
-                                                chapter.id &&
-                                              editingField?.field === "event" &&
-                                              editingField?.subfield ===
-                                                "description"
-                                            }
-                                          />
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-                                )}
-
-                                {/* Person Detection */}
-                                {chapter.person && (
-                                  <div
-                                    className="detail-card person-card"
-                                    onClick={() => {
-                                      if (
-                                        chapter.person?.first_seen !== undefined
-                                      ) {
-                                        handleTimelineClick(
-                                          chapter.person.first_seen
-                                        );
-                                      }
-                                    }}
-                                  >
-                                    <div className="detail-header">
-                                      <span className="detail-title">
-                                        {language === "ar"
-                                          ? "تم اكتشاف أشخاص"
-                                          : "Person Identified"}
-                                      </span>
-                                      {chapter.person.confidence && (
-                                        <span className="confidence-badge">
-                                          {getPersonText(
-                                            chapter.person,
-                                            "confidence"
-                                          )}
-                                        </span>
-                                      )}
-                                    </div>
-                                    <div className="detail-content">
-                                      {editingField?.chapterId === chapter.id &&
-                                      editingField?.field === "person" ? (
-                                        <div className="edit-mode">
-                                          <textarea
-                                            value={editValue}
-                                            onChange={(e) =>
-                                              setEditValue(e.target.value)
-                                            }
-                                            className="edit-textarea"
-                                            dir={
-                                              language === "ar" ? "rtl" : "ltr"
-                                            }
-                                            rows={3}
-                                            autoFocus
-                                          />
-                                          <div className="edit-actions">
-                                            <button
-                                              className="save-btn"
-                                              onClick={saveEdit}
-                                            >
-                                              <Check size={16} />
-                                              {language === "ar"
-                                                ? "حفظ"
-                                                : "Save"}
-                                            </button>
-                                            <button
-                                              className="cancel-btn"
-                                              onClick={cancelEditing}
-                                            >
-                                              <X size={16} />
-                                              {language === "ar"
-                                                ? "إلغاء"
-                                                : "Cancel"}
-                                            </button>
-                                          </div>
-                                        </div>
-                                      ) : (
-                                        <div className="view-mode">
-                                          <p
-                                            className="detail-description"
-                                            dir={
-                                              language === "ar" ? "rtl" : "ltr"
-                                            }
-                                          >
-                                            {getPersonText(
-                                              chapter.person,
-                                              "description"
-                                            )}
-                                          </p>
-                                          <EditButton
-                                            onClick={() =>
-                                              startEditing(
-                                                chapter.id,
-                                                "person",
-                                                getPersonText(
-                                                  chapter.person!,
-                                                  "description"
-                                                )
-                                              )
-                                            }
-                                            isEditing={
-                                              editingField?.chapterId ===
-                                                chapter.id &&
-                                              editingField?.field === "person"
-                                            }
-                                          />
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-                                )}
-
-                                {/* Object Detection */}
-                                {chapter.object && (
-                                  <div
-                                    className={`detail-card object-card ${
-                                      chapter.object.suspicious
-                                        ? "suspicious"
-                                        : ""
-                                    }`}
-                                    onClick={() => {
-                                      if (
-                                        chapter.object?.first_seen !== undefined
-                                      ) {
-                                        handleTimelineClick(
-                                          chapter.object.first_seen
-                                        );
-                                      }
-                                    }}
-                                  >
-                                    <div className="detail-header">
-                                      <span className="detail-title">
-                                        {language === "ar"
-                                          ? "تم اكتشاف شيء"
-                                          : "Object Detected"}
-                                      </span>
-                                      <div className="detail-header-badges">
-                                        {chapter.object.suspicious && (
-                                          <span className="suspicious-badge">
-                                            {language === "ar"
-                                              ? "مشبوه"
-                                              : "Suspicious"}
-                                          </span>
-                                        )}
-                                        {chapter.object.confidence && (
-                                          <span className="confidence-badge">
-                                            {getObjectText(
-                                              chapter.object,
-                                              "confidence"
-                                            )}
-                                          </span>
-                                        )}
-                                      </div>
-                                    </div>
-                                    <div className="detail-content">
-                                      {editingField?.chapterId === chapter.id &&
-                                      editingField?.field === "object" ? (
-                                        <div className="edit-mode">
-                                          <textarea
-                                            value={editValue}
-                                            onChange={(e) =>
-                                              setEditValue(e.target.value)
-                                            }
-                                            className="edit-textarea"
-                                            dir={
-                                              language === "ar" ? "rtl" : "ltr"
-                                            }
-                                            rows={3}
-                                            autoFocus
-                                          />
-                                          <div className="edit-actions">
-                                            <button
-                                              className="save-btn"
-                                              onClick={saveEdit}
-                                            >
-                                              <Check size={16} />
-                                              {language === "ar"
-                                                ? "حفظ"
-                                                : "Save"}
-                                            </button>
-                                            <button
-                                              className="cancel-btn"
-                                              onClick={cancelEditing}
-                                            >
-                                              <X size={16} />
-                                              {language === "ar"
-                                                ? "إلغاء"
-                                                : "Cancel"}
-                                            </button>
-                                          </div>
-                                        </div>
-                                      ) : (
-                                        <div className="view-mode">
-                                          <p
-                                            className="detail-description"
-                                            dir={
-                                              language === "ar" ? "rtl" : "ltr"
-                                            }
-                                          >
-                                            {getObjectText(
-                                              chapter.object,
-                                              "description"
-                                            )}
-                                          </p>
-                                          <EditButton
-                                            onClick={() =>
-                                              startEditing(
-                                                chapter.id,
-                                                "object",
-                                                getObjectText(
-                                                  chapter.object!,
-                                                  "description"
-                                                )
-                                              )
-                                            }
-                                            isEditing={
-                                              editingField?.chapterId ===
-                                                chapter.id &&
-                                              editingField?.field === "object"
-                                            }
-                                          />
-                                        </div>
-                                      )}
-                                      {chapter.object.risk_relevance && (
-                                        <p
-                                          className="risk-relevance"
-                                          dir={
-                                            language === "ar" ? "rtl" : "ltr"
-                                          }
-                                        >
-                                          <strong>
-                                            {language === "ar"
-                                              ? "تقييم المخاطر:"
-                                              : "Risk Assessment:"}
-                                          </strong>{" "}
-                                          {chapter.object.risk_relevance}
-                                        </p>
-                                      )}
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            )}
                           </div>
-                        ))}
+                        ) : (
+                          <div className="view-mode">
+                            <p
+                              className="summary-text"
+                              dir={language === "ar" ? "rtl" : "ltr"}
+                            >
+                              {getSummaryText(displayResults?.summary || "")}
+                            </p>
+                            <EditButton
+                              onClick={() =>
+                                startEditing(
+                                  "global-summary",
+                                  "summary",
+                                  getSummaryText(displayResults?.summary || "")
+                                )
+                              }
+                              isEditing={
+                                editingField?.chapterId === "global-summary" &&
+                                editingField?.field === "summary"
+                              }
+                            />
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
 
-                {/* Language Toggle */}
-                <div className="language-toggle">
-                  <span className="language-toggle-label">
-                    {language === "ar" ? "اللغة:" : "Language:"}
-                  </span>
-                  <button
-                    className={`language-btn ${
-                      language === "en" ? "active" : ""
-                    }`}
-                    onClick={() => setLanguage("en")}
-                  >
-                    English
-                  </button>
-                  <button
-                    className={`language-btn ${
-                      language === "ar" ? "active" : ""
-                    }`}
-                    onClick={() => setLanguage("ar")}
-                  >
-                    العربية
-                  </button>
-                </div>
+                  {/* Video Chapters Section */}
+                  {displayResults?.chapters &&
+                    displayResults.chapters.length > 0 && (
+                      <div className="chapters-section">
+                        <h3 className="section-header">
+                          {language === "ar"
+                            ? "فصول الفيديو"
+                            : "Video Chapters"}{" "}
+                          ({displayResults.chapters.length})
+                        </h3>
+                        <div className="chapters-list">
+                          {displayResults.chapters.map(
+                            (chapter: ChapterData) => (
+                              <div key={chapter.id} className="chapter-card">
+                                {/* Chapter Header - Clickable */}
+                                <div
+                                  className="chapter-header"
+                                  onClick={() => {
+                                    toggleChapter(chapter.id);
+                                    handleTimelineClick(chapter.start_seconds);
+                                  }}
+                                >
+                                  <div className="chapter-header-left">
+                                    <span className="chapter-icon">
+                                      {expandedChapter === chapter.id
+                                        ? "▼"
+                                        : "▶"}
+                                    </span>
+                                    <div className="chapter-info">
+                                      <div className="chapter-title">
+                                        {language === "ar"
+                                          ? "الفصل"
+                                          : "Chapter"}{" "}
+                                        {chapter.displayIndex}
+                                      </div>
+                                      <div className="chapter-time">
+                                        {formatTime(chapter.start_seconds)} -{" "}
+                                        {formatTime(chapter.end_seconds)} (
+                                        {formatTime(chapter.duration_seconds)}{" "}
+                                        {language === "ar"
+                                          ? "المدة"
+                                          : "duration"}
+                                        )
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="chapter-header-right">
+                                    {chapter.risk_score !== undefined && (
+                                      <span
+                                        className="risk-badge"
+                                        style={{
+                                          backgroundColor: getRiskScoreColor(
+                                            chapter.risk_score
+                                          ),
+                                        }}
+                                      >
+                                        {language === "ar" ? "المخاطر" : "Risk"}
+                                        : {chapter.risk_score}
+                                      </span>
+                                    )}
+                                    {chapter.confidence !== undefined && (
+                                      <span className="confidence-badge">
+                                        {language === "ar"
+                                          ? `الثقة: ${Math.round(
+                                              chapter.confidence
+                                            )}%`
+                                          : `${Math.round(
+                                              chapter.confidence
+                                            )}% confidence`}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
 
-                <div className="export-actions">
-                  <button className="continue-btn">
-                    {language === "ar"
-                      ? "تصدير التقرير PDF"
-                      : "Export Report ad PDF"}
-                  </button>
-                  <button className="continue-btn secondary">
-                    {language === "ar"
-                      ? "تحميل حزمة الأدلة"
-                      : "Download Evidence Package"}
-                  </button>
+                                {/* Chapter Summary */}
+                                <div className="chapter-summary">
+                                  {editingField?.chapterId === chapter.id &&
+                                  editingField?.field === "summary" ? (
+                                    <div className="edit-mode">
+                                      <textarea
+                                        value={editValue}
+                                        onChange={(e) =>
+                                          setEditValue(e.target.value)
+                                        }
+                                        className="edit-textarea"
+                                        dir={language === "ar" ? "rtl" : "ltr"}
+                                        rows={4}
+                                        autoFocus
+                                      />
+                                      <div className="edit-actions">
+                                        <button
+                                          className="save-btn"
+                                          onClick={saveEdit}
+                                          title={
+                                            language === "ar" ? "حفظ" : "Save"
+                                          }
+                                        >
+                                          <Check size={16} />
+                                          {language === "ar" ? "حفظ" : "Save"}
+                                        </button>
+                                        <button
+                                          className="cancel-btn"
+                                          onClick={cancelEditing}
+                                          title={
+                                            language === "ar"
+                                              ? "إلغاء"
+                                              : "Cancel"
+                                          }
+                                        >
+                                          <X size={16} />
+                                          {language === "ar"
+                                            ? "إلغاء"
+                                            : "Cancel"}
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div className="view-mode">
+                                      <p
+                                        dir={language === "ar" ? "rtl" : "ltr"}
+                                      >
+                                        {getChapterSummary(chapter)}
+                                      </p>
+                                      <EditButton
+                                        onClick={() =>
+                                          startEditing(
+                                            chapter.id,
+                                            "summary",
+                                            getChapterSummary(chapter)
+                                          )
+                                        }
+                                        isEditing={
+                                          editingField?.chapterId ===
+                                            chapter.id &&
+                                          editingField?.field === "summary"
+                                        }
+                                      />
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Expanded Chapter Details */}
+                                {(expandedChapter === chapter.id ||
+                                  isExporting) && (
+                                  <div className="chapter-details">
+                                    {/* Event Detection */}
+                                    {chapter.event && (
+                                      <div
+                                        className="detail-card event-card"
+                                        onClick={() => {
+                                          if (
+                                            chapter.event?.timestamp !==
+                                            undefined
+                                          ) {
+                                            handleTimelineClick(
+                                              chapter.event.timestamp
+                                            );
+                                          } else if (
+                                            chapter.event?.start_millis !==
+                                            undefined
+                                          ) {
+                                            handleTimelineClick(
+                                              chapter.event.start_millis / 1000
+                                            );
+                                          }
+                                        }}
+                                      >
+                                        <div className="detail-header">
+                                          <span className="detail-title">
+                                            {language === "ar"
+                                              ? "تم اكتشاف حدث"
+                                              : "Activity Detected"}
+                                          </span>
+                                          <div className="detail-header-badges">
+                                            {chapter.event.type && (
+                                              <span className="event-type-badge">
+                                                {getEventText(
+                                                  chapter.event,
+                                                  "type"
+                                                )}
+                                              </span>
+                                            )}
+                                            {chapter.event.confidence && (
+                                              <span className="confidence-badge">
+                                                {getEventText(
+                                                  chapter.event,
+                                                  "confidence"
+                                                )}
+                                              </span>
+                                            )}
+                                          </div>
+                                        </div>
+                                        <div className="detail-content">
+                                          {editingField?.chapterId ===
+                                            chapter.id &&
+                                          editingField?.field === "event" &&
+                                          editingField?.subfield ===
+                                            "description" ? (
+                                            <div className="edit-mode">
+                                              <textarea
+                                                value={editValue}
+                                                onChange={(e) =>
+                                                  setEditValue(e.target.value)
+                                                }
+                                                className="edit-textarea"
+                                                dir={
+                                                  language === "ar"
+                                                    ? "rtl"
+                                                    : "ltr"
+                                                }
+                                                rows={3}
+                                                autoFocus
+                                              />
+                                              <div className="edit-actions">
+                                                <button
+                                                  className="save-btn"
+                                                  onClick={saveEdit}
+                                                >
+                                                  <Check size={16} />
+                                                  {language === "ar"
+                                                    ? "حفظ"
+                                                    : "Save"}
+                                                </button>
+                                                <button
+                                                  className="cancel-btn"
+                                                  onClick={cancelEditing}
+                                                >
+                                                  <X size={16} />
+                                                  {language === "ar"
+                                                    ? "إلغاء"
+                                                    : "Cancel"}
+                                                </button>
+                                              </div>
+                                            </div>
+                                          ) : (
+                                            <div className="view-mode">
+                                              <p
+                                                className="detail-description"
+                                                dir={
+                                                  language === "ar"
+                                                    ? "rtl"
+                                                    : "ltr"
+                                                }
+                                              >
+                                                {getEventText(
+                                                  chapter.event,
+                                                  "description"
+                                                )}
+                                              </p>
+                                              <EditButton
+                                                onClick={() =>
+                                                  startEditing(
+                                                    chapter.id,
+                                                    "event",
+                                                    getEventText(
+                                                      chapter.event!,
+                                                      "description"
+                                                    ),
+                                                    "description"
+                                                  )
+                                                }
+                                                isEditing={
+                                                  editingField?.chapterId ===
+                                                    chapter.id &&
+                                                  editingField?.field ===
+                                                    "event" &&
+                                                  editingField?.subfield ===
+                                                    "description"
+                                                }
+                                              />
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {/* Person Detection */}
+                                    {chapter.person && (
+                                      <div
+                                        className="detail-card person-card"
+                                        onClick={() => {
+                                          if (
+                                            chapter.person?.first_seen !==
+                                            undefined
+                                          ) {
+                                            handleTimelineClick(
+                                              chapter.person.first_seen
+                                            );
+                                          }
+                                        }}
+                                      >
+                                        <div className="detail-header">
+                                          <span className="detail-title">
+                                            {language === "ar"
+                                              ? "تم اكتشاف أشخاص"
+                                              : "Person Identified"}
+                                          </span>
+                                          {chapter.person.confidence && (
+                                            <span className="confidence-badge">
+                                              {getPersonText(
+                                                chapter.person,
+                                                "confidence"
+                                              )}
+                                            </span>
+                                          )}
+                                        </div>
+                                        <div className="detail-content">
+                                          {editingField?.chapterId ===
+                                            chapter.id &&
+                                          editingField?.field === "person" ? (
+                                            <div className="edit-mode">
+                                              <textarea
+                                                value={editValue}
+                                                onChange={(e) =>
+                                                  setEditValue(e.target.value)
+                                                }
+                                                className="edit-textarea"
+                                                dir={
+                                                  language === "ar"
+                                                    ? "rtl"
+                                                    : "ltr"
+                                                }
+                                                rows={3}
+                                                autoFocus
+                                              />
+                                              <div className="edit-actions">
+                                                <button
+                                                  className="save-btn"
+                                                  onClick={saveEdit}
+                                                >
+                                                  <Check size={16} />
+                                                  {language === "ar"
+                                                    ? "حفظ"
+                                                    : "Save"}
+                                                </button>
+                                                <button
+                                                  className="cancel-btn"
+                                                  onClick={cancelEditing}
+                                                >
+                                                  <X size={16} />
+                                                  {language === "ar"
+                                                    ? "إلغاء"
+                                                    : "Cancel"}
+                                                </button>
+                                              </div>
+                                            </div>
+                                          ) : (
+                                            <div className="view-mode">
+                                              <p
+                                                className="detail-description"
+                                                dir={
+                                                  language === "ar"
+                                                    ? "rtl"
+                                                    : "ltr"
+                                                }
+                                              >
+                                                {getPersonText(
+                                                  chapter.person,
+                                                  "description"
+                                                )}
+                                              </p>
+                                              <EditButton
+                                                onClick={() =>
+                                                  startEditing(
+                                                    chapter.id,
+                                                    "person",
+                                                    getPersonText(
+                                                      chapter.person!,
+                                                      "description"
+                                                    )
+                                                  )
+                                                }
+                                                isEditing={
+                                                  editingField?.chapterId ===
+                                                    chapter.id &&
+                                                  editingField?.field ===
+                                                    "person"
+                                                }
+                                              />
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {/* Object Detection */}
+                                    {chapter.object && (
+                                      <div
+                                        className={`detail-card object-card ${
+                                          chapter.object.suspicious
+                                            ? "suspicious"
+                                            : ""
+                                        }`}
+                                        onClick={() => {
+                                          if (
+                                            chapter.object?.first_seen !==
+                                            undefined
+                                          ) {
+                                            handleTimelineClick(
+                                              chapter.object.first_seen
+                                            );
+                                          }
+                                        }}
+                                      >
+                                        <div className="detail-header">
+                                          <span className="detail-title">
+                                            {language === "ar"
+                                              ? "تم اكتشاف شيء"
+                                              : "Object Detected"}
+                                          </span>
+                                          <div className="detail-header-badges">
+                                            {chapter.object.suspicious && (
+                                              <span className="suspicious-badge">
+                                                {language === "ar"
+                                                  ? "مشبوه"
+                                                  : "Suspicious"}
+                                              </span>
+                                            )}
+                                            {chapter.object.confidence && (
+                                              <span className="confidence-badge">
+                                                {getObjectText(
+                                                  chapter.object,
+                                                  "confidence"
+                                                )}
+                                              </span>
+                                            )}
+                                          </div>
+                                        </div>
+                                        <div className="detail-content">
+                                          {editingField?.chapterId ===
+                                            chapter.id &&
+                                          editingField?.field === "object" ? (
+                                            <div className="edit-mode">
+                                              <textarea
+                                                value={editValue}
+                                                onChange={(e) =>
+                                                  setEditValue(e.target.value)
+                                                }
+                                                className="edit-textarea"
+                                                dir={
+                                                  language === "ar"
+                                                    ? "rtl"
+                                                    : "ltr"
+                                                }
+                                                rows={3}
+                                                autoFocus
+                                              />
+                                              <div className="edit-actions">
+                                                <button
+                                                  className="save-btn"
+                                                  onClick={saveEdit}
+                                                >
+                                                  <Check size={16} />
+                                                  {language === "ar"
+                                                    ? "حفظ"
+                                                    : "Save"}
+                                                </button>
+                                                <button
+                                                  className="cancel-btn"
+                                                  onClick={cancelEditing}
+                                                >
+                                                  <X size={16} />
+                                                  {language === "ar"
+                                                    ? "إلغاء"
+                                                    : "Cancel"}
+                                                </button>
+                                              </div>
+                                            </div>
+                                          ) : (
+                                            <div className="view-mode">
+                                              <p
+                                                className="detail-description"
+                                                dir={
+                                                  language === "ar"
+                                                    ? "rtl"
+                                                    : "ltr"
+                                                }
+                                              >
+                                                {getObjectText(
+                                                  chapter.object,
+                                                  "description"
+                                                )}
+                                              </p>
+                                              <EditButton
+                                                onClick={() =>
+                                                  startEditing(
+                                                    chapter.id,
+                                                    "object",
+                                                    getObjectText(
+                                                      chapter.object!,
+                                                      "description"
+                                                    )
+                                                  )
+                                                }
+                                                isEditing={
+                                                  editingField?.chapterId ===
+                                                    chapter.id &&
+                                                  editingField?.field ===
+                                                    "object"
+                                                }
+                                              />
+                                            </div>
+                                          )}
+                                          {chapter.object.risk_relevance && (
+                                            <p
+                                              className="risk-relevance"
+                                              dir={
+                                                language === "ar"
+                                                  ? "rtl"
+                                                  : "ltr"
+                                              }
+                                            >
+                                              <strong>
+                                                {language === "ar"
+                                                  ? "تقييم المخاطر:"
+                                                  : "Risk Assessment:"}
+                                              </strong>{" "}
+                                              {chapter.object.risk_relevance}
+                                            </p>
+                                          )}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            )
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                  {/* Language Toggle */}
+                  <div className="language-toggle">
+                    <span className="language-toggle-label">
+                      {language === "ar" ? "اللغة:" : "Language:"}
+                    </span>
+                    <button
+                      className={`language-btn ${
+                        language === "en" ? "active" : ""
+                      }`}
+                      onClick={() => setLanguage("en")}
+                    >
+                      English
+                    </button>
+                    <button
+                      className={`language-btn ${
+                        language === "ar" ? "active" : ""
+                      }`}
+                      onClick={() => setLanguage("ar")}
+                    >
+                      العربية
+                    </button>
+                  </div>
+
+                  <div className="export-actions">
+                    <button
+                      className="continue-btn"
+                      onClick={exportWithExpandedChapters}
+                      disabled={isExporting}
+                    >
+                      {isExporting ? (
+                        <>
+                          <span className="processing-spinner">⟳</span>
+                          {language === "ar"
+                            ? "جاري التصدير..."
+                            : "Exporting..."}
+                        </>
+                      ) : language === "ar" ? (
+                        "تصدير التقرير PDF"
+                      ) : (
+                        "Export Report as PDF"
+                      )}
+                    </button>
+                  </div>
                 </div>
               </div>
             ) : (
