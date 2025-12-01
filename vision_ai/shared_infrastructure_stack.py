@@ -29,9 +29,13 @@ class SharedInfrastructureStack(Stack):
                     s3.HttpMethods.GET,
                     s3.HttpMethods.PUT,
                     s3.HttpMethods.POST,
-                    s3.HttpMethods.DELETE
+                    s3.HttpMethods.DELETE,
+                    s3.HttpMethods.HEAD
                 ],
-                allowed_origins=["http://localhost:3000"],
+                allowed_origins=[
+                "http://localhost:3000",
+                "https://d1beit5kpeumzc.cloudfront.net"  
+                ],
                 allowed_headers=["*"],
                 exposed_headers=["ETag"],
                 max_age=3000

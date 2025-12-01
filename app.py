@@ -12,6 +12,7 @@ from vision_ai.rewrite_stack import RewriteStack
 from vision_ai.summarization_stack import SummarizationStack
 from vision_ai.api_deployment_stack import APIDeploymentStack
 from vision_ai.transcription_stack import TranscriptionStack
+from vision_ai.frontend_stack import FrontendStack
 
 load_dotenv()
 app = cdk.App()
@@ -35,7 +36,7 @@ env = cdk.Environment(
 )
  
 app_name = "vision-ai"
-
+environment = app.node.try_get_context("environment") or "prod"
 # ==========================================
 # 1. COGNITO STACK - Authentication
 # ==========================================
@@ -164,6 +165,19 @@ deployment_stack.add_dependency(advanced_analysis_stack)
 deployment_stack.add_dependency(rewrite_stack)
 deployment_stack.add_dependency(transcription_stack)
 deployment_stack.add_dependency(summarization_stack)
+
+# ==========================================
+# 10. FRONTEND STACK
+# CloudFront + S3 for React Frontend
+# ==========================================
+frontend_stack = FrontendStack(
+    app, f"{app_name}-frontend-stack",
+    environment=environment,
+    env=env,
+    description="CloudFront distribution and S3 bucket for React frontend with OAC security"
+)
+
+
 
 # Add tags
 cdk.Tags.of(app).add("Project", "VisionAI")
