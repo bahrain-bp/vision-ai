@@ -1,8 +1,8 @@
-import React, {  useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useRealTimeTranslation } from '../../hooks/useRealTimeTranslation';
 import { Globe, Trash2, Eye } from 'lucide-react';
 import TranslationSettings from './TranslationSettings';
-import PDFExporter from '../LiveTranscription/PDFExporter'; 
+import PDFExporter from './TranslationPDFExporter'; 
 
 const RealTimeTranslation: React.FC = () => {
   const {
@@ -16,13 +16,18 @@ const RealTimeTranslation: React.FC = () => {
     setWitnessLanguage
   } = useRealTimeTranslation();
 
-  // Auto-scroll ref
+  // Auto-scroll refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const translationContainerRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom when new translations arrive
- // useEffect(() => {
-   // messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  //}, [translations]);
+  useEffect(() => {
+    if (translationContainerRef.current) {
+      const container = translationContainerRef.current;
+      // Directly set the scroll position to the bottom of the container
+      container.scrollTop = container.scrollHeight;
+    }
+  }, [translations]);
 
   // Generate transcript text for PDF export 
   const generateTranscriptText = () => {
@@ -107,7 +112,10 @@ const RealTimeTranslation: React.FC = () => {
         </div>
       </div>
 
-      <div className="translation-container">
+      <div 
+        className="translation-container"
+        ref={translationContainerRef}
+      >
         {translations.length === 0 ? (
           <div className="empty-state">
             <Globe size={48} className="empty-icon" />
@@ -130,14 +138,12 @@ const RealTimeTranslation: React.FC = () => {
                 </div>
               </div>
             ))}
-            {/* Auto-scroll anchor */}
             <div ref={messagesEndRef} />
           </div>
         )}
       </div>
 
       <div className="action-buttons">
-        {/* Replace the old download button with PDFExporter - same as transcription */}
         <PDFExporter
           transcript={generateTranscriptText()}
           title={"Investigation Transcript - Translation"}
