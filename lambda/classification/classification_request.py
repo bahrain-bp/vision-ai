@@ -63,33 +63,35 @@ def classify_report(text: str) -> Dict[str, Any]:
     Call Nova Lite to classify a report into one category and return it
     in the detected report language.
     """
-    target_language = "ar" if any("\u0600" <= ch <= "\u06FF" for ch in text) else "en"
+    target_language = "ar" if any("؀" <= ch <= "ۿ" for ch in text) else "en"
     default_labels = {
         "violation": "مخالفة" if target_language == "ar" else "violation",
         "misdemeanor": "جنحة" if target_language == "ar" else "misdemeanor",
         "felony": "جناية" if target_language == "ar" else "felony",
     }
 
-    system_prompt = (
-        "أنت مصنف قانوني لتقارير تحقيق بحرينية. صنّف الواقعة في فئة واحدة فقط من الفئات الثلاث: "
-        "مخالفة (violation)، جنحة (misdemeanor)، جناية (felony). لا تستخدم أي فئة أخرى. "
-        "اكتشف لغة التقرير وأعد الاستجابة بنفس اللغة. أعد JSON فقط بالمفاتيح: category، confidence، reason. "
-        "category يجب أن يكون التسمية باللغة المكتشفة لإحدى الفئات الثلاث فقط. "
-        "confidence عدد عشري بين 0 و 1. السبب مختصر (<=140 حرفاً) وبنفس لغة التقرير."
-    )
+    system_prompt = """
+أنت مصنف قانوني. صنف النص في فئة واحدة فقط من بين: مخالفة، جنحة، جناية.
+اكتشف لغة النص (عربية أو غيرها) وأجب بنفس اللغة.
+أعد JSON فقط بالمفاتيح: category، confidence، reason.
+category يجب أن تكون إحدى التسميات الثلاث في لغة الرد.
+confidence رقم بين 0 و1.
+reason سبب مختصر للتصنيف.
+لا تضف مقدمات أو شروحات أو اعتذارات ولا ترفض الإجابة.
+    """.strip()
 
-    user_prompt = (
-        "نص التقرير:\n\"\"\"\n"
-        f"{text}\n"
-        "\"\"\"\n"
-        "اكتشف اللغة وأعد فقط JSON بهذا الشكل:\n"
-        "{\n"
-        '  \"category\": \"مخالفة أو جنحة أو جناية (أو كلماتها المكافئة باللغة المكتشفة)\",\n'
-        '  \"confidence\": 0.0,\n'
-        '  \"reason\": \"سبب مختصر جداً في نفس اللغة\"\n'
-        "}\n"
-        "لا تضف أي نص آخر ولا أي فئات إضافية."
-    )
+    user_prompt = f"""
+صنّف النص التالي:
+{text}
+
+أعد فقط JSON بالشكل التالي:
+{{
+  "category": "مخالفة أو جنحة أو جناية (باللغة المطابقة للنص)",
+  "confidence": 0.0,
+  "reason": "سبب مختصر للتصنيف بنفس لغة النص"
+}}
+لا تضف أي شيء آخر.
+    """.strip()
 
     response = bedrock.converse(
         modelId=MODEL_ID,
@@ -101,7 +103,7 @@ def classify_report(text: str) -> Dict[str, Any]:
     raw_text = response["output"]["message"]["content"][0].get("text", "")
     logger.info("Bedrock classification raw response: %s", raw_text[:400])
 
-    parsed: Dict[str, Any] = {}
+    parsed: dict = {}
     try:
         parsed = json.loads(extract_json_block(raw_text))
     except Exception:
@@ -115,7 +117,11 @@ def classify_report(text: str) -> Dict[str, Any]:
     raw_category = str(parsed.get("category", "")).strip()
     category_norm = raw_category.lower()
 
-    arabic_map = {"مخالفة": "violation", "جنحة": "misdemeanor", "جناية": "felony"}
+    arabic_map = {
+        "مخالفة": "violation",
+        "جنحة": "misdemeanor",
+        "جناية": "felony",
+    }
     english_map = {"violation": "violation", "misdemeanor": "misdemeanor", "felony": "felony"}
 
     code_from_label = arabic_map.get(raw_category) or english_map.get(category_norm)
@@ -139,7 +145,6 @@ def classify_report(text: str) -> Dict[str, Any]:
         "reason": reason,
         "model": MODEL_ID,
     }
-
 
 def handler(event, context):
     try:

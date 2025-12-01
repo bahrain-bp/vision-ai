@@ -11,7 +11,7 @@ interface ClassificationProps {
 
 type LoadingState = "idle" | "upload" | "extract" | "classify" | "save";
 
-const MAX_FILE_SIZE_MB = 3;
+const MAX_FILE_SIZE_MB = 4;
 const ALLOWED_TYPES = [
   "application/pdf",
   "application/msword",
