@@ -154,5 +154,20 @@ class StreamManager {
       this.audioStream = null;
     }
   }
+
+  pauseStreams(isPaused:boolean): void {
+    
+    if (this.displayStream) {
+      this.displayStream.getAudioTracks().forEach((track) => {
+        track.enabled = !isPaused;
+      });
+    }
+
+    if (this.audioStream) {
+      this.audioStream.getAudioTracks().forEach((track) => {
+        track.enabled = !isPaused;
+      });
+    }
+  }
 }
 export default StreamManager.getInstance();

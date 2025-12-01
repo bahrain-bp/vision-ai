@@ -1,3 +1,6 @@
+import {
+  TranscribeStreamingClient,
+} from "@aws-sdk/client-transcribe-streaming";
 export interface TranscribedWord {
   id: number;
   content: string;
@@ -7,6 +10,7 @@ export interface TranscribedWord {
 
 export interface TranscriptionResult {
   words: TranscribedWord[];
+  sentences: string;
   speaker: string;
   formattedTranscript: string;
   timeStamp: string;
@@ -49,6 +53,7 @@ export type ErrorType =
   | "device"
   | "permission"
   | "service"
+  | "timeout"
   | "unknown";
 
 export const ErrorTypeLabels: Record<ErrorType, string> = {
@@ -57,6 +62,7 @@ export const ErrorTypeLabels: Record<ErrorType, string> = {
   device: "Device Problem",
   permission: "Permission Denied",
   service: "Service Unavailable",
+  timeout: "Session Timeout",
   unknown: "Unexpected Error",
 };
 
@@ -73,3 +79,20 @@ export const ErrorTypeLabels: Record<ErrorType, string> = {
       [key: string]: any;
     };
   }
+export interface LanguagePreferences {
+  languageMode: "unified" | "separate";
+  sharedLanguage: string ; // For unified mode
+  investigatorLanguage: string; // For separate mode
+  witnessLanguage: string; // For separate mode - single language
+}
+
+
+export interface sourceSettings {
+  source: "display" | "microphone";
+  transcribeClient: TranscribeStreamingClient;
+  stream: MediaStream;
+  maxAttempts: number;
+  selectedLanguage?: string;
+  speakerMode?: sessionType;
+  detectionLanguages?: string;
+}
