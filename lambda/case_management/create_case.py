@@ -49,7 +49,7 @@ def handler(event, context):
             ContentType='application/json'
         )
 
-        police_docs_key = f"cases/{case_id}/policeDocuments/"
+        police_docs_key = f"cases/{case_id}/police-documents/"
         s3_client.put_object(
         Bucket=bucket_name,
         Key=police_docs_key,
