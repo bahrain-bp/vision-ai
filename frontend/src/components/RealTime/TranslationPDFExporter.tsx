@@ -9,6 +9,7 @@ interface TranslationPDFExporterProps {
   title: string;
   fileName: string;
   sessionDate?: string;
+  contentType?: 'transcript' | 'report'; 
 }
 
 const TranslationPDFExporter: React.FC<TranslationPDFExporterProps> = ({
@@ -16,11 +17,30 @@ const TranslationPDFExporter: React.FC<TranslationPDFExporterProps> = ({
   title,
   fileName,
   sessionDate = new Date().toLocaleDateString(),
+  contentType = 'transcript', 
 }) => {
   const [isGenerating, setIsGenerating] = useState(false);
 
   // Convert transcript to Markdown format
   const generateMarkdownContent = (): string => {
+    if (contentType === 'report') {
+      // Simple format for report/summary
+      const markdown = `# ${title}
+
+**Date:** ${sessionDate}
+
+---
+
+${transcript}
+
+---
+
+*Generated on ${new Date().toLocaleString()}*
+`;
+      return markdown;
+    }
+
+    // Original transcript format
     const markdown = `# ${title}
 
 **Date:** ${sessionDate}
@@ -101,7 +121,7 @@ ${transcript.split('\n').map(line => {
       const padding = 40;
       const contentHeight = pageHeight - (padding * 2);
 
-      // Format the transcript lines
+      // Format the content based on type
       const lines = transcript.split('\n').filter(line => line.trim());
       
       // Create header content
@@ -110,29 +130,41 @@ ${transcript.split('\n').map(line => {
           <h1>${title}</h1>
           <p>Date: ${sessionDate}</p>
         </div>
-        <div class="pdf-section-title">
-          <h2>Transcript</h2>
-        </div>
+        ${contentType === 'transcript' ? '<div class="pdf-section-title"><h2>Transcript</h2></div>' : ''}
       `;
 
-      // Split content into entries with proper word wrapping
-      const entries = lines.map(line => {
-        const match = line.match(/\[(.*?)\]\s*\[(.*?)\]:\s*(.*)/);
-        if (match) {
-          const [, time, speaker, text] = match;
+      // Split content into entries based on content type
+      let entries: string[];
+      
+      if (contentType === 'report') {
+        // For report/summary: plain text paragraphs without blue boxes
+        entries = lines.map(line => {
           return `
-            <div class="transcript-entry">
-              <strong>[${time}] ${speaker}:</strong>
-              <div class="transcript-text-box">${text}</div>
+            <div class="report-paragraph">
+              <p>${line}</p>
             </div>
           `;
-        }
-        return `
-          <div class="transcript-entry">
-            <div class="transcript-text-box">${line}</div>
-          </div>
-        `;
-      });
+        });
+      } else {
+        // For transcript: original format with blue boxes
+        entries = lines.map(line => {
+          const match = line.match(/\[(.*?)\]\s*\[(.*?)\]:\s*(.*)/);
+          if (match) {
+            const [, time, speaker, text] = match;
+            return `
+              <div class="transcript-entry">
+                <strong>[${time}] ${speaker}:</strong>
+                <div class="transcript-text-box">${text}</div>
+              </div>
+            `;
+          }
+          return `
+            <div class="transcript-entry">
+              <div class="transcript-text-box">${line}</div>
+            </div>
+          `;
+        });
+      }
 
       // Function to create a page element
       const createPageElement = (content: string, isFirstPage: boolean) => {
@@ -313,8 +345,8 @@ ${transcript.split('\n').map(line => {
     blockquote {
       margin: 0;
       padding: 8pt 15pt;
-      background-color: #f5f5f5;
-      border-left: 4pt solid #4A90E2;
+      background-color: ${contentType === 'report' ? 'transparent' : '#f5f5f5'};
+      border-left: ${contentType === 'report' ? 'none' : '4pt solid #4A90E2'};
       font-family: inherit;
       page-break-inside: avoid;
       word-wrap: break-word;
@@ -326,8 +358,9 @@ ${transcript.split('\n').map(line => {
       margin: 16pt 0;
     }
     p {
-      margin: 0;
+      margin: 0 0 10pt 0;
       page-break-inside: avoid;
+      text-align: justify;
     }
   </style>
 </head>
