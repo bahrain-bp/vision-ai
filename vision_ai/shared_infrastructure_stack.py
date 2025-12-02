@@ -20,8 +20,7 @@ class SharedInfrastructureStack(Stack):
         # ==========================================
         self.investigation_bucket = s3.Bucket(
             self, "InvestigationBucket",
-            bucket_name="vision-rt-investigation-system",
-            versioned=True,
+            bucket_name=f"vision-investigation-system-{self.account}",              versioned=True,
             encryption=s3.BucketEncryption.S3_MANAGED,
             removal_policy=RemovalPolicy.RETAIN,
             cors=[s3.CorsRule(
