@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Loader } from "lucide-react";
 import "../../ProcessingView.css";
 
@@ -16,6 +16,7 @@ export interface SessionData {
   duration?: string;
   witness?: string;
   status?: string;
+  extractedTextKey?: string;
 }
 
 interface ProcessingViewProps {
@@ -32,17 +33,39 @@ interface Tab {
 const ProcessingView: React.FC<ProcessingViewProps> = ({ sessionData, language }) => {
   const [activeTab, setActiveTab] = useState<string>("Classification");
   const [isProcessing, setIsProcessing] = useState<boolean>(true);
+  const [extractedTextKey, setExtractedTextKey] = useState<string | undefined>(
+    sessionData.extractedTextKey
+  );
+
+  useEffect(() => {
+    setExtractedTextKey(sessionData.extractedTextKey);
+  }, [sessionData.sessionId, sessionData.extractedTextKey]);
+
+  const handleExtractedKey = (key: string) => {
+    setExtractedTextKey(key);
+  };
+
+  const sessionWithKey: SessionData = {
+    ...sessionData,
+    extractedTextKey,
+  };
 
   const tabs: Tab[] = [
     {
        id: "Classification",
        label: language === "en" ? "Classification" : "التصنيف",
-       render: () => <Classification sessionData={sessionData} />,
+       render: () => (
+         <Classification
+           sessionData={sessionWithKey}
+           language={language}
+           onExtractedKey={handleExtractedKey}
+         />
+       ),
        },
     { 
       id: "Rewrite",
       label: language === "en" ? "Rewrite" : "إعادة الصياغة",
-      render: () => <Rewrite sessionData={sessionData} />,
+      render: () => <Rewrite sessionData={sessionWithKey} />,
      },
     { id: "CameraFootage",
       label: language === "en" ? "Camera Footage" : "لقطات الكاميرا",
@@ -50,7 +73,7 @@ const ProcessingView: React.FC<ProcessingViewProps> = ({ sessionData, language }
      },
     { id: "AISuggestions",
      label: language === "en" ? "AI Suggestions" : "اقتراحات الذكاء الاصطناعي",
-     render: () => <AISuggestions sessionData={sessionData} />,
+     render: () => <AISuggestions sessionData={sessionWithKey} />,
     },
     { 
       id: "Contradictions",
