@@ -180,7 +180,7 @@ summarization_stack = SummarizationStack(
 summarization_stack.add_dependency(shared_stack)
 
 # ==========================================
-# 9. CAMERA FOOTAGE ANALYSIS STACK
+# 10. CAMERA FOOTAGE ANALYSIS STACK
 # Uses shared API by ID
 # ==========================================
 camera_footage_stack = CameraFootageAnalysisStack(
@@ -198,7 +198,7 @@ camera_footage_stack.add_dependency(shared_stack)
 
 
 # ==========================================
-# 10. Detect Contradiction STACK
+# 11. Detect Contradiction STACK
 # ==========================================
 detect_contradiction_stack = ContradictionStack(
     app,
@@ -212,7 +212,7 @@ detect_contradiction_stack = ContradictionStack(
 detect_contradiction_stack.add_dependency(shared_stack)
 
 # ==========================================
-# 11. API DEPLOYMENT STACK
+# 12. API DEPLOYMENT STACK
 # Deploys API after all routes are added
 # ==========================================
 deployment_stack = APIDeploymentStack(
@@ -237,7 +237,7 @@ deployment_stack.add_dependency(summarization_stack)
 deployment_stack.add_dependency(camera_footage_stack)
 
 # ==========================================
-# 12. FRONTEND STACK
+# 13. FRONTEND STACK
 # CloudFront + S3 for React Frontend
 # ==========================================
 frontend_stack = FrontendStack(
