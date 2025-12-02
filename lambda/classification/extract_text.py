@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import re
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from urllib.parse import unquote_plus
 
 import boto3
@@ -45,6 +46,7 @@ TEXT_TEMPERATURE = float(os.environ.get("TEXT_TEMPERATURE", "0.2"))
 TEXT_TOP_P = float(os.environ.get("TEXT_TOP_P", "0.9"))
 PDF_MIN_TEXT_CHARS = int(os.environ.get("PDF_MIN_TEXT_CHARS", "40"))
 PDF_OCR_LANGS = os.environ.get("PDF_OCR_LANGS", "ara+eng")
+PDF_THREAD_WORKERS = int(os.environ.get("PDF_THREAD_WORKERS", "4"))
 
 NORMALIZATION_SYSTEM_PROMPT = """
 أنت محرّك لتطبيع/تنظيم نصوص المستندات القانونية.
@@ -239,25 +241,25 @@ def extract_pdf(s3_key):
     pdf_obj = s3.get_object(Bucket=BUCKET_NAME, Key=s3_key)
     pdf_bytes = pdf_obj["Body"].read()
 
-    pages_text = []
-    doc = fitz.open(stream=pdf_bytes, filetype="pdf")
-    try:
-        for page_index, page in enumerate(doc, 1):
-            page_image = render_pdf_page_image(page)
-            raw_text = extract_pdf_raw_text(page)
+    with fitz.open(stream=pdf_bytes, filetype="pdf") as doc:
+        page_count = doc.page_count
+        max_workers = max(1, min(PDF_THREAD_WORKERS, page_count))
+        futures = []
+        pages_text = [None] * page_count
 
-            if is_sparse_pdf_text(raw_text):
-                ocr_text = ocr_pdf_page(page_image)
-                if ocr_text:
-                    raw_text = merge_lines(ocr_text)
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            for page_index, page in enumerate(doc, 1):
+                page_image = render_pdf_page_image(page)
+                raw_text = extract_pdf_raw_text(page)
+                futures.append(
+                    executor.submit(process_pdf_page, page_index, raw_text, page_image)
+                )
 
-            normalized = normalize_pdf_page(raw_text, page_image)
-            page_body = normalized or raw_text
-            pages_text.append(format_page_output(page_index, page_body))
-    finally:
-        doc.close()
+            for future in as_completed(futures):
+                page_index, page_output = future.result()
+                pages_text[page_index - 1] = page_output
 
-    full_text = "\n\n".join(pages_text).strip()
+    full_text = "\n\n".join([p for p in pages_text if p]).strip()
     if not full_text:
         return error_response("failed to extract the text", status=500)
     return api_response(full_text)
@@ -409,6 +411,18 @@ def is_sparse_pdf_text(text: str) -> bool:
         return True
     compact = re.sub(r"\s+", "", text)
     return len(compact) < PDF_MIN_TEXT_CHARS
+
+
+def process_pdf_page(page_index: int, raw_text: str, page_image: bytes):
+    text = raw_text
+    if is_sparse_pdf_text(text):
+        ocr_text = ocr_pdf_page(page_image)
+        if ocr_text:
+            text = merge_lines(ocr_text)
+
+    normalized = normalize_pdf_page(text, page_image)
+    page_body = normalized or text
+    return page_index, format_page_output(page_index, page_body)
 
 
 def ocr_pdf_page(image_bytes: bytes) -> str:
