@@ -89,6 +89,14 @@ class classificationStack(Stack):
             description="python-docx dependency layer",
         )
 
+        tesseract_layer = _lambda.LayerVersion(
+            self,
+            "TesseractLayer",
+            code=_lambda.Code.from_asset("./layers/tesseract-al2-layer.zip"),
+            compatible_runtimes=[_lambda.Runtime.PYTHON_3_12],
+            description="Tesseract OCR binary layer for Amazon Linux 2",
+        )
+
         get_upload_url_lambda = _lambda.Function(
             self, "GetUploadUrlFunction",
             runtime=_lambda.Runtime.PYTHON_3_11,
@@ -138,8 +146,12 @@ class classificationStack(Stack):
             memory_size=512,
             timeout = Duration.seconds(900),  
             layers=[
+                tesseract_layer,
                 _lambda.LayerVersion.from_layer_version_arn(
                     self, "PDFLayer", "arn:aws:lambda:us-east-1:770693421928:layer:Klayers-p312-PyMuPDF:11"
+                ),
+                _lambda.LayerVersion.from_layer_version_arn(
+                    self, "PillowLayer", "arn:aws:lambda:us-east-1:770693421928:layer:Klayers-p312-Pillow:8"
                 ),
                 docx_layer,
             ],
@@ -147,6 +159,8 @@ class classificationStack(Stack):
                 "BUCKET_NAME": investigation_bucket.bucket_name,
                 "BEDROCK_REGION": "us-east-1",             
                 "MODEL_ID": "us.meta.llama3-2-90b-instruct-v1:0",  
+                "TESSDATA_PREFIX": "/opt/tesseract/share",
+                "TESSERACT_CMD": "/opt/bin/tesseract",
             },
         )
 

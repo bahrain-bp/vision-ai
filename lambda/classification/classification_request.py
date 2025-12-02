@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import re
 from typing import Any, Dict
 
 import boto3
@@ -63,7 +64,7 @@ def classify_report(text: str) -> Dict[str, Any]:
     Call Nova Lite to classify a report into one category and return it
     in the detected report language.
     """
-    target_language = "ar" if any("؀" <= ch <= "ۿ" for ch in text) else "en"
+    target_language = "ar" if re.search(r"[\u0600-\u06FF]", text) else "en"
     default_labels = {
         "violation": "مخالفة" if target_language == "ar" else "violation",
         "misdemeanor": "جنحة" if target_language == "ar" else "misdemeanor",
@@ -71,26 +72,30 @@ def classify_report(text: str) -> Dict[str, Any]:
     }
 
     system_prompt = """
-أنت مصنف قانوني. صنف النص في فئة واحدة فقط من بين: مخالفة، جنحة، جناية.
-اكتشف لغة النص (عربية أو غيرها) وأجب بنفس اللغة.
-أعد JSON فقط بالمفاتيح: category، confidence، reason.
-category يجب أن تكون إحدى التسميات الثلاث في لغة الرد.
-confidence رقم بين 0 و1.
-reason سبب مختصر للتصنيف.
-لا تضف مقدمات أو شروحات أو اعتذارات ولا ترفض الإجابة.
+You are a legal text classifier for investigation reports. Classify the report into exactly one category based on bahrain laws:
+- violation (minor policy/administrative breach)
+- misdemeanor (medium-severity criminal offense)
+- felony (serious criminal offense)
+
+Rules:
+- Reply ONLY with JSON containing: category, confidence, reason.
+- The rcategory should be in the same language of the report
+- category must be one of: "violation", "misdemeanor", "felony", or their Arabic equivalents: "مخالفة", "جنحة", "جناية".
+- confidence must be a number between 0 and 1.
+- reason should be a concise Arabic sentence explaining the choice.
+- Do NOT add any text outside the JSON.
     """.strip()
 
     user_prompt = f"""
-صنّف النص التالي:
+صنّف البلاغ التالي في فئة واحدة فقط (مخالفة / جنحة / جناية):
 {text}
 
-أعد فقط JSON بالشكل التالي:
+أرجع الاستجابة JSON فقط بهذا الشكل:
 {{
-  "category": "مخالفة أو جنحة أو جناية (باللغة المطابقة للنص)",
+  "category": "مخالفة أو جنحة أو جناية (أو الإنجليزية المكافئة)",
   "confidence": 0.0,
-  "reason": "سبب مختصر للتصنيف بنفس لغة النص"
+  "reason": "سبب مختصر لاختيار الفئة"
 }}
-لا تضف أي شيء آخر.
     """.strip()
 
     response = bedrock.converse(
@@ -117,11 +122,7 @@ reason سبب مختصر للتصنيف.
     raw_category = str(parsed.get("category", "")).strip()
     category_norm = raw_category.lower()
 
-    arabic_map = {
-        "مخالفة": "violation",
-        "جنحة": "misdemeanor",
-        "جناية": "felony",
-    }
+    arabic_map = {"مخالفة": "violation", "جنحة": "misdemeanor", "جناية": "felony"}
     english_map = {"violation": "violation", "misdemeanor": "misdemeanor", "felony": "felony"}
 
     code_from_label = arabic_map.get(raw_category) or english_map.get(category_norm)
@@ -145,6 +146,7 @@ reason سبب مختصر للتصنيف.
         "reason": reason,
         "model": MODEL_ID,
     }
+
 
 def handler(event, context):
     try:

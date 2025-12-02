@@ -7,6 +7,8 @@ from urllib.parse import unquote_plus
 
 import boto3
 import fitz
+import pytesseract
+from PIL import Image
 from docx import Document
 from docx.oxml.table import CT_Tbl
 from docx.oxml.text.paragraph import CT_P
@@ -16,6 +18,14 @@ from docx.text.paragraph import Paragraph
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
+
+# Ensure the Lambda runtime can locate the Tesseract binaries and data files from the layer.
+os.environ.setdefault("PATH", "")
+os.environ["PATH"] = "/opt/bin:" + os.environ["PATH"]
+os.environ.setdefault("LD_LIBRARY_PATH", "")
+os.environ["LD_LIBRARY_PATH"] = "/opt/lib:" + os.environ["LD_LIBRARY_PATH"]
+os.environ.setdefault("TESSDATA_PREFIX", "/opt/tesseract/share")
+pytesseract.pytesseract.tesseract_cmd = os.environ.get("TESSERACT_CMD", "/opt/bin/tesseract")
 
 s3 = boto3.client("s3")
 cognito_idp = boto3.client("cognito-idp")
@@ -33,6 +43,8 @@ VISION_TOP_P = float(os.environ.get("VISION_TOP_P", "0.9"))
 TEXT_MAX_TOKENS = int(os.environ.get("TEXT_MAX_TOKENS", "4000"))
 TEXT_TEMPERATURE = float(os.environ.get("TEXT_TEMPERATURE", "0.2"))
 TEXT_TOP_P = float(os.environ.get("TEXT_TOP_P", "0.9"))
+PDF_MIN_TEXT_CHARS = int(os.environ.get("PDF_MIN_TEXT_CHARS", "40"))
+PDF_OCR_LANGS = os.environ.get("PDF_OCR_LANGS", "ara+eng")
 
 NORMALIZATION_SYSTEM_PROMPT = """
 أنت محرّك لتطبيع/تنظيم نصوص المستندات القانونية.
@@ -231,8 +243,14 @@ def extract_pdf(s3_key):
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
     try:
         for page_index, page in enumerate(doc, 1):
-            raw_text = extract_pdf_raw_text(page)
             page_image = render_pdf_page_image(page)
+            raw_text = extract_pdf_raw_text(page)
+
+            if is_sparse_pdf_text(raw_text):
+                ocr_text = ocr_pdf_page(page_image)
+                if ocr_text:
+                    raw_text = merge_lines(ocr_text)
+
             normalized = normalize_pdf_page(raw_text, page_image)
             page_body = normalized or raw_text
             pages_text.append(format_page_output(page_index, page_body))
@@ -384,3 +402,20 @@ def merge_lines(text):
 
 def format_page_output(page_index, body):
     return f"=== Page {page_index} ===\n{body.strip()}"
+
+
+def is_sparse_pdf_text(text: str) -> bool:
+    if text is None:
+        return True
+    compact = re.sub(r"\s+", "", text)
+    return len(compact) < PDF_MIN_TEXT_CHARS
+
+
+def ocr_pdf_page(image_bytes: bytes) -> str:
+    try:
+        image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+        text = pytesseract.image_to_string(image, lang=PDF_OCR_LANGS)
+        return text.strip()
+    except Exception:
+        logger.exception("Tesseract OCR failed")
+        return ""
