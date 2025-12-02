@@ -4,37 +4,44 @@ import { useTranscription } from "../../hooks/useTranscription";
 import {
   RecordingStatus,
   TranscriptionStatus,
-  sessionType,
+  SessionType,
+  LanguagePreferences,
 } from "../../types/";
-import PDFExporter from "./PDFExporter";
+import PDFExporter from "../RealTime/TranslationPDFExporter"; 
 import ErrorDisplay from "./ErrorDisplay";
 import { useState } from "react";
+import {useCaseContext} from "../../hooks/useCaseContext"
 
 interface LiveTranscriptionProps {
   startRecordingProp: boolean;
   setSessionState: (state: RecordingStatus) => void;
-  selectedLanguage: string;
-  detectionLanguages?:string[];
-  setSessionType: (sesType: sessionType) => void;
-  sessionType: sessionType;
+  languagePreferences: LanguagePreferences;
+  detectionLanguages?: string[];
+  setSessionType: (sesType: SessionType) => void;
+  sessionType: SessionType;
 }
 
 const LiveTranscription: React.FC<LiveTranscriptionProps> = ({
   startRecordingProp,
   setSessionState,
-  selectedLanguage,
+  languagePreferences,
   detectionLanguages,
   //setSessionType,
   sessionType,
 }) => {
   const { audioStatus, recordingStatus, startRecording, getFullTranscript } =
     useTranscription();
+
+    const {currentCase,currentSession} = useCaseContext();
+
+    
   const [error, setError] = useState<TranscriptionStatus | null>(null);
 
   const [isStarting, setIsStarting] = useState(false);
 
   const hasStarted = useRef(false);
 
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (
@@ -48,16 +55,16 @@ const LiveTranscription: React.FC<LiveTranscriptionProps> = ({
         setIsStarting(true);
         setError(null);
         try {
-              const detectionLangString =
-                detectionLanguages && detectionLanguages.length > 0
-                  ? detectionLanguages.join(",")
-                  : undefined;
-            const result: TranscriptionStatus = await startRecording(
-              setSessionState,
-              selectedLanguage,
-              sessionType,
-              detectionLangString
-            );
+          const detectionLangString =
+            detectionLanguages && detectionLanguages.length > 0
+              ? detectionLanguages.join(",")
+              : undefined;
+          const result: TranscriptionStatus = await startRecording(
+            setSessionState,
+            languagePreferences,
+            sessionType,
+            detectionLangString
+          );
 
           if (!result.success) {
             console.error("Failed to start recording: ", result.error);
@@ -75,7 +82,13 @@ const LiveTranscription: React.FC<LiveTranscriptionProps> = ({
 
       start();
     }
-  }, [startRecordingProp, recordingStatus, selectedLanguage]);
+  }, [startRecordingProp, recordingStatus, languagePreferences]);
+
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.scrollTop = textareaRef.current.scrollHeight;
+    }
+  }, [getFullTranscript]);
 
   if (error) {
     return (
@@ -126,6 +139,7 @@ const LiveTranscription: React.FC<LiveTranscriptionProps> = ({
       <textarea
         value={getFullTranscript}
         readOnly
+        ref={textareaRef}
         placeholder="Transcript will appear here..."
         style={{
           width: "100%",
@@ -145,7 +159,8 @@ const LiveTranscription: React.FC<LiveTranscriptionProps> = ({
         <PDFExporter
           transcript={getFullTranscript}
           title={"Investigation Transcript"}
-          fileName={"Transcript"}
+          fileName={"transcript-"+currentCase?.caseId+"-"+currentSession?.sessionId}
+          sessionDate={new Date().toLocaleDateString()}
         />
         <button className="action-btn">
           <Copy className="btn-icon" />

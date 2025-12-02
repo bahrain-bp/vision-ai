@@ -4,6 +4,7 @@
   "private": true,
   "dependencies": {
     "@aws-sdk/client-transcribe-streaming": "^3.928.0",
+    "@aws-sdk/client-translate": "^3.939.0",
     "@aws-sdk/credential-providers": "^3.922.0",
     "aws-amplify": "^6.15.7",
     "axios": "^1.13.2",
@@ -14,6 +15,7 @@
     "lucide-react": "^0.548.0",
     "microphone-stream": "^6.0.1",
     "multiselect-react-dropdown": "^2.0.25",
+    "node": "^25.2.1",
     "primeicons": "^7.0.0",
     "primereact": "^10.9.7",
     "process": "^0.11.10",
@@ -42,7 +44,8 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "deploy:frontend": "npm run build && cd .. && cdk deploy vision-ai-frontend-stack --require-approval never"
   },
   "eslintConfig": {
     "extends": [

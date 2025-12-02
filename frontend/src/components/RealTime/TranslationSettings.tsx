@@ -19,6 +19,13 @@ const TranslationSettings: React.FC<TranslationSettingsProps> = ({
   translationSettings,
   onTranslationSettingsChange,
 }) => {
+  // Function to get language name from code
+  const getLanguageName = (code: string): string => {
+    const languageCode = code.split("-")[0];
+    const displayName = new Intl.DisplayNames(["en"], { type: "language" }).of(languageCode);
+    return displayName || code;
+  };
+
   // Generate language options from AWS Transcribe LanguageCode
   const languageOptions = Object.entries(LanguageCode).map(([code, name]) => {
     const formattedCode = code.split("_")[0].toLowerCase() + "-" + code.split("_")[1].toUpperCase();
@@ -32,6 +39,10 @@ const TranslationSettings: React.FC<TranslationSettingsProps> = ({
       name: `${displayName} (${region})`
     };
   });
+
+  // Get current language names
+  const investigatorLangName = getLanguageName(translationSettings.sourceLanguage);
+  const witnessLangName = getLanguageName(translationSettings.targetLanguage);
 
   return (
     <div className="session-card">
@@ -74,7 +85,7 @@ const TranslationSettings: React.FC<TranslationSettingsProps> = ({
 
         <div className="translation-display">
           <span className="translation-direction">
-            {translationSettings.sourceLanguage.toUpperCase()} → {translationSettings.targetLanguage.toUpperCase()}
+            Investigator: <strong>{investigatorLangName}</strong> | Witness: <strong>{witnessLangName}</strong>
           </span>
         </div>
       </div>

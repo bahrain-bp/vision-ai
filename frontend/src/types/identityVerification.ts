@@ -57,6 +57,7 @@ export interface VerificationRequest {
   documentKey: string;
   personPhotoKey: string;
   personType: PersonType;
+  documentType?: "cpr" | "passport";
   participantName?: string;
   participantCPR?: string;
   participantNationality?: string;
@@ -112,6 +113,9 @@ export interface DocumentVerificationProps {
   caseId: string;
   sessionId: string;
   personType: PersonType;
+  documentType: DocumentType;
+  setDocumentType: (type: DocumentType) => void;
+  onEndSession?: () => void;
 }
 
 // ==========================================

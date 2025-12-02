@@ -7,7 +7,7 @@ class StreamManager {
 
   private static instance: StreamManager;
 
-  constructor() {}
+  private constructor() {}
 
   static getInstance(): StreamManager {
     if (!StreamManager.instance) {
@@ -18,7 +18,7 @@ class StreamManager {
 
   async getDisplayStream(): Promise<{
     success: boolean;
-    error?: any;
+    error?: Error | unknown;
     displayStream: MediaStream | null;
   }> {
     if (this.displayStream === null) {
@@ -45,7 +45,7 @@ class StreamManager {
 
   async getMicStream(): Promise<{
     success: boolean;
-    error?: any;
+    error?: Error | unknown;
     audioStream: MediaStream | null;
   }> {
     if (this.audioStream === null) {
@@ -65,7 +65,7 @@ class StreamManager {
     return { success: true, audioStream: this.audioStream };
   }
 
-  getSampleRate() {
+  getSampleRate(): number {
     return this.sampleRate;
   }
 
@@ -143,7 +143,7 @@ class StreamManager {
     };
   }
 
-  stopStreams() {
+  stopStreams(): void {
     if (this.displayStream) {
       this.displayStream.getTracks().forEach((track) => track.stop());
       this.displayStream = null;
@@ -152,6 +152,20 @@ class StreamManager {
     if (this.audioStream) {
       this.audioStream.getTracks().forEach((track) => track.stop());
       this.audioStream = null;
+    }
+  }
+
+  pauseStreams(isPaused: boolean): void {
+    if (this.displayStream) {
+      this.displayStream.getAudioTracks().forEach((track) => {
+        track.enabled = !isPaused;
+      });
+    }
+
+    if (this.audioStream) {
+      this.audioStream.getAudioTracks().forEach((track) => {
+        track.enabled = !isPaused;
+      });
     }
   }
 }
