@@ -1,11 +1,12 @@
 import React, { useRef, useState } from "react";
-import { Pencil, Check, X } from "lucide-react";
+import { Pencil, Check, X, AlertTriangle } from "lucide-react";
 import "../../../ProcessingView.css";
 import { SessionData } from "../ProcessingView";
 import { exportAnalysisResultsAsPDF } from "../../../services/CamFootageAnalysis/AnalysisPdfExportService";
 
 interface CameraFootageProps {
   sessionData: SessionData;
+  language: "en" | "ar";
 }
 
 interface TranslatedText {
@@ -95,12 +96,14 @@ interface AnalysisResult {
 
 const CameraFootage: React.FC<CameraFootageProps> = ({
   sessionData: _sessionData,
+  language,
 }) => {
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
   const [isUploading, setIsUploading] = useState<boolean>(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  console.log(uploadError);
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(
     null
   );
@@ -109,7 +112,6 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
   //const [jobId, setJobId] = useState<string>("");
   const [pollingStatus, setPollingStatus] = useState<string>("");
   const [videoDuration, setVideoDuration] = useState<number | null>(null);
-  const [language, setLanguage] = useState<"en" | "ar">("en"); // Add language state
 
   const [editingField, setEditingField] = useState<{
     chapterId: string;
@@ -122,8 +124,12 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
   const [editedResults, setEditedResults] = useState<AnalysisResult | null>(
     null
   );
-
   const [isExporting, setIsExporting] = useState(false);
+  const [banner, setBanner] = useState<{
+    type: "success" | "error" | "warning" | "info";
+    message: string;
+  } | null>(null);
+  const [showResetModal, setShowResetModal] = useState(false);
 
   // Use edited results if available, otherwise use original
   const displayResults = editedResults || analysisResult;
@@ -153,20 +159,72 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
     return pattern.test(sessionId);
   };
 
+  // Helper function to show banner
+  const showBanner = (
+    type: "success" | "error" | "warning" | "info",
+    message: string,
+    duration: number = 5000
+  ) => {
+    setBanner({ type, message });
+    if (duration > 0) {
+      setTimeout(() => setBanner(null), duration);
+    }
+  };
+
+  // reset function for new uplaod
+  const resetForNewUpload = () => {
+    setVideoFile(null);
+    setVideoUrl(null);
+    setAnalysisResult(null);
+    setEditedResults(null);
+    setExpandedChapter(null);
+    setPollingStatus("");
+    setVideoS3Key("");
+    setVideoDuration(null);
+    setShowResetModal(false);
+    showBanner(
+      "info",
+      language === "ar"
+        ? "النظام جاهز لتحميل فيديو جديد"
+        : "Ready for new video upload."
+    );
+  };
+
   // Helper function to automatically export results with expanded chapters
   const exportWithExpandedChapters = async () => {
     setIsExporting(true);
+    showBanner(
+      "info",
+      language === "ar"
+        ? "جاري تحضير تصدير ملف PDF..."
+        : "Preparing PDF export...",
+      0
+    );
 
     // Wait for re-render with all chapters expanded
     await new Promise((resolve) => setTimeout(resolve, 300));
 
-    exportAnalysisResultsAsPDF(
-      videoFile?.name || "video-analysis",
-      _sessionData?.sessionId || "unknown",
-      language
-    );
+    try {
+      exportAnalysisResultsAsPDF(
+        videoFile?.name || "video-analysis",
+        _sessionData?.sessionId || "unknown",
+        language
+      );
+      showBanner(
+        "success",
+        language === "ar"
+          ? "تم تصدير ملف PDF بنجاح!"
+          : "PDF exported successfully!"
+      );
+    } catch (error) {
+      showBanner(
+        "error",
+        language === "ar"
+          ? "فشل تصدير ملف PDF. يرجى المحاولة مرة أخرى."
+          : "Failed to export PDF. Please try again."
+      );
+    }
 
-    // Reset after export
     setTimeout(() => {
       setIsExporting(false);
     }, 500);
@@ -311,6 +369,12 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
     }
 
     setEditedResults(updatedResults);
+    showBanner(
+      "success",
+      language === "ar"
+        ? "تم حفظ التغييرات بنجاح!"
+        : "Changes saved successfully!"
+    );
     setEditingField(null);
     setEditValue("");
   };
@@ -322,20 +386,61 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
     const file = event.target.files?.[0];
     if (!file) return;
 
+    // Validate file type
+    const validTypes = [
+      "video/mp4",
+      "video/avi",
+      "video/quicktime",
+      "video/x-msvideo",
+    ];
+    if (!validTypes.includes(file.type)) {
+      console.log("[Debug] Invalid file type:", file.type);
+      showBanner(
+        "error",
+        language === "ar"
+          ? "يرجى تحميل ملف فيديو (MP4, AVI, أو MOV)."
+          : "Please upload a valid video file (MP4, AVI, or MOV)."
+      );
+      return;
+    }
+
+    // Validate file size (2GB max)
+    const maxSize = 2 * 1024 * 1024 * 1024;
+    if (file.size > maxSize) {
+      console.log("[Debug] File too large:", file.size);
+      showBanner(
+        "error",
+        language === "ar"
+          ? "ملف الفيديو كبير جداً. الحد الأقصى 2 جيجابايت."
+          : "Video file is too large. Maximum size is 2GB."
+      );
+      return;
+    }
+
     let sessionId = _sessionData?.sessionId || "unknown";
 
     if (!isValidSessionId(sessionId)) {
-      console.error("Invalid sessionId format");
-      alert(
-        `Invalid sessionId format: ${sessionId}. Expected format: session-YYYYMMDDHHMMSS-XXXXXXXX`
+      console.error("[Debug] Invalid session ID:", sessionId);
+      showBanner(
+        "error",
+        language === "ar"
+          ? "انتهت صلاحية الجلسة. يرجى تحديث الصفحة."
+          : "Session expired. Please refresh the page."
       );
       return;
     }
 
     setIsUploading(true);
     setUploadError(null);
+    showBanner(
+      "info",
+      language === "ar" ? "جاري تحميل الفيديو..." : "Uploading your video...",
+      0
+    );
 
     try {
+      console.log("[Debug] Getting presigned URL for:", file.name);
+
       // Step 1: Get presigned URL
       const uploadUrlResponse = await fetch(
         `${process.env.REACT_APP_API_ENDPOINT}/footage/upload-url`,
@@ -355,9 +460,10 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
       }
 
       const uploadData = await uploadUrlResponse.json();
-      console.log("Presigned URL received:", uploadData);
+      console.log("[Debug] Presigned URL received:", uploadData);
 
       // Step 2: Upload to S3
+      console.log("[Debug] Uploading to S3...");
       const s3UploadResponse = await fetch(uploadData.uploadUrl, {
         method: "PUT",
         body: file,
@@ -371,14 +477,24 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
       }
 
       // Step 3: Success
+      console.log("[Debug] Upload successful, S3 key:", uploadData.s3Key);
       setVideoFile(file);
       setVideoS3Key(uploadData.s3Key);
       const url = URL.createObjectURL(file);
       setVideoUrl(url);
-      console.log("Video uploaded successfully");
+      showBanner(
+        "success",
+        language === "ar"
+          ? "تم تحميل الفيديو بنجاح! النظام جاهز للتحليل."
+          : "Video uploaded successfully! Ready to analyze."
+      );
     } catch (error: any) {
-      console.error("Upload error:", error);
-      setUploadError(error.message || "Upload failed");
+      showBanner(
+        "error",
+        language === "ar"
+          ? "فشل التحميل. يرجى التحقق من اتصالك والمحاولة مرة أخرى."
+          : "Upload failed. Please check your connection and try again."
+      );
     } finally {
       setIsUploading(false);
     }
@@ -402,9 +518,47 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
     const pollInterval = 10000; // 10 seconds
     let attempts = 0;
 
+    // User-friendly progress messages
+    const progressMessages =
+      language === "ar"
+        ? [
+            "جاري تحليل محتوى الفيديو...",
+            "جاري اكتشاف الأنشطة والأشياء...",
+            "جاري التعرف على الأشخاص...",
+            "جاري معالجة تفاصيل المشهد...",
+            "جاري استخراج اللحظات المهمة...",
+            "جاري إنشاء الجدول الزمني...",
+            "على وشك الانتهاء...",
+            "جاري إنهاء التحليل...",
+          ]
+        : [
+            "Analyzing video content...",
+            "Detecting activities and objects...",
+            "Identifying people in footage...",
+            "Processing scene details...",
+            "Extracting key moments...",
+            "Generating timeline...",
+            "Almost there...",
+            "Finalizing analysis...",
+          ];
+
+    const getProgressMessage = (completed: number, total: number): string => {
+      const progress = completed / total;
+      if (progress < 0.15) return progressMessages[0];
+      if (progress < 0.3) return progressMessages[1];
+      if (progress < 0.45) return progressMessages[2];
+      if (progress < 0.6) return progressMessages[3];
+      if (progress < 0.75) return progressMessages[4];
+      if (progress < 0.85) return progressMessages[5];
+      if (progress < 0.95) return progressMessages[6];
+      return progressMessages[7];
+    };
+
     const poll = async () => {
       attempts++;
-      setPollingStatus(`Checking results... (${attempts}/${maxAttempts})`);
+
+      // Console log for debugging
+      console.log(`[Debug] Polling attempt ${attempts}/${maxAttempts}`);
 
       try {
         const response = await fetch(
@@ -414,7 +568,7 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               s3Key,
-              expectedSegments, // Pass expected segments
+              expectedSegments,
             }),
           }
         );
@@ -423,18 +577,36 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
 
         // Handle 202 - Still processing
         if (response.status === 202) {
-          setPollingStatus(
-            `Analysis in progress: ${data.segmentsCompleted || 0}/${
-              data.segmentsExpected || expectedSegments
-            } segments completed...`
+          const completed = data.segmentsCompleted || 0;
+          const total = data.segmentsExpected || expectedSegments;
+
+          // Console log for debugging
+          console.log(
+            `[Debug] Progress: ${completed}/${total} segments completed`
           );
+
+          // User-friendly message
+          const userMessage = getProgressMessage(completed, total);
+          setPollingStatus(userMessage);
+          showBanner("info", userMessage, 0);
+
           if (attempts < maxAttempts) {
             setTimeout(poll, pollInterval);
           } else {
+            console.error("[Debug] Analysis timed out after max attempts");
             setIsAnalyzing(false);
-            setPollingStatus("Analysis timed out");
+            setPollingStatus("");
+            showBanner(
+              "warning",
+              language === "ar"
+                ? "التحليل يستغرق وقتاً أطول من المتوقع. يرجى الانتظار أو المحاولة لاحقاً."
+                : "Analysis is taking longer than expected. Please wait or try again later."
+            );
             setAnalysisResult({
-              summary: "Analysis timed out after 20 minutes",
+              summary:
+                language === "ar"
+                  ? "انتهت مهلة التحليل. يرجى المحاولة مرة أخرى."
+                  : "Analysis timed out. Please try again.",
               events: [],
               chapters: [],
               processedAt: new Date(),
@@ -445,7 +617,9 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
 
         // Handle 200 - Complete
         if (response.status === 200 && data.status === "complete") {
-          console.log("Analysis complete:", data);
+          console.log("[Debug] Analysis complete:", data);
+          console.log(`[Debug] ${data.segmentsCompleted} segment(s) processed`);
+
           setAnalysisResult({
             summary: data.results.summary || "No summary available",
             events: data.results.events || [],
@@ -454,23 +628,45 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
             processedAt: new Date(),
           });
           setIsAnalyzing(false);
-          setPollingStatus(
-            `Analysis complete! (${data.segmentsCompleted} segment(s) processed)`
+          setPollingStatus("");
+
+          // User-friendly success message
+          const chaptersCount = data.results.chapters?.length || 0;
+          showBanner(
+            "success",
+            chaptersCount > 0
+              ? language === "ar"
+                ? `اكتمل التحليل! تم العثور على ${chaptersCount} لحظة مهمة.`
+                : `Analysis complete! Found ${chaptersCount} key moment${
+                    chaptersCount > 1 ? "s" : ""
+                  }.`
+              : language === "ar"
+              ? "اكتمل التحليل!"
+              : "Analysis complete!"
           );
           return;
         }
 
-        // Handle other status codes
         throw new Error(`Unexpected status: ${response.status}`);
       } catch (error: any) {
-        console.error("Polling error:", error);
+        console.error("[Debug] Polling error:", error);
+
         if (attempts < maxAttempts) {
           setTimeout(poll, pollInterval);
         } else {
           setIsAnalyzing(false);
-          setPollingStatus("Analysis failed or timed out");
+          setPollingStatus("");
+          showBanner(
+            "error",
+            language === "ar"
+              ? "حدث خطأ ما. يرجى المحاولة مرة أخرى."
+              : "Something went wrong. Please try again."
+          );
           setAnalysisResult({
-            summary: error.message || "Analysis failed",
+            summary:
+              language === "ar"
+                ? "فشل التحليل. يرجى المحاولة مرة أخرى."
+                : "Analysis failed. Please try again.",
             events: [],
             chapters: [],
             processedAt: new Date(),
@@ -485,10 +681,23 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
   const startAnalysis = async () => {
     setIsAnalyzing(true);
     setAnalysisResult(null);
-    setPollingStatus("Starting analysis...");
+    setPollingStatus(
+      language === "ar" ? "جاري تحضير الفيديو..." : "Preparing your video..."
+    );
+    showBanner(
+      "info",
+      language === "ar"
+        ? "جاري تحضير الفيديو للتحليل..."
+        : "Preparing your video for analysis...",
+      0
+    );
 
     try {
       const sessionId = _sessionData?.sessionId || "unknown";
+
+      // Console log for debugging
+      console.log("[Debug] Starting analysis for:", videoS3Key);
+      console.log("[Debug] Video duration:", videoDuration);
 
       const response = await fetch(
         `${process.env.REACT_APP_API_ENDPOINT}/footage/analyze`,
@@ -510,23 +719,44 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
         throw new Error(result.error || "Analysis request failed");
       }
 
-      console.log("Analysis job started:", result);
-      console.log(`${result.segmentsStarted} segment job(s) created`);
+      // Console log for debugging
+      console.log("[Debug] Analysis job started:", result);
+      console.log(`[Debug] ${result.segmentsStarted} segment job(s) created`);
+      console.log(pollingStatus);
 
-      // Use expected_segments from backend response
       const expectedSegments =
         result.expected_segments || result.segmentsStarted;
-      console.log("Using expectedSegments:", expectedSegments);
+
+      // User-friendly message
       setPollingStatus(
-        `Analysis in progress (${expectedSegments} segment(s))...`
+        language === "ar"
+          ? "جاري تحليل محتوى الفيديو..."
+          : "Analyzing video content..."
       );
+      showBanner(
+        "info",
+        language === "ar"
+          ? "جاري تحليل محتوى الفيديو..."
+          : "Analyzing video content...",
+        0
+      );
+
       pollForResults(videoS3Key, expectedSegments);
     } catch (error: any) {
-      console.error("Analysis error:", error);
+      console.error("[Debug] Analysis error:", error);
       setIsAnalyzing(false);
       setPollingStatus("");
+      showBanner(
+        "error",
+        language === "ar"
+          ? "فشل بدء التحليل. يرجى المحاولة مرة أخرى."
+          : "Failed to start analysis. Please try again."
+      );
       setAnalysisResult({
-        summary: error.message || "Analysis failed",
+        summary:
+          language === "ar"
+            ? "فشل بدء التحليل. يرجى المحاولة مرة أخرى."
+            : "Analysis failed to start. Please try again.",
         events: [],
         chapters: [],
         processedAt: new Date(),
@@ -564,47 +794,76 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
   };
 
   return (
-    <div className="camera-footage-wrapper">
-      <div className="camera-title">Camera Footage Analysis</div>
-      <p className="camera-description">
-        *Upload and analyze surveillance footage for evidence extraction
+    <div
+      className="camera-footage-wrapper"
+      dir={language === "ar" ? "rtl" : "ltr"}
+    >
+      {/* Notification Banner */}
+      {banner && (
+        <div className={`notification-banner banner-${banner.type}`}>
+          <span className="banner-icon">
+            {banner.type === "success"}
+            {banner.type === "error"}
+            {banner.type === "warning"}
+            {banner.type === "info"}
+          </span>
+          <span className="banner-message">{banner.message}</span>
+        </div>
+      )}
+
+      {/* Confirmation Modal */}
+      {showResetModal && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <div className="modal-icon">
+              <AlertTriangle size={48} color="#22417b" />
+            </div>
+            <h3 className="modal-title">
+              {language === "ar" ? "هل أنت متأكد؟" : "Are you sure?"}
+            </h3>
+            <p className="modal-message">
+              {language === "ar"
+                ? "نتائج التحليل الحالية ستفقد. قم بتصديرها إذا كنت تود الاحتفاظ بها"
+                : "Your current analysis results will be lost. Export the report as PDF if you want to keep them."}
+            </p>
+            <div className="modal-actions">
+              <button
+                className="modal-btn cancel"
+                onClick={() => setShowResetModal(false)}
+              >
+                {language === "ar" ? "إلغاء" : "Cancel"}
+              </button>
+              <button className="modal-btn confirm" onClick={resetForNewUpload}>
+                {language === "ar" ? "متابعة" : "Proceed"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Title and Description */}
+      <div className="camera-title" dir={language === "ar" ? "rtl" : "ltr"}>
+        {language === "ar"
+          ? "تحليل فيديوهات المراقبة"
+          : "Camera Footage Analysis"}
+      </div>
+      <p className="camera-description" dir={language === "ar" ? "rtl" : "ltr"}>
+        {language === "ar"
+          ? "*قم بتحميل وتحليل فيديوهات المراقبة لاستخراج الأدلة"
+          : "*Upload and analyze surveillance footage for evidence extraction"}
       </p>
 
-      {uploadError && (
-        <div
-          style={{
-            color: "red",
-            backgroundColor: "#fee",
-            padding: "10px",
-            borderRadius: "4px",
-            marginBottom: "10px",
-          }}
-        >
-          {uploadError}
-        </div>
-      )}
-
-      {pollingStatus && isAnalyzing && (
-        <div
-          style={{
-            color: "#0066cc",
-            backgroundColor: "#e6f2ff",
-            padding: "10px",
-            borderRadius: "4px",
-            marginBottom: "10px",
-          }}
-        >
-          {pollingStatus}
-        </div>
-      )}
-
       <div className="camera-footage-container">
-        {/* Video Upload & Player Section */}
+        {/* Video Upload Section */}
         <div className="tab-section">
-          <div className="tab-section-title">Video Upload</div>
+          <div
+            className="tab-section-title"
+            dir={language === "ar" ? "rtl" : "ltr"}
+          >
+            {language === "ar" ? "تحميل الفيديو" : "Video Upload"}
+          </div>
           <div className="tab-section-content">
             {!videoUrl ? (
-              /* Upload Section */
               <div className="video-upload-area">
                 <input
                   type="file"
@@ -614,17 +873,21 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
                   id="video-upload"
                   disabled={isUploading}
                 />
-                {/* Label for File Input */}
                 <label htmlFor="video-upload" className="upload-label">
                   <div className="upload-content">
                     <div className="upload-icon-cam">📹</div>
-                    <div className="upload-text">Upload Video File</div>
+                    <div className="upload-text">
+                      {language === "ar"
+                        ? "تحميل ملف فيديو"
+                        : "Upload Video File"}
+                    </div>
                     <div className="upload-subtitle">
-                      MP4, AVI, MOV up to 2GB
+                      {language === "ar"
+                        ? "MP4, AVI, MOV حتى 2 جيجابايت"
+                        : "MP4, AVI, MOV up to 2GB"}
                     </div>
                   </div>
                 </label>
-                {/* Upload Button */}
                 <button
                   type="button"
                   className="continue-btn"
@@ -636,15 +899,16 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
                   {isUploading ? (
                     <>
                       <span className="processing-spinner">⟳</span>
-                      Uploading...
+                      {language === "ar" ? "جاري التحميل..." : "Uploading..."}
                     </>
+                  ) : language === "ar" ? (
+                    "انقر للتصفح أو اسحب وأفلت"
                   ) : (
                     "Click to browse or drag and drop"
                   )}
                 </button>
               </div>
             ) : (
-              /* Video Player Section */
               <div className="video-player-container">
                 <div className="video-wrapper">
                   <video
@@ -654,17 +918,17 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
                     className="video-player"
                     onLoadedMetadata={handleVideoLoaded}
                   >
-                    Your browser does not support the video tag.
+                    {language === "ar"
+                      ? "متصفحك لا يدعم علامة الفيديو."
+                      : "Your browser does not support the video tag."}
                   </video>
                 </div>
-                {/* Video Controls */}
                 <div className="video-controls">
                   <div className="video-info">
                     {videoFile?.name} • {formatTime(getVideoDuration())}
                   </div>
 
                   {!analysisResult ? (
-                    // Show Start Analysis button before analysis
                     <button
                       onClick={startAnalysis}
                       disabled={isAnalyzing || videoDuration === null}
@@ -675,29 +939,24 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
                       {isAnalyzing ? (
                         <>
                           <span className="processing-spinner">⟳</span>
-                          Analyzing...
+                          {language === "ar"
+                            ? "جاري التحليل..."
+                            : "Analyzing..."}
                         </>
+                      ) : language === "ar" ? (
+                        "بدء التحليل"
                       ) : (
                         "Start Analysis"
                       )}
                     </button>
                   ) : (
-                    // Show Upload Another Video button after analysis
                     <button
                       className="continue-btn"
-                      onClick={() => {
-                        // Reset all states
-                        setVideoFile(null);
-                        setVideoUrl(null);
-                        setAnalysisResult(null);
-                        setEditedResults(null);
-                        setExpandedChapter(null);
-                        setPollingStatus("");
-                        setVideoS3Key("");
-                        setVideoDuration(null);
-                      }}
+                      onClick={() => setShowResetModal(true)}
                     >
-                      Upload Another Video
+                      {language === "ar"
+                        ? "تحميل فيديو آخر"
+                        : "Upload Another Video"}
                     </button>
                   )}
                 </div>
@@ -706,8 +965,14 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
           </div>
         </div>
 
+        {/* Analysis Results Section */}
         <div className="tab-section">
-          <div className="tab-section-title">Analysis Results</div>
+          <div
+            className="tab-section-title"
+            dir={language === "ar" ? "rtl" : "ltr"}
+          >
+            {language === "ar" ? "نتائج التحليل" : "Analysis Results"}
+          </div>
           <div className="tab-section-content">
             {analysisResult ? (
               <div id="analysis-content">
@@ -1356,29 +1621,7 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
                       </div>
                     )}
 
-                  {/* Language Toggle */}
-                  <div className="language-toggle">
-                    <span className="language-toggle-label">
-                      {language === "ar" ? "اللغة:" : "Language:"}
-                    </span>
-                    <button
-                      className={`language-btn ${
-                        language === "en" ? "active" : ""
-                      }`}
-                      onClick={() => setLanguage("en")}
-                    >
-                      English
-                    </button>
-                    <button
-                      className={`language-btn ${
-                        language === "ar" ? "active" : ""
-                      }`}
-                      onClick={() => setLanguage("ar")}
-                    >
-                      العربية
-                    </button>
-                  </div>
-
+                  {/* Export Actions */}
                   <div className="export-actions">
                     <button
                       className="continue-btn"
@@ -1403,7 +1646,11 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
               </div>
             ) : (
               <div className="no-results">
-                <p>Upload a video to start analysis</p>
+                <p dir={language === "ar" ? "rtl" : "ltr"}>
+                  {language === "ar"
+                    ? "قم بتحميل فيديو لبدء التحليل"
+                    : "Upload a video to start analysis"}
+                </p>
               </div>
             )}
           </div>

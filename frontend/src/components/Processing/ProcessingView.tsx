@@ -30,38 +30,46 @@ interface Tab {
   render: () => JSX.Element;
 }
 
-const ProcessingView: React.FC<ProcessingViewProps> = ({ sessionData, language }) => {
+const ProcessingView: React.FC<ProcessingViewProps> = ({
+  sessionData,
+  language,
+}) => {
   const [activeTab, setActiveTab] = useState<string>("Classification");
   const [isProcessing, setIsProcessing] = useState<boolean>(true);
 
   const tabs: Tab[] = [
     {
-       id: "Classification",
-       label: language === "en" ? "Classification" : "التصنيف",
-       render: () => <Classification />,
-       },
-    { 
-      id: "Rewrite",
-      label: language === "en" ? "Rewrite" : "إعادة الصياغة",
-      render: () => <Rewrite sessionData={sessionData} />,
-     },
-    { id: "CameraFootage",
-      label: language === "en" ? "Camera Footage" : "لقطات الكاميرا",
-      render: () => <CameraFootage sessionData={sessionData}/>,
-     },
-    { id: "AISuggestions",
-     label: language === "en" ? "AI Suggestions" : "اقتراحات الذكاء الاصطناعي",
-     render: () => <AISuggestions sessionData={sessionData} />,
+      id: "Classification",
+      label: language === "en" ? "Classification" : "تصنيف القضية",
+      render: () => <Classification />,
     },
-    { 
+    {
+      id: "Rewrite",
+      label: language === "en" ? "Rewrite" : "إعادة صياغة التقرير",
+      render: () => <Rewrite sessionData={sessionData} />,
+    },
+    {
+      id: "CameraFootage",
+      label: language === "en" ? "Camera Footage" : "تحليل الفيديوهات ",
+      render: () => (
+        <CameraFootage sessionData={sessionData} language={language} />
+      ),
+    },
+    {
+      id: "AISuggestions",
+      label: language === "en" ? "AI Suggestions" : "اقتراحات الذكاء الاصطناعي",
+      render: () => <AISuggestions sessionData={sessionData} />,
+    },
+    {
       id: "Contradictions",
       label: language === "en" ? "Contradictions" : "التناقضات",
       render: () => <Contradictions language={language} />,
     },
-    { id: "Outcome",
-    label: language === "en" ? "Outcome" : "النتيجة",
-    render: () => <Outcome />,
-  },
+    {
+      id: "Outcome",
+      label: language === "en" ? "Outcome" : "الإدانة",
+      render: () => <Outcome />,
+    },
   ];
 
   const handleContinue = (): void => {
@@ -74,7 +82,9 @@ const ProcessingView: React.FC<ProcessingViewProps> = ({ sessionData, language }
         <div className="processing-content">
           <Loader className="processing-spinner" />
           <h2 className="processing-title">
-            {language === "en" ? "Processing Session Data" : "جاري معالجة بيانات الجلسة"}
+            {language === "en"
+              ? "Processing Session Data"
+              : "جاري معالجة بيانات الجلسة"}
           </h2>
           <p className="processing-description">
             {language === "en"
