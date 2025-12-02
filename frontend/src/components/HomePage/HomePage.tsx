@@ -1,17 +1,11 @@
 import React, { useState, useEffect } from "react";
-import {
-  LogOut,
-  Plus,
-  Folder,
-  Clock,
-  User,
-  Search,
-  AlertCircle,
-} from "lucide-react";
+import { LogOut, Folder, AlertCircle } from "lucide-react";
 import authService from "../../services/authService";
 import { User as UserType } from "../../types/";
 import { useCaseContext } from "../../hooks/useCaseContext";
 import CreateCaseModal from "./CreateCaseModal";
+import ActionBar from "./ActionBar";
+import CasesGrid from "./CasesGrid";
 
 interface HomePageProps {
   user: UserType | null;
@@ -41,6 +35,10 @@ const HomePage: React.FC<HomePageProps> = ({
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const casesPerPage = 12;
+  const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
+  const [statusFilter, setStatusFilter] = useState<
+    "all" | "active" | "inactive"
+  >("all");
 
   useEffect(() => {
     loadAllCases();
@@ -69,19 +67,26 @@ const HomePage: React.FC<HomePageProps> = ({
     }
   };
 
-  const formatDate = (dateString: string): string => {
-    return new Date(dateString).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-  };
+  const filteredCases = allCases
+    .filter((caseItem) => {
+      // Search filter
+      const matchesSearch =
+        caseItem.caseTitle.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        caseItem.caseId.toLowerCase().includes(searchTerm.toLowerCase());
 
-  const filteredCases = allCases.filter(
-    (caseItem) =>
-      caseItem.caseTitle.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      caseItem.caseId.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+      // Status filter
+      const matchesStatus =
+        statusFilter === "all" || caseItem.status === statusFilter;
+
+      return matchesSearch && matchesStatus;
+    })
+    .sort((a, b) => {
+      // Sort by date
+      const dateA = new Date(a.createdAt).getTime();
+      const dateB = new Date(b.createdAt).getTime();
+
+      return sortOrder === "newest" ? dateB - dateA : dateA - dateB;
+    });
 
   // Pagination calculations
   const totalPages = Math.ceil(filteredCases.length / casesPerPage);
@@ -185,26 +190,16 @@ const HomePage: React.FC<HomePageProps> = ({
         )}
 
         {/* Actions Bar */}
-        <div className="actions-bar">
-          <div className="search-box">
-            <Search size={20} className="search-icon" />
-            <input
-              type="text"
-              placeholder="Search cases..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="search-input"
-            />
-          </div>
-          <button
-            onClick={() => setShowCreateCaseModal(true)}
-            disabled={isLoading}
-            className="new-case-btn"
-          >
-            <Plus size={20} />
-            <span>New Case</span>
-          </button>
-        </div>
+        <ActionBar
+          searchTerm={searchTerm}
+          onSearchChange={setSearchTerm}
+          statusFilter={statusFilter}
+          onStatusFilterChange={setStatusFilter}
+          sortOrder={sortOrder}
+          onSortOrderChange={setSortOrder}
+          onCreateCase={() => setShowCreateCaseModal(true)}
+          isLoading={isLoading}
+        />
 
         {/* Cases List */}
         <div className="cases-container">
@@ -214,132 +209,19 @@ const HomePage: React.FC<HomePageProps> = ({
             <span className="cases-count">{filteredCases.length} cases</span>
           </div>
 
-          {isLoading ? (
-            <div className="loading-state">
-              <div className="spinner"></div>
-              <p className="loading-text">Loading cases...</p>
-            </div>
-          ) : filteredCases.length === 0 ? (
-            <div className="empty-state">
-              <Folder size={48} className="empty-icon" />
-              <h3 className="empty-title">
-                {searchTerm ? "No cases found" : "No cases yet"}
-              </h3>
-              <p className="empty-description">
-                {searchTerm
-                  ? "Try adjusting your search terms"
-                  : "Create your first case to get started"}
-              </p>
-              {!searchTerm && (
-                <button
-                  onClick={() => setShowCreateCaseModal(true)}
-                  className="new-case-btn"
-                >
-                  <Plus size={20} />
-                  <span>Create Case</span>
-                </button>
-              )}
-            </div>
-          ) : (
-            <>
-              <div className="cases-grid">
-                {currentCases.map((caseItem) => (
-                  <div
-                    key={caseItem.caseId}
-                    className={`case-card ${
-                      currentCase?.caseId === caseItem.caseId ? "selected" : ""
-                    }`}
-                  >
-                    <div className="case-card-header">
-                      <Folder size={20} className="case-folder-icon" />
-                      <span className={`case-status ${caseItem.status}`}>
-                        {caseItem.status}
-                      </span>
-                    </div>
-
-                    <h3 className="case-title">{caseItem.caseTitle}</h3>
-                    <p className="case-description">
-                      {caseItem.caseDescription}
-                    </p>
-
-                    <div className="case-meta">
-                      <div className="case-meta-item">
-                        <User size={14} />
-                        <span>{caseItem.createdBy}</span>
-                      </div>
-                      <div className="case-meta-item">
-                        <Clock size={14} />
-                        <span>{formatDate(caseItem.createdAt)}</span>
-                      </div>
-                    </div>
-
-                    <div className="case-footer">
-                      <span className="case-id">{caseItem.caseId}</span>
-                    </div>
-
-                    <div className="case-status-actions">
-                      {caseItem.status === "active" ? (
-                        <button
-                          onClick={() => handleDeactivateCase(caseItem.caseId)}
-                          className="deactivate-case-btn"
-                          disabled={isLoading}
-                        >
-                          Deactivate Case
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => handleActivateCase(caseItem.caseId)}
-                          className="activate-case-btn"
-                          disabled={isLoading}
-                        >
-                          Activate Case
-                        </button>
-                      )}
-                    </div>
-
-                    <div className="case-card-actions">
-                      {caseItem.status === "active" && (
-                        <button
-                          onClick={() =>
-                            handleStartSessionInCase(caseItem.caseId)
-                          }
-                          className="start-session-card-btn"
-                        >
-                          <Plus size={16} />
-                          <span>Start New Session</span>
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="pagination-container">
-                  <button
-                    onClick={() => handlePageChange(currentPage - 1)}
-                    disabled={currentPage === 1}
-                    className="pagination-btn"
-                  >
-                    Previous
-                  </button>
-
-                  <span className="pagination-info">
-                    Page {currentPage} of {totalPages}
-                  </span>
-
-                  <button
-                    onClick={() => handlePageChange(currentPage + 1)}
-                    disabled={currentPage === totalPages}
-                    className="pagination-btn"
-                  >
-                    Next
-                  </button>
-                </div>
-              )}
-            </>
-          )}
+          <CasesGrid
+            cases={currentCases}
+            currentCase={currentCase}
+            isLoading={isLoading}
+            searchTerm={searchTerm}
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={handlePageChange}
+            onActivateCase={handleActivateCase}
+            onDeactivateCase={handleDeactivateCase}
+            onStartSession={handleStartSessionInCase}
+            onCreateCase={() => setShowCreateCaseModal(true)}
+          />
         </div>
 
         {/* Create Case Modal */}

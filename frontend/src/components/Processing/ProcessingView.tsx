@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import { Loader } from "lucide-react";
 import "../../ProcessingView.css";
 
-// import processing tab components 
 import Classification from "./processing-tabs/Classification";
 import Rewrite from "./processing-tabs/Rewrite";
 import CameraFootage from "./processing-tabs/CameraFootage";
@@ -17,12 +16,11 @@ export interface SessionData {
   duration?: string;
   witness?: string;
   status?: string;
-  extractedKey?: string | null;
-  // we can other fields as needed later 
 }
 
 interface ProcessingViewProps {
   sessionData: SessionData;
+  language: "en" | "ar"; // passed from SessionPage
 }
 
 interface Tab {
@@ -31,90 +29,76 @@ interface Tab {
   render: () => JSX.Element;
 }
 
-
-const ProcessingView: React.FC<ProcessingViewProps> = ({ sessionData }) => {
+const ProcessingView: React.FC<ProcessingViewProps> = ({ sessionData, language }) => {
   const [activeTab, setActiveTab] = useState<string>("Classification");
-  const [isProcessing, setIsProcessing] = useState<boolean>(true); // processing state 
-  const [extractedKey, setExtractedKey] = useState<string | null>(sessionData.extractedKey ?? null);
-  const sessionDataWithKey: SessionData = { ...sessionData, extractedKey };
-
+  const [isProcessing, setIsProcessing] = useState<boolean>(true);
 
   const tabs: Tab[] = [
     {
-      id: "Classification",
-      label: "Classification",
-      render: () => (
-        <Classification
-          sessionData={sessionDataWithKey}
-          onExtractedKey={setExtractedKey}
-        />
-      ),
-    },
-    {
+       id: "Classification",
+       label: language === "en" ? "Classification" : "التصنيف",
+       render: () => <Classification sessionData={sessionData} />,
+       },
+    { 
       id: "Rewrite",
-      label: "Rewrite",
-      render: () => <Rewrite sessionData={sessionDataWithKey} />,
-    },
-    {
-      id: "CameraFootage",
-      label: "Camera Footage",
+      label: language === "en" ? "Rewrite" : "إعادة الصياغة",
+      render: () => <Rewrite sessionData={sessionData} />,
+     },
+    { id: "CameraFootage",
+      label: language === "en" ? "Camera Footage" : "لقطات الكاميرا",
       render: () => <CameraFootage />,
+     },
+    { id: "AISuggestions",
+     label: language === "en" ? "AI Suggestions" : "اقتراحات الذكاء الاصطناعي",
+     render: () => <AISuggestions sessionData={sessionData} />,
     },
-    {
-      id: "AISuggestions",
-      label: "AI Suggestions",
-      render: () => <AISuggestions sessionData={sessionDataWithKey} />,
-    },
-    {
+    { 
       id: "Contradictions",
-      label: "Contradictions",
-      render: () => <Contradictions />,
+      label: language === "en" ? "Contradictions" : "التناقضات",
+      render: () => <Contradictions language={language} />,
     },
-    {
-      id: "Outcome",
-      label: "Outcome",
-      render: () => <Outcome />,
-    },
+    { id: "Outcome",
+    label: language === "en" ? "Outcome" : "النتيجة",
+    render: () => <Outcome />,
+  },
   ];
-   
-  // logic of the cont button could be changed later when theres actual backend processing  
+
   const handleContinue = (): void => {
     setIsProcessing(false);
-  }
+  };
 
   const renderTabContent = (): JSX.Element | null => {
     if (isProcessing) {
       return (
         <div className="processing-content">
           <Loader className="processing-spinner" />
-          <h2 className="processing-title">Processing Session Data</h2>
+          <h2 className="processing-title">
+            {language === "en" ? "Processing Session Data" : "جاري معالجة بيانات الجلسة"}
+          </h2>
           <p className="processing-description">
-            Analyzing transcription and translation quality...
+            {language === "en"
+              ? "Analyzing transcription and translation quality..."
+              : "تحليل جودة النسخ والترجمة..."}
           </p>
           <p className="session-reference">
-            Session: {sessionData.sessionId}
+            {language === "en" ? "Session:" : "الجلسة:"} {sessionData.sessionId}
           </p>
-          <button
-            className="continue-btn"
-            onClick={handleContinue}
-          >
-            Continue
+          <button className="continue-btn" onClick={handleContinue}>
+            {language === "en" ? "Continue" : "متابعة"}
           </button>
         </div>
       );
     }
-    
     const activeTabConfig = tabs.find((tab) => tab.id === activeTab);
     return activeTabConfig ? activeTabConfig.render() : null;
   };
-  
+
   const isAISuggestionsActive = !isProcessing && activeTab === "AISuggestions";
 
-  // dynamic tab render 
   return (
     <div className="processing-view">
       <div className="processing-tabs">
-        {tabs.map(tab => (
+        {tabs.map((tab) => (
           <button
             key={tab.id}
             className={`tab-btn ${activeTab === tab.id ? "active" : ""} ${isProcessing ? "disabled" : ""}`}
@@ -132,8 +116,6 @@ const ProcessingView: React.FC<ProcessingViewProps> = ({ sessionData }) => {
       </div>
     </div>
   );
-
- 
 };
 
 export default ProcessingView;
