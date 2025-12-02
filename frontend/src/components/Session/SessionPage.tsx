@@ -69,7 +69,16 @@ const SessionPage: React.FC<SessionPageProps> = ({
   const [activeMainTab, setActiveMainTab] = useState<MainTab>("real-time");
   const [sessionState, setSessionState] = useState<RecordingStatus>("off");
   const [showSummaryModal, setShowSummaryModal] = useState<boolean>(false);
-  const { stopRecording } = useTranscription();
+  const { stopRecording, toggleRecordingPause, toggleReset } = useTranscription();
+
+  const [language, setLanguage] = useState<"en" | "ar">("en");
+
+  const [triggerSummarization, setTriggerSummarization] = useState<boolean>(false);
+  
+const [isPaused, setIsPaused] = useState(false);
+ const [timerMs, setTimerMs] = useState(0);
+ const [timerString, setTimerString] = useState("00:00:00");
+
   const [setupData, setSetupData] = useState<SetupData>({
     witnessData: {
       fullName: sessionData?.participantData?.fullName || "",
@@ -124,7 +133,7 @@ const SessionPage: React.FC<SessionPageProps> = ({
         sessionId: "#2025-INV-0042",
         investigator: getInvestigatorName(),
         language: language === "en" ? "English" : "Arabic",
-        duration: "00:00",
+        duration: timerString,
         participant: "Not set",
         status: "Active",
       };
@@ -137,8 +146,7 @@ const SessionPage: React.FC<SessionPageProps> = ({
 
   const handleEndSession = async () => {
     stopRecording(setSessionState);
-
-
+    
     if (currentSession && currentCase) {
       try {
         await updateSessionStatus(

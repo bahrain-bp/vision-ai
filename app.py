@@ -89,7 +89,7 @@ case_management_stack.add_dependency(shared_stack)
 case_management_stack.add_dependency(identity_stack)  
 
 # ==========================================
-# 4. IDENTITY VERIFICATION STACK
+# 5. IDENTITY VERIFICATION STACK
 # Uses shared API by ID 
 # ==========================================
 identity_stack = IdentityVerificationStack(
@@ -104,7 +104,7 @@ identity_stack = IdentityVerificationStack(
 identity_stack.add_dependency(case_management_stack)
 
 # ==========================================
-# 4. ADVANCED ANALYSIS STACK
+# 6. ADVANCED ANALYSIS STACK
 # AI Suggested Questions feature
 # ==========================================
 advanced_analysis_stack = AdvancedAnalysisStack(
@@ -119,7 +119,7 @@ advanced_analysis_stack = AdvancedAnalysisStack(
 advanced_analysis_stack.add_dependency(shared_stack)
 
 # ==========================================
-# 6. REWRITE STACK
+# 7. REWRITE STACK
 # Document rewriting with AWS Bedrock
 # ==========================================
 rewrite_stack = RewriteStack(
@@ -135,7 +135,7 @@ rewrite_stack.add_dependency(shared_stack)
 
 
 # ==========================================
-# 7. TRANSCRIPTION STACK
+# 8. TRANSCRIPTION STACK
 # ==========================================
 transcription_stack = TranscriptionStack(
     app, f"{app_name}-transcription-stack", env=env,
@@ -147,7 +147,7 @@ transcription_stack = TranscriptionStack(
 transcription_stack.add_dependency(shared_stack)
 
 # ==========================================
-# 8. SUMMARIZATION STACK
+# 9. SUMMARIZATION STACK
 # AI Report Summarization with Bedrock
 # ==========================================
 summarization_stack = SummarizationStack(
@@ -163,7 +163,7 @@ summarization_stack.add_dependency(shared_stack)
 
 
 # ==========================================
-# 9. Detect Contradiction STACK
+# 10. Detect Contradiction STACK
 # ==========================================
 detect_contradiction_stack = ContradictionStack(
     app, f"{app_name}-detect-contradiction-stack",
@@ -176,7 +176,7 @@ detect_contradiction_stack = ContradictionStack(
 detect_contradiction_stack.add_dependency(shared_stack)
 
 # ==========================================
-# 7. API DEPLOYMENT STACK
+# 11. API DEPLOYMENT STACK
 # Deploys API after all routes are added
 # ==========================================
 deployment_stack = APIDeploymentStack(
@@ -198,7 +198,7 @@ deployment_stack.add_dependency(transcription_stack)
 deployment_stack.add_dependency(summarization_stack)
 
 # ==========================================
-# 10. FRONTEND STACK
+# 12. FRONTEND STACK
 # CloudFront + S3 for React Frontend
 # ==========================================
 frontend_stack = FrontendStack(
