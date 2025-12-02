@@ -12,18 +12,17 @@ MODEL_ID = os.environ.get("BEDROCK_MODEL_ID", "amazon.nova-lite-v1:0")
 def handler(event, context):
     try:
         body = json.loads(event.get("body", "{}"))
-        case_id = body.get("caseId")
         witness_id = body.get("witnessId")
-        if not case_id or not witness_id:
-            return error(400, "caseId and witnessId are required")
+        if not witness_id:
+            return error(400, "witnessId is required")
 
-        transcript_key = f"DetectContradiction/cases/{case_id}/interviews/{witness_id}.txt"
+        transcript_key = f"DetectContradiction/interviews/{witness_id}.txt"
         transcript = load_s3_text(transcript_key)
         if transcript is None:
             return error(404, f"Transcript not found: {transcript_key}")
 
         # Other witnesses
-        prefix_interviews = f"DetectContradiction/cases/{case_id}/interviews/"
+        prefix_interviews = "DetectContradiction/interviews/"
         cross_transcripts = {}
         for key in list_all_keys(BUCKET, prefix_interviews):
             if key.endswith(".txt") and witness_id not in key:
@@ -32,10 +31,10 @@ def handler(event, context):
                 if txt:
                     cross_transcripts[other_id] = txt
 
-        # Reports (content)
-        reports = list_reports(case_id)
+        # Reports (content from rewritten/)
+        reports = list_rewritten_report()
 
-        prompt = build_prompt(case_id, transcript, cross_transcripts, reports)
+        prompt = build_prompt(transcript, cross_transcripts, reports)
 
         response = bedrock.invoke_model(
             modelId=MODEL_ID,
@@ -65,14 +64,14 @@ def handler(event, context):
         contradictions = extract_json(text_output)
 
         timestamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
-        output_key = f"DetectContradiction/cases/{case_id}/contradiction/{witness_id}/{timestamp}.json"
+        output_key = f"DetectContradiction/contradictions/{witness_id}/{timestamp}.json"
         output_obj = {
-            "caseId": case_id,
-            "witnessId": witness_id,
-            "results": contradictions,
-            "storedAt": output_key,
-            "generatedAt": timestamp
-        }
+             "witnessId": witness_id,
+              "results": contradictions,
+               "storedAt": output_key,
+               "generatedAt": timestamp,
+               "reportSource": reports[0]["key"] if reports else None
+                    }
 
         s3.put_object(
             Bucket=BUCKET,
@@ -102,18 +101,26 @@ def load_s3_text(key):
     except Exception:
         return None
 
-def list_reports(case_id):
-    prefix = f"DetectContradiction/cases/{case_id}/reports/"
-    keys = list_all_keys(BUCKET, prefix)
+def list_rewritten_report():
+    prefix = "rewritten/"
+    paginator = s3.get_paginator("list_objects_v2")
+    latest_obj = None
+
+    for page in paginator.paginate(Bucket=BUCKET, Prefix=prefix):
+        for obj in page.get("Contents", []):
+            if obj["Key"].endswith(".txt"):
+                if latest_obj is None or obj["LastModified"] > latest_obj["LastModified"]:
+                    latest_obj = obj
+
     reports = []
-    for key in keys:
-        if key.endswith(".txt"):
-            txt = load_s3_text(key)
-            if txt:
-                reports.append({"key": key, "text": txt[:5000]})
+    if latest_obj:
+        txt = load_s3_text(latest_obj["Key"])
+        if txt:
+            reports.append({"key": latest_obj["Key"], "text": txt[:5000]})
     return reports
 
-def build_prompt(case_id, transcript, cross_transcripts, reports):
+
+def build_prompt(transcript, cross_transcripts, reports):
     def clip(s, n=8000):
         return s[:n]
     cross_text = "\n---\n".join([f"[{wid}] {clip(txt, 4000)}" for wid, txt in cross_transcripts.items()])
@@ -123,40 +130,39 @@ def build_prompt(case_id, transcript, cross_transcripts, reports):
 أنت نظام ذكاء اصطناعي متخصص في كشف التناقضات في التحقيقات.
 
 المهمة:
-- اكتشف التناقضات الداخلية داخل شهادة الشاهد نفسه.
-- اكتشف التناقضات مع شهادات الشهود الآخرين.
-- تحقق من التناقضات أو الدعم مع تقارير الشرطة والأدلة.
-- لا تكرر نفس التناقض أكثر من مرة. إذا ظهر نفس التناقض مع عدة مصادر، اجمعها في عنصر واحد مع ذكر جميع المصادر في الحقل "source".
+- اقرأ النصوص المقدمة (مقابلات، شهادات، تقارير، أدلة).
+- قارن أقوال كل طرف مع نفسه ومع الآخرين ومع التقارير الرسمية أو الأدلة.
+- صنّف النتائج إلى ثلاث درجات وضوح:
+
+التصنيفات:
+- الأحمر (red): تناقض مباشر وواضح بين أقوال شخص واحد أو بين شهادات مختلفة أو مع التقرير الرسمي.
+- الأصفر (yellow): حالة غير واضحة أو متناقضة جزئياً، أو صياغة غامضة قد تشير إلى تناقض لكن ليست مؤكدة.
+- الأخضر (green): اتساق أو دعم بين الأقوال والتقارير، حيث تتفق المصادر على نفس المعلومة.
 
 المخرجات:
 - يجب أن تكون النتيجة مصفوفة JSON فقط، بدون أي تعليق إضافي أو نص خارج المصفوفة.
 - يجب أن تكون جميع النصوص باللغة العربية الفصحى الواضحة.
-- يجب ترتيب النتائج حسب اللون (الخطورة): الأحمر أولاً، ثم الأصفر، ثم الأخضر.
-- يجب أن تكون صياغة الحقل "text" جملة كاملة تصف التناقض بشكل واضح، وليس مجرد مقتطف قصير.
-- لا تكرر التناقضات؛ اجمعها في عنصر واحد مع قائمة المصادر.
+- يجب أن تكون صياغة الحقل "text" جملة كاملة تصف التناقض أو الاتساق بشكل واضح.
+- رتّب النتائج حسب اللون: الأحمر أولاً، ثم الأصفر، ثم الأخضر.
+- لا تكرر نفس التناقض؛ اجمعه في عنصر واحد مع قائمة المصادر.
 
 المخطط (Schema):
 [
   {{
-    "text": "النص المقتبس أو الملخص",
+    "text": "وصف التناقض أو الاتساق بشكل كامل",
     "source": "witness|cross|report (يمكن أن تكون قائمة مثل witness+report)",
-    "evidence": "تفسير قصير يشير إلى السطر أو التقرير",
+    "evidence": "اقتباس قصير أو تفسير يوضح سبب التصنيف",
     "severity": "red|yellow|green"
   }}
 ]
 
-التعريفات:
-- الأحمر (red): تناقض مباشر مع شاهد آخر أو تقرير رسمي.
-- الأصفر (yellow): غامض أو يحتمل التناقض ويحتاج مراجعة.
-- الأخضر (green): متسق أو مدعوم من مصادر أخرى.
-
-نص الشاهد:
+النصوص:
 {clip(transcript, 12000)}
 
 شهادات أخرى:
 {cross_text}
 
-تقارير الشرطة:
+تقارير رسمية:
 {report_text}
 
 أعد فقط مصفوفة JSON حسب المخطط أعلاه. إذا لم توجد نتائج، أعد [].

@@ -6,8 +6,11 @@ interface Contradiction {
   severity: "red" | "yellow" | "green";
 }
 
+interface ContradictionsProps {
+  language: "en" | "ar";
+}
+
 interface AnalysisResponse {
-  caseId: string;
   witnessId: string;
   results: Contradiction[];
   storedAt: string;
@@ -19,53 +22,56 @@ const severityIcons: Record<string, string> = {
   green: "✅",
 };
 
+const translations = {
+  en: {
+    title: "Contradiction Analysis",
+    selectWitness: "Select Witness:",
+    loadingWitnesses: "Loading witnesses...",
+    selectOption: "-- Select Witness --",
+    analyzeBtn: "Analyze Contradictions",
+    analyzing: "Analyzing...",
+    results: "Results – "
+  },
+  ar: {
+    title: "تحليل التناقضات",
+    selectWitness: "اختر الشاهد:",
+    loadingWitnesses: "جاري تحميل الشهود...",
+    selectOption: "-- اختر الشاهد --",
+    analyzeBtn: "تحليل التناقضات",
+    analyzing: "جاري التحليل...",
+    results: "النتائج – "
+  }
+};
+
 const API_BASE_URL = process.env.REACT_APP_API_ENDPOINT;
 
-const BUCKET_NAME = "vision-investigation-system-052904446370";
-
-const Contradictions: React.FC = () => {
-  const [caseId, setCaseId] = useState("CASE-001");
+const Contradictions: React.FC<ContradictionsProps> = ({ language }) => {
   const [witnesses, setWitnesses] = useState<string[]>([]);
   const [selectedWitness, setSelectedWitness] = useState("");
   const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadingWitnesses, setLoadingWitnesses] = useState(false);
 
-  const [s3Path, setS3Path] = useState<string | null>(null);
-
-
   useEffect(() => {
     const loadWitnesses = async () => {
-      if (!caseId.trim()) return;
       setLoadingWitnesses(true);
-
       try {
         const res = await fetch(
-          `${API_BASE_URL}/contradictions/witnesses?caseId=${caseId}`
+          `${API_BASE_URL}/contradictions/witnesses`
         );
         const json = await res.json();
-        if (json.witnesses) {
-          setWitnesses(json.witnesses);
-        } else {
-          setWitnesses([]);
-        }
+        setWitnesses(json.witnesses || []);
       } catch (err) {
         console.error("Error loading witnesses:", err);
         setWitnesses([]);
       }
-
       setLoadingWitnesses(false);
     };
-
     loadWitnesses();
-  }, [caseId]);
+  }, []);
 
-  // ============================================================
-  // ANALYZE CONTRADICTIONS
-  // ============================================================
   const handleAnalyzeClick = async () => {
     if (!selectedWitness) return;
-
     setLoading(true);
     setAnalysis(null);
 
@@ -73,13 +79,10 @@ const Contradictions: React.FC = () => {
       const res = await fetch(`${API_BASE_URL}/contradictions/analyze`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ caseId, witnessId: selectedWitness }),
+        body: JSON.stringify({ witnessId: selectedWitness }),
       });
 
       const raw = await res.json();
-      console.log("Raw response:", raw);
-
-      // Handle both wrapped and unwrapped responses
       let parsed: AnalysisResponse;
       if (typeof raw.body === "string") {
         parsed = JSON.parse(raw.body);
@@ -88,43 +91,33 @@ const Contradictions: React.FC = () => {
       } else {
         parsed = raw;
       }
-
-      console.log("Parsed analysis:", parsed);
       setAnalysis(parsed);
-      setS3Path(`s3://${BUCKET_NAME}/${parsed.storedAt}`); 
-
     } catch (err) {
       console.error("Error analyzing contradictions:", err);
     }
-
     setLoading(false);
   };
 
   return (
     <div className="contradictions-container">
-      <h2>Contradiction Analysis</h2>
-
-      {/* CASE ID INPUT */}
-      <div className="case-id-container">
-        <label>Case ID:</label>
-        <input
-          value={caseId}
-          onChange={(e) => setCaseId(e.target.value)}
-          placeholder="CASE-001"
-        />
-      </div>
+      <h2>{translations[language].title}</h2>
 
       {/* WITNESS DROPDOWN */}
       <div className="dropdown-container">
-        <label>Select Witness:</label>
+        <label>{translations[language].selectWitness}</label>
         {loadingWitnesses ? (
-          <p>Loading witnesses...</p>
+          <p>{translations[language].loadingWitnesses}</p>
         ) : (
           <select
             value={selectedWitness}
             onChange={(e) => setSelectedWitness(e.target.value)}
+            disabled={loadingWitnesses}
           >
-            <option value="">-- Select Witness --</option>
+            <option value="">
+              {loadingWitnesses
+                ? translations[language].loadingWitnesses
+                : translations[language].selectOption}
+            </option>
             {witnesses.map((w) => (
               <option key={w} value={w}>
                 {w}
@@ -141,15 +134,18 @@ const Contradictions: React.FC = () => {
           onClick={handleAnalyzeClick}
           disabled={loading || !selectedWitness}
         >
-          {loading ? "Analyzing..." : "Analyze Contradictions"}
+          {loading
+            ? translations[language].analyzing
+            : translations[language].analyzeBtn}
         </button>
       </div>
 
       {/* RESULTS */}
       {analysis && (
         <div className="results-container">
-          <h3 className="results-heading">Results – {analysis.witnessId}</h3>
-
+          <h3 className="results-heading">
+            {translations[language].results}{analysis.witnessId}
+          </h3>
           <div className="contradiction-cards">
             {analysis.results.map((item, index) => (
               <div key={index} className={`contradiction-card ${item.severity}`}>
@@ -160,14 +156,6 @@ const Contradictions: React.FC = () => {
               </div>
             ))}
           </div>
-          {s3Path && (
-            <button 
-              onClick={() => console.log("S3 Path:", s3Path)}
-              style={{ fontSize: "12px", padding: "4px 8px" }}
-            >
-              Download S3 Path
-            </button>
-          )}
         </div>
       )}
     </div>

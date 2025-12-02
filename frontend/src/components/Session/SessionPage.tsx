@@ -64,10 +64,14 @@ const SessionPage: React.FC<SessionPageProps> = ({
     setCurrentSession,
     setCurrentPersonName,
   } = useCaseContext();
+
   const [activeMainTab, setActiveMainTab] = useState<MainTab>("real-time");
   const [sessionState, setSessionState] = useState<RecordingStatus>("off");
   const [showSummaryModal, setShowSummaryModal] = useState<boolean>(false);
   const { stopRecording } = useTranscription();
+
+  const [language, setLanguage] = useState<"en" | "ar">("en");
+
   const [setupData, setSetupData] = useState<SetupData>({
     witnessData: {
       fullName: sessionData?.participantData?.fullName || "",
@@ -94,7 +98,7 @@ const SessionPage: React.FC<SessionPageProps> = ({
     ? {
         sessionId: currentSession.sessionId,
         investigator: currentSession.investigator || getInvestigatorName(),
-        language: "Arabic",
+        language: language === "en" ? "English" : "Arabic",
         duration: currentSession.duration,
         participant: setupData.witnessData.fullName || "Not set",
         status: currentSession.status,
@@ -102,7 +106,7 @@ const SessionPage: React.FC<SessionPageProps> = ({
     : {
         sessionId: "#2025-INV-0042",
         investigator: getInvestigatorName(),
-        language: "Arabic",
+        language: language === "en" ? "English" : "Arabic",
         duration: "00:00",
         participant: "Not set",
         status: "Active",
@@ -116,8 +120,6 @@ const SessionPage: React.FC<SessionPageProps> = ({
 
   const handleEndSession = async () => {
     stopRecording(setSessionState);
-
-
     if (currentSession && currentCase) {
       try {
         await updateSessionStatus(
@@ -131,8 +133,6 @@ const SessionPage: React.FC<SessionPageProps> = ({
     }
     setCurrentSession(null);
     setCurrentPersonName(null);
-
-
     setShowSummaryModal(true);
   };
 
@@ -193,12 +193,10 @@ const SessionPage: React.FC<SessionPageProps> = ({
       alert("Please enter witness full name.");
       return;
     }
-
     if (!setupData.identityData.referencePhoto) {
       alert("Please upload a reference photo.");
       return;
     }
-
     updateIdentityData("isVerified", true);
     alert("Identity verification completed successfully!");
   };
@@ -210,7 +208,6 @@ const SessionPage: React.FC<SessionPageProps> = ({
       if (sessionCreationAttempted.current) {
         return;
       }
-
       if (currentCase && !currentSession) {
         try {
           sessionCreationAttempted.current = true;
@@ -222,7 +219,6 @@ const SessionPage: React.FC<SessionPageProps> = ({
         }
       }
     };
-
     initializeSession();
   }, [currentCase, currentSession, createSession, user]);
 
@@ -242,7 +238,7 @@ const SessionPage: React.FC<SessionPageProps> = ({
                 <span className="session-label">Session</span>
                 <span className="session-id">
                   {currentSessionData.sessionId}
-                </span>
+                  </span>
                 {sessionState === "on" && (
                   <span className="live-indicator">
                     <span className="live-dot"></span>
@@ -263,8 +259,18 @@ const SessionPage: React.FC<SessionPageProps> = ({
             <div className="nav-controls">
               <div className="language-controls">
                 <span className="language-label">Language:</span>
-                <button className="lang-btn active">EN</button>
-                <button className="lang-btn">AR</button>
+                <button
+                  className={`lang-btn ${language === "en" ? "active" : ""}`}
+                  onClick={() => setLanguage("en")}
+                >
+                  EN
+                </button>
+                <button
+                  className={`lang-btn ${language === "ar" ? "active" : ""}`}
+                  onClick={() => setLanguage("ar")}
+                >
+                  AR
+                </button>
               </div>
               <div className="time-display">
                 <Clock className="icon" />
@@ -302,21 +308,22 @@ const SessionPage: React.FC<SessionPageProps> = ({
       </div>
 
       <div className="session-main-content">
-        {activeMainTab === "real-time" ? (
-          <RealTimeView
-            sessionState={sessionState}
-            setSessionState={setSessionState}
-            sessionData={currentSessionData}
-            setupData={setupData}
-            onWitnessDataChange={updateWitnessData}
-            onIdentityDataChange={updateIdentityData}
-            onTranslationSettingsChange={updateTranslationSettings}
-            onVerifyIdentity={handleVerifyIdentity}
-          />
-        ) : (
-          <ProcessingView sessionData={currentSessionData} />
-        )}
+     {activeMainTab === "real-time" ? (
+     <RealTimeView
+      sessionState={sessionState}
+      setSessionState={setSessionState}
+      sessionData={currentSessionData}
+      setupData={setupData}
+      onWitnessDataChange={updateWitnessData}
+      onIdentityDataChange={updateIdentityData}
+      onTranslationSettingsChange={updateTranslationSettings}
+      onVerifyIdentity={handleVerifyIdentity}
+     />
+     ) : (
+     <ProcessingView sessionData={currentSessionData} language={language} />
+      )}
       </div>
+
 
       {showSummaryModal && (
         <SessionSummaryModal

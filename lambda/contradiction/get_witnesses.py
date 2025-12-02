@@ -7,13 +7,11 @@ BUCKET = os.environ["BUCKET_NAME"]
 
 def handler(event, context):
     try:
-        params = event.get("queryStringParameters") or {}
-        case_id = params.get("caseId")
-        if not case_id:
-            return error(400, "caseId is required")
-
-        prefix = f"DetectContradiction/cases/{case_id}/interviews/"
+    
+        prefix = "DetectContradiction/interviews/"
         keys = list_all_keys(BUCKET, prefix)
+
+        # Extract witness IDs from filenames
         witnesses = [k.split("/")[-1].replace(".txt", "") for k in keys if k.endswith(".txt")]
 
         return ok({"witnesses": sorted(witnesses)})
