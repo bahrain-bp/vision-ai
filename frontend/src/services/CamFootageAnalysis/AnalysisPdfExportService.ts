@@ -3,7 +3,8 @@ import html2pdf from "html2pdf.js";
 export const exportAnalysisResultsAsPDF = (
   videoName: string,
   sessionId: string,
-  language: "en" | "ar"
+  language: "en" | "ar",
+  caseId: string
 ) => {
   try {
     const element = document.getElementById("analysis-content");
@@ -45,6 +46,9 @@ export const exportAnalysisResultsAsPDF = (
         <div><strong>${
           language === "ar" ? "الفيديو:" : "Video:"
         }</strong> ${videoName}</div>
+        <div><strong>${
+          language === "ar" ? "رقم القضية:" : "Case ID:"
+        }</strong> ${caseId}</div>
         <div><strong>${
           language === "ar" ? "رقم الجلسة:" : "Session ID:"
         }</strong> ${sessionId}</div>

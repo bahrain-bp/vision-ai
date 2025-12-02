@@ -6,7 +6,8 @@ import SessionSummaryModal from "../RealTime/SessionSummaryModal";
 import { User, RecordingStatus } from "../../types/";
 import { useTranscription } from "../../hooks/useTranscription";
 import { useCaseContext } from "../../hooks/useCaseContext";
-import {getTimeString} from "../common/Timer/Timer"; 
+import { getTimeString } from "../common/Timer/Timer";
+import { CameraFootageProvider } from "../../context/CameraFootageContext";
 
 interface ParticipantData {
   fullName: string;
@@ -69,15 +70,17 @@ const SessionPage: React.FC<SessionPageProps> = ({
   const [activeMainTab, setActiveMainTab] = useState<MainTab>("real-time");
   const [sessionState, setSessionState] = useState<RecordingStatus>("off");
   const [showSummaryModal, setShowSummaryModal] = useState<boolean>(false);
-  const { stopRecording, toggleRecordingPause, toggleReset } = useTranscription();
+  const { stopRecording, toggleRecordingPause, toggleReset } =
+    useTranscription();
 
   const [language, setLanguage] = useState<"en" | "ar">("en");
 
-  const [triggerSummarization, setTriggerSummarization] = useState<boolean>(false);
-  
-const [isPaused, setIsPaused] = useState(false);
- const [timerMs, setTimerMs] = useState(0);
- const [timerString, setTimerString] = useState("00:00:00");
+  const [triggerSummarization, setTriggerSummarization] =
+    useState<boolean>(false);
+
+  const [isPaused, setIsPaused] = useState(false);
+  const [timerMs, setTimerMs] = useState(0);
+  const [timerString, setTimerString] = useState("00:00:00");
 
   const [setupData, setSetupData] = useState<SetupData>({
     witnessData: {
@@ -96,11 +99,11 @@ const [isPaused, setIsPaused] = useState(false);
     },
   });
 
-    const getInvestigatorName = () => {
-      if (user?.username) return user.username;
-      return "Unknown Investigator";
-    };
-    
+  const getInvestigatorName = () => {
+    if (user?.username) return user.username;
+    return "Unknown Investigator";
+  };
+
   useEffect(() => {
     let intervalId: any;
 
@@ -117,8 +120,6 @@ const [isPaused, setIsPaused] = useState(false);
     const formatted = getTimeString(timerMs);
     setTimerString(formatted);
   }, [timerMs]);
-
-
 
   const currentSessionData: SessionData = currentSession
     ? {
@@ -146,7 +147,7 @@ const [isPaused, setIsPaused] = useState(false);
 
   const handleEndSession = async () => {
     stopRecording(setSessionState);
-    
+
     if (currentSession && currentCase) {
       try {
         await updateSessionStatus(
@@ -268,7 +269,7 @@ const [isPaused, setIsPaused] = useState(false);
                 <span className="session-label">Session</span>
                 <span className="session-id">
                   {currentSessionData.sessionId}
-                  </span>
+                </span>
                 {sessionState === "on" && (
                   <span className="live-indicator">
                     <span className="live-dot"></span>
@@ -336,7 +337,7 @@ const [isPaused, setIsPaused] = useState(false);
                   </button>
 
                   <button
-                    onClick={()=> toggleReset()}
+                    onClick={() => toggleReset()}
                     className="reset-btn"
                     style={{
                       padding: "10px 20px",
@@ -393,23 +394,27 @@ const [isPaused, setIsPaused] = useState(false);
       </div>
 
       <div className="session-main-content">
-     {activeMainTab === "real-time" ? (
-     <RealTimeView
-      sessionState={sessionState}
-      setSessionState={setSessionState}
-      sessionData={currentSessionData}
-      setupData={setupData}
-      onWitnessDataChange={updateWitnessData}
-      onIdentityDataChange={updateIdentityData}
-      onTranslationSettingsChange={updateTranslationSettings}
-      onVerifyIdentity={handleVerifyIdentity}
+        {activeMainTab === "real-time" ? (
+          <RealTimeView
+            sessionState={sessionState}
+            setSessionState={setSessionState}
+            sessionData={currentSessionData}
+            setupData={setupData}
+            onWitnessDataChange={updateWitnessData}
+            onIdentityDataChange={updateIdentityData}
+            onTranslationSettingsChange={updateTranslationSettings}
+            onVerifyIdentity={handleVerifyIdentity}
             triggerSummarization={triggerSummarization}
-     />
-     ) : (
-     <ProcessingView sessionData={currentSessionData} language={language} />
-      )}
+          />
+        ) : (
+          <CameraFootageProvider>
+            <ProcessingView
+              sessionData={currentSessionData}
+              language={language}
+            />
+          </CameraFootageProvider>
+        )}
       </div>
-
 
       {showSummaryModal && (
         <SessionSummaryModal

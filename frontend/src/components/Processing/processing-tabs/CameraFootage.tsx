@@ -1,8 +1,13 @@
-import React, { useRef, useState } from "react";
+import React, { useRef } from "react";
 import { Pencil, Check, X, AlertTriangle } from "lucide-react";
 import "../../../ProcessingView.css";
 import { SessionData } from "../ProcessingView";
 import { exportAnalysisResultsAsPDF } from "../../../services/CamFootageAnalysis/AnalysisPdfExportService";
+import {
+  useCameraFootage,
+  ChapterData,
+} from "../../../context/CameraFootageContext";
+import { CaseContext } from "../../../context/CaseContext";
 
 interface CameraFootageProps {
   sessionData: SessionData;
@@ -14,122 +19,57 @@ interface TranslatedText {
   ar: string;
 }
 
-interface TranslatedFields {
-  en: {
-    description: string;
-    type?: string;
-    confidence?: string;
-  };
-  ar: {
-    description: string;
-    type?: string;
-    confidence?: string;
-  };
-}
-
-interface Event {
-  id: string;
-  timestamp: number;
-  start_millis?: number;
-  end_millis?: number;
-  duration_seconds?: number;
-  description: string;
-  confidence?: number;
-  type: string;
-  risk_score?: number;
-}
-
-interface ChapterData {
-  id: string;
-  displayIndex: number;
-  segmentIndex: number;
-  timestamp: number;
-  start_seconds: number;
-  end_seconds: number;
-  duration_seconds: number;
-  summary: string;
-  translations?: TranslatedText;
-  risk_score?: number;
-  confidence?: number;
-  type: string;
-  event?: {
-    id: string;
-    description: string;
-    type: string;
-    confidence: number;
-    timestamp?: number;
-    start_millis?: number;
-    end_millis?: number;
-    translations?: TranslatedFields;
-  };
-  person?: {
-    id: string;
-    description: string;
-    confidence: number;
-    first_seen?: number;
-    last_seen?: number;
-    translations?: TranslatedFields;
-  };
-  object?: {
-    id: string;
-    description: string;
-    suspicious: boolean;
-    risk_relevance: string;
-    confidence: number;
-    first_seen?: number;
-    last_seen?: number;
-    translations?: TranslatedFields;
-  };
-}
-
-interface AnalysisResult {
-  events: Event[];
-  summary: string | TranslatedText;
-  chapters?: ChapterData[];
-  metadata?: {
-    duration_seconds: number;
-    frame_rate?: number;
-    format?: string;
-  };
-  processedAt?: Date;
-}
-
 const CameraFootage: React.FC<CameraFootageProps> = ({
   sessionData: _sessionData,
   language,
 }) => {
-  const [videoFile, setVideoFile] = useState<File | null>(null);
-  const [videoUrl, setVideoUrl] = useState<string | null>(null);
-  const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
-  const [isUploading, setIsUploading] = useState<boolean>(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
-  console.log(uploadError);
-  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(
-    null
-  );
-  const [expandedChapter, setExpandedChapter] = useState<string | null>(null);
-  const [videoS3Key, setVideoS3Key] = useState<string>("");
-  //const [jobId, setJobId] = useState<string>("");
-  const [pollingStatus, setPollingStatus] = useState<string>("");
-  const [videoDuration, setVideoDuration] = useState<number | null>(null);
+  // Use context instead of local state
+  const {
+    state,
+    setVideoFile,
+    setVideoUrl,
+    setIsAnalyzing,
+    setIsUploading,
+    setUploadError,
+    setAnalysisResult,
+    setEditedResults,
+    setExpandedChapter,
+    setVideoS3Key,
+    setPollingStatus,
+    setVideoDuration,
+    setIsExporting,
+    setBanner,
+    setShowResetModal,
+  } = useCameraFootage();
 
-  const [editingField, setEditingField] = useState<{
+  const caseContext = React.useContext(CaseContext);
+  const currentCase = caseContext?.currentCase;
+  const caseId = currentCase?.caseId || "Unknown Case ID";
+
+  const {
+    videoFile,
+    videoUrl,
+    isAnalyzing,
+    isUploading,
+    //uploadError,
+    analysisResult,
+    editedResults,
+    expandedChapter,
+    videoS3Key,
+    pollingStatus,
+    videoDuration,
+    isExporting,
+    banner,
+    showResetModal,
+  } = state;
+
+  // Local state for editing (doesn't need to persist)
+  const [editingField, setEditingField] = React.useState<{
     chapterId: string;
     field: "summary" | "event" | "person" | "object";
     subfield?: "description" | "type";
   } | null>(null);
-  const [editValue, setEditValue] = useState<string>("");
-
-  // Store edited results
-  const [editedResults, setEditedResults] = useState<AnalysisResult | null>(
-    null
-  );
-  const [isExporting, setIsExporting] = useState(false);
-  const [banner, setBanner] = useState<{
-    type: "success" | "error" | "warning" | "info";
-    message: string;
-  } | null>(null);
-  const [showResetModal, setShowResetModal] = useState(false);
+  const [editValue, setEditValue] = React.useState<string>("");
 
   // Use edited results if available, otherwise use original
   const displayResults = editedResults || analysisResult;
@@ -171,7 +111,7 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
     }
   };
 
-  // reset function for new uplaod
+  // reset function for new upload
   const resetForNewUpload = () => {
     setVideoFile(null);
     setVideoUrl(null);
@@ -208,7 +148,8 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
       exportAnalysisResultsAsPDF(
         videoFile?.name || "video-analysis",
         _sessionData?.sessionId || "unknown",
-        language
+        language,
+        caseId
       );
       showBanner(
         "success",
