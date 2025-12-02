@@ -12,7 +12,11 @@ import IdentityVerification from "./IdentityVerification/IdentityVerification";
 import TranscriptionSessionSetup from "../LiveTranscription/TranscriptionSessionSetup"
 import QuestionGenerator from './AIAssistant/QuestionGenerator';
 import { TranslationProvider } from '../../context/TranslationContext';
-import { RecordingStatus, sessionType, LanguagePreferences } from "../../types/";
+import {
+  RecordingStatus,
+  SessionType,
+  LanguagePreferences,
+} from "../../types/";
 import SummarizationReport from "./SummarizationReport";
 
 interface SessionData {
@@ -83,7 +87,7 @@ const RealTimeView: React.FC<RealTimeViewProps> = ({
   const [aiExpanded, setAiExpanded] = useState(false);
   const [isIdentityVerified, setIsIdentityVerified] = useState(false);
   const [startRecording, setStartRecording] = useState(false);
-  const [sessionType, setSessionType] = useState<sessionType>("standard");
+  const [sessionType, setSessionType] = useState<SessionType>("standard");
   const [detectionLanguages, setDetectionLanguages] = useState([]);
 
   const [languagePreferences, setLanguagePreferences] =
