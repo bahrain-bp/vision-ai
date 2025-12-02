@@ -17,11 +17,11 @@ export interface SessionData {
   duration?: string;
   witness?: string;
   status?: string;
-  // we can other fields as needed later
 }
 
 interface ProcessingViewProps {
   sessionData: SessionData;
+  language: "en" | "ar"; // passed from SessionPage
 }
 
 interface Tab {
@@ -30,44 +30,40 @@ interface Tab {
   render: () => JSX.Element;
 }
 
-const ProcessingView: React.FC<ProcessingViewProps> = ({ sessionData }) => {
+const ProcessingView: React.FC<ProcessingViewProps> = ({ sessionData, language }) => {
   const [activeTab, setActiveTab] = useState<string>("Classification");
-  const [isProcessing, setIsProcessing] = useState<boolean>(true); // processing state
+  const [isProcessing, setIsProcessing] = useState<boolean>(true);
 
   const tabs: Tab[] = [
     {
-      id: "Classification",
-      label: "Classification",
-      render: () => <Classification />,
-    },
-    {
+       id: "Classification",
+       label: language === "en" ? "Classification" : "التصنيف",
+       render: () => <Classification />,
+       },
+    { 
       id: "Rewrite",
-      label: "Rewrite",
+      label: language === "en" ? "Rewrite" : "إعادة الصياغة",
       render: () => <Rewrite sessionData={sessionData} />,
+     },
+    { id: "CameraFootage",
+      label: language === "en" ? "Camera Footage" : "لقطات الكاميرا",
+      render: () => <CameraFootage sessionData={sessionData}/>,
+     },
+    { id: "AISuggestions",
+     label: language === "en" ? "AI Suggestions" : "اقتراحات الذكاء الاصطناعي",
+     render: () => <AISuggestions sessionData={sessionData} />,
     },
-    {
-      id: "CameraFootage",
-      label: "Camera Footage",
-      render: () => <CameraFootage sessionData={sessionData} />,
-    },
-    {
-      id: "AISuggestions",
-      label: "AI Suggestions",
-      render: () => <AISuggestions sessionData={sessionData} />,
-    },
-    {
+    { 
       id: "Contradictions",
-      label: "Contradictions",
-      render: () => <Contradictions />,
+      label: language === "en" ? "Contradictions" : "التناقضات",
+      render: () => <Contradictions language={language} />,
     },
-    {
-      id: "Outcome",
-      label: "Outcome",
-      render: () => <Outcome />,
-    },
+    { id: "Outcome",
+    label: language === "en" ? "Outcome" : "النتيجة",
+    render: () => <Outcome />,
+  },
   ];
 
-  // logic of the cont button could be changed later when theres actual backend processing
   const handleContinue = (): void => {
     setIsProcessing(false);
   };
@@ -77,25 +73,29 @@ const ProcessingView: React.FC<ProcessingViewProps> = ({ sessionData }) => {
       return (
         <div className="processing-content">
           <Loader className="processing-spinner" />
-          <h2 className="processing-title">Processing Session Data</h2>
+          <h2 className="processing-title">
+            {language === "en" ? "Processing Session Data" : "جاري معالجة بيانات الجلسة"}
+          </h2>
           <p className="processing-description">
-            Analyzing transcription and translation quality...
+            {language === "en"
+              ? "Analyzing transcription and translation quality..."
+              : "تحليل جودة النسخ والترجمة..."}
           </p>
-          <p className="session-reference">Session: {sessionData.sessionId}</p>
+          <p className="session-reference">
+            {language === "en" ? "Session:" : "الجلسة:"} {sessionData.sessionId}
+          </p>
           <button className="continue-btn" onClick={handleContinue}>
-            Continue
+            {language === "en" ? "Continue" : "متابعة"}
           </button>
         </div>
       );
     }
-
     const activeTabConfig = tabs.find((tab) => tab.id === activeTab);
     return activeTabConfig ? activeTabConfig.render() : null;
   };
 
   const isAISuggestionsActive = !isProcessing && activeTab === "AISuggestions";
 
-  // dynamic tab render
   return (
     <div className="processing-view">
       <div className="processing-tabs">

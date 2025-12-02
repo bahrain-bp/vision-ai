@@ -65,11 +65,15 @@ const SessionPage: React.FC<SessionPageProps> = ({
     setCurrentSession,
     setCurrentPersonName,
   } = useCaseContext();
+
   const [activeMainTab, setActiveMainTab] = useState<MainTab>("real-time");
   const [sessionState, setSessionState] = useState<RecordingStatus>("off");
   const [showSummaryModal, setShowSummaryModal] = useState<boolean>(false);
+  const { stopRecording, toggleRecordingPause, toggleReset } = useTranscription();
+
+  const [language, setLanguage] = useState<"en" | "ar">("en");
+
   const [triggerSummarization, setTriggerSummarization] = useState<boolean>(false);
-  const { stopRecording,toggleRecordingPause,toggleReset} = useTranscription();
   
 const [isPaused, setIsPaused] = useState(false);
  const [timerMs, setTimerMs] = useState(0);
@@ -120,7 +124,7 @@ const [isPaused, setIsPaused] = useState(false);
     ? {
         sessionId: currentSession.sessionId,
         investigator: currentSession.investigator || getInvestigatorName(),
-        language: "Arabic",
+        language: language === "en" ? "English" : "Arabic",
         duration: timerString,
         participant: setupData.witnessData.fullName || "Not set",
         status: currentSession.status,
@@ -128,7 +132,7 @@ const [isPaused, setIsPaused] = useState(false);
     : {
         sessionId: "#2025-INV-0042",
         investigator: getInvestigatorName(),
-        language: "Arabic",
+        language: language === "en" ? "English" : "Arabic",
         duration: timerString,
         participant: "Not set",
         status: "Active",
@@ -159,6 +163,7 @@ const [isPaused, setIsPaused] = useState(false);
 
     // Trigger switch to summarization tab
     setTriggerSummarization(true);
+    setShowSummaryModal(true);
   };
 
   const handleCloseSummary = () => {
@@ -218,12 +223,10 @@ const [isPaused, setIsPaused] = useState(false);
       alert("Please enter witness full name.");
       return;
     }
-
     if (!setupData.identityData.referencePhoto) {
       alert("Please upload a reference photo.");
       return;
     }
-
     updateIdentityData("isVerified", true);
     alert("Identity verification completed successfully!");
   };
@@ -235,7 +238,6 @@ const [isPaused, setIsPaused] = useState(false);
       if (sessionCreationAttempted.current) {
         return;
       }
-
       if (currentCase && !currentSession) {
         try {
           sessionCreationAttempted.current = true;
@@ -247,7 +249,6 @@ const [isPaused, setIsPaused] = useState(false);
         }
       }
     };
-
     initializeSession();
   }, [currentCase, currentSession, createSession, user]);
 
@@ -267,7 +268,7 @@ const [isPaused, setIsPaused] = useState(false);
                 <span className="session-label">Session</span>
                 <span className="session-id">
                   {currentSessionData.sessionId}
-                </span>
+                  </span>
                 {sessionState === "on" && (
                   <span className="live-indicator">
                     <span className="live-dot"></span>
@@ -288,8 +289,18 @@ const [isPaused, setIsPaused] = useState(false);
             <div className="nav-controls">
               <div className="language-controls">
                 <span className="language-label">Language:</span>
-                <button className="lang-btn active">EN</button>
-                <button className="lang-btn">AR</button>
+                <button
+                  className={`lang-btn ${language === "en" ? "active" : ""}`}
+                  onClick={() => setLanguage("en")}
+                >
+                  EN
+                </button>
+                <button
+                  className={`lang-btn ${language === "ar" ? "active" : ""}`}
+                  onClick={() => setLanguage("ar")}
+                >
+                  AR
+                </button>
               </div>
               <div className="time-display">
                 <Clock className="icon" />
@@ -382,22 +393,23 @@ const [isPaused, setIsPaused] = useState(false);
       </div>
 
       <div className="session-main-content">
-        {activeMainTab === "real-time" ? (
-          <RealTimeView
-            sessionState={sessionState}
-            setSessionState={setSessionState}
-            sessionData={currentSessionData}
-            setupData={setupData}
-            onWitnessDataChange={updateWitnessData}
-            onIdentityDataChange={updateIdentityData}
-            onTranslationSettingsChange={updateTranslationSettings}
-            onVerifyIdentity={handleVerifyIdentity}
+     {activeMainTab === "real-time" ? (
+     <RealTimeView
+      sessionState={sessionState}
+      setSessionState={setSessionState}
+      sessionData={currentSessionData}
+      setupData={setupData}
+      onWitnessDataChange={updateWitnessData}
+      onIdentityDataChange={updateIdentityData}
+      onTranslationSettingsChange={updateTranslationSettings}
+      onVerifyIdentity={handleVerifyIdentity}
             triggerSummarization={triggerSummarization}
-          />
-        ) : (
-          <ProcessingView sessionData={currentSessionData} />
-        )}
+     />
+     ) : (
+     <ProcessingView sessionData={currentSessionData} language={language} />
+      )}
       </div>
+
 
       {showSummaryModal && (
         <SessionSummaryModal

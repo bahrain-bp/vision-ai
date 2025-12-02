@@ -12,7 +12,10 @@ from vision_ai.rewrite_stack import RewriteStack
 from vision_ai.summarization_stack import SummarizationStack
 from vision_ai.api_deployment_stack import APIDeploymentStack
 from vision_ai.transcription_stack import TranscriptionStack
+from vision_ai.frontend_stack import FrontendStack
+from vision_ai.detect_contradiction_stack import ContradictionStack
 from vision_ai.camera_footage_stack import CameraFootageAnalysisStack
+
 
 load_dotenv()
 app = cdk.App()
@@ -35,7 +38,7 @@ env = cdk.Environment(
 )
 
 app_name = "vision-ai"
-
+environment = app.node.try_get_context("environment") or "prod"
 # ==========================================
 # 1. COGNITO STACK - Authentication
 # ==========================================
@@ -94,7 +97,24 @@ case_management_stack.add_dependency(shared_stack)
 case_management_stack.add_dependency(identity_stack)
 
 # ==========================================
-# 5. ADVANCED ANALYSIS STACK
+# 5. IDENTITY VERIFICATION STACK
+# Uses shared API by ID
+# ==========================================
+identity_stack = IdentityVerificationStack(
+    app,
+    f"{app_name}-identity-verification-stack",
+    env=env,
+    investigation_bucket=shared_stack.investigation_bucket,
+    shared_api_id=shared_stack.shared_api.rest_api_id,
+    shared_api_root_resource_id=shared_stack.shared_api.rest_api_root_resource_id,
+    description="Identity verification: CPR extraction, name extraction, and face comparison with CloudWatch logging",
+)
+
+# Ensure identity stack depends on case management stack
+identity_stack.add_dependency(case_management_stack)
+
+# ==========================================
+# 6. ADVANCED ANALYSIS STACK
 # AI Suggested Questions feature
 # ==========================================
 advanced_analysis_stack = AdvancedAnalysisStack(
@@ -111,7 +131,7 @@ advanced_analysis_stack = AdvancedAnalysisStack(
 advanced_analysis_stack.add_dependency(shared_stack)
 
 # ==========================================
-# 6. REWRITE STACK
+# 7. REWRITE STACK
 # Document rewriting with AWS Bedrock
 # ==========================================
 rewrite_stack = RewriteStack(
@@ -129,7 +149,7 @@ rewrite_stack.add_dependency(shared_stack)
 
 
 # ==========================================
-# 7. TRANSCRIPTION STACK
+# 8. TRANSCRIPTION STACK
 # ==========================================
 transcription_stack = TranscriptionStack(
     app,
@@ -143,7 +163,7 @@ transcription_stack = TranscriptionStack(
 transcription_stack.add_dependency(shared_stack)
 
 # ==========================================
-# 8. SUMMARIZATION STACK
+# 9. SUMMARIZATION STACK
 # AI Report Summarization with Bedrock
 # ==========================================
 summarization_stack = SummarizationStack(
@@ -178,7 +198,21 @@ camera_footage_stack.add_dependency(shared_stack)
 
 
 # ==========================================
-# 9. API DEPLOYMENT STACK
+# 10. Detect Contradiction STACK
+# ==========================================
+detect_contradiction_stack = ContradictionStack(
+    app,
+    f"{app_name}-detect-contradiction-stack",
+    investigation_bucket=shared_stack.investigation_bucket,
+    shared_api_id=shared_stack.shared_api.rest_api_id,
+    shared_api_root_resource_id=shared_stack.shared_api.rest_api_root_resource_id,
+    env=env,
+    description="Detect Contradiction using 2 Lambda and AWS Bedrock Nova Lite",
+)
+detect_contradiction_stack.add_dependency(shared_stack)
+
+# ==========================================
+# 11. API DEPLOYMENT STACK
 # Deploys API after all routes are added
 # ==========================================
 deployment_stack = APIDeploymentStack(
@@ -197,9 +231,23 @@ deployment_stack.add_dependency(case_management_stack)
 
 deployment_stack.add_dependency(advanced_analysis_stack)
 deployment_stack.add_dependency(rewrite_stack)
+deployment_stack.add_dependency(detect_contradiction_stack)
 deployment_stack.add_dependency(transcription_stack)
 deployment_stack.add_dependency(summarization_stack)
 deployment_stack.add_dependency(camera_footage_stack)
+
+# ==========================================
+# 12. FRONTEND STACK
+# CloudFront + S3 for React Frontend
+# ==========================================
+frontend_stack = FrontendStack(
+    app,
+    f"{app_name}-frontend-stack",
+    environment=environment,
+    env=env,
+    description="CloudFront distribution and S3 bucket for React frontend with OAC security",
+)
+
 
 # Add tags
 cdk.Tags.of(app).add("Project", "VisionAI")

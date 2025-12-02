@@ -74,13 +74,13 @@ class TranslationService {
     let originalLanguage = 'auto'; // Let AWS detect the language
 
     if (speaker === "Investigator") {
-      // Investigator speaks → Witness sees translation to witness language
+      // Investigator speaks, Witness sees translation to witness language
       // Let AWS detect the source language automatically
       witnessDisplay = await this.translateText(originalText, 'auto', witnessLanguage);
       console.log(`    Witness sees (${witnessLanguage}): "${witnessDisplay}"`);
       
     } else if (speaker === "Witness") {
-      // Witness speaks → Investigator sees translation to investigator language
+      // Witness speaks, Investigator sees translation to investigator language
       // Let AWS detect the source language automatically  
       investigatorDisplay = await this.translateText(originalText, 'auto', investigatorLanguage);
       console.log(`    Investigator sees (${investigatorLanguage}): "${investigatorDisplay}"`);
