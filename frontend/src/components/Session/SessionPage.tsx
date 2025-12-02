@@ -1,5 +1,12 @@
 import React, { useState, useEffect } from "react";
-import { ArrowLeft, Clock, Pause, Play, RotateCcw } from "lucide-react";
+import {
+  ArrowLeft,
+  Clock,
+  Pause,
+  Play,
+  RotateCcw,
+  ArrowRight,
+} from "lucide-react";
 import RealTimeView from "../RealTime/RealTimeView";
 import ProcessingView from "../Processing/ProcessingView";
 import SessionSummaryModal from "../RealTime/SessionSummaryModal";
@@ -255,18 +262,28 @@ const SessionPage: React.FC<SessionPageProps> = ({
 
   return (
     <div className="session-page-container">
-      <nav className="session-nav">
+      <nav className="session-nav" dir={language === "ar" ? "rtl" : "ltr"}>
         <div className="nav-content">
           <div className="nav-items">
             <button onClick={handleBackToHome} className="back-button">
-              <ArrowLeft className="icon" />
-              <span>Back to Home</span>
+              {language === "ar" ? (
+                <ArrowRight className="icon" />
+              ) : (
+                <ArrowLeft className="icon" />
+              )}
+              <span>
+                {language === "ar"
+                  ? "العودة إلى الصفحة الرئيسية"
+                  : "Back to Home"}
+              </span>
             </button>
 
             <div className="nav-center">
               <h1 className="app-logo-text">VISION-AI</h1>
               <div className="session-info-header">
-                <span className="session-label">Session</span>
+                <span className="session-label">
+                  {language === "ar" ? "الجلسة" : "Session"}
+                </span>
                 <span className="session-id">
                   {currentSessionData.sessionId}
                 </span>
@@ -278,18 +295,22 @@ const SessionPage: React.FC<SessionPageProps> = ({
                 )}
               </div>
               <p className="investigator-info">
-                Investigator: {currentSessionData.investigator}
+                {language === "ar" ? "المحقق" : "Investigator"}:{" "}
+                {currentSessionData.investigator}
               </p>
               {currentCase && (
                 <p className="case-info">
-                  Case: {currentCase.caseTitle} ({currentCase.caseId})
+                  {language === "ar" ? "القضية" : "Case"}:{" "}
+                  {currentCase.caseTitle} ({currentCase.caseId})
                 </p>
               )}
             </div>
 
             <div className="nav-controls">
               <div className="language-controls">
-                <span className="language-label">Language:</span>
+                <span className="language-label">
+                  {language === "ar" ? "اللغة:" : "Language:"}
+                </span>
                 <button
                   className={`lang-btn ${language === "en" ? "active" : ""}`}
                   onClick={() => setLanguage("en")}
