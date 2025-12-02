@@ -20,7 +20,7 @@ class SharedInfrastructureStack(Stack):
         # ==========================================
         self.investigation_bucket = s3.Bucket(
             self, "InvestigationBucket",
-            bucket_name=f"vision-investigation-system-{self.account}",  
+            bucket_name="vision-rt-investigation-system",
             versioned=True,
             encryption=s3.BucketEncryption.S3_MANAGED,
             removal_policy=RemovalPolicy.RETAIN,
@@ -29,9 +29,11 @@ class SharedInfrastructureStack(Stack):
                     s3.HttpMethods.GET,
                     s3.HttpMethods.PUT,
                     s3.HttpMethods.POST,
-                    s3.HttpMethods.DELETE
+                    s3.HttpMethods.DELETE,
+                    s3.HttpMethods.HEAD
                 ],
-                allowed_origins=["http://localhost:3000"],
+                allowed_origins=["*"]
+                ,
                 allowed_headers=["*"],
                 exposed_headers=["ETag"],
                 max_age=3000

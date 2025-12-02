@@ -5,7 +5,6 @@ import re
 from datetime import datetime
 import logging
 
-# Configure logging
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
@@ -15,53 +14,20 @@ s3 = boto3.client('s3')
 BUCKET_NAME = os.environ['BUCKET_NAME']
 
 def handler(event, context):
-    """
-    Orchestrate complete identity verification workflow including cleanup
-    
-    POST /identity/verify - Main verification workflow
-    DELETE /identity/cleanup - Cleanup previous verification files
-    
-    Verification Body: {
-        "caseId": "CASE-001",
-        "sessionId": "session-20250103-123456",
-        "documentKey": "cases/.../documents/citizen-id-document_20250109-143000.jpg",
-        "personPhotoKey": "cases/.../photos/witness-photo_20250109-143100.jpg",
-        "personType": "witness",
-        "personName": "John Doe",
-        "manualOverride": false,
-        "overrideReason": "",
-        "attemptNumber": 1
-    }
-    
-    Cleanup Body: {
-        "caseId": "CASE-001",
-        "sessionId": "session-20250103-123456",
-        "personType": "witness",
-        "attemptNumber": 1
-    }
-    """
     try:
-        # Check if this is a cleanup request (DELETE method)
         if event.get('httpMethod') == 'DELETE':
             return handle_cleanup_request(event, context)
         else:
-            # Default to verification workflow (POST method)
             return handle_verification_request(event, context)
-            
     except Exception as e:
         logger.error(f"✗ CRITICAL ERROR in identity verification workflow: {str(e)}", exc_info=True)
-        return error_response(500, 'Identity verification workflow failed', {
-            'details': str(e)
-        })
-
+        return error_response(500, 'Identity verification workflow failed', {'details': str(e)})
 
 def handle_verification_request(event, context):
-    """Handle identity verification workflow"""
     logger.info("=" * 60)
     logger.info("=== STARTING IDENTITY VERIFICATION WORKFLOW ===")
     logger.info("=" * 60)
-    
-    # Parse request body
+
     body = json.loads(event.get('body', '{}'))
     case_id = body.get('caseId')
     session_id = body.get('sessionId')
@@ -75,6 +41,7 @@ def handle_verification_request(event, context):
     participant_name = body.get('participantName', '')
     participant_cpr = body.get('participantCPR', '')
     participant_nationality = body.get('participantNationality', '')
+    document_type = body.get('documentType', 'cpr')
     logger.info(f"Request Parameters:")
     logger.info(f"  - Case ID: {case_id}")
     logger.info(f"  - Session ID: {session_id}")
@@ -86,29 +53,38 @@ def handle_verification_request(event, context):
         logger.info(f"  - Override Reason: {override_reason}")
     logger.info(f"  - Document Key: {document_key}")
     logger.info(f"  - Person Photo Key: {person_photo_key}")
-    
-    # Validate inputs
+
+    # Validate required inputs
     if not all([case_id, session_id, document_key, person_photo_key]):
         logger.error("Missing required parameters")
         return error_response(400, 'caseId, sessionId, documentKey, and personPhotoKey are required')
-    
+
     # Validate person type
     valid_person_types = ['witness', 'accused', 'victim']
     if person_type not in valid_person_types:
         logger.error(f"Invalid person type: {person_type}")
         return error_response(400, f'personType must be one of: {", ".join(valid_person_types)}')
     
-    # Validate attempt number - ENFORCE MAX 3 ATTEMPTS
+    if document_type not in ['cpr', 'passport']:
+        return error_response(400, 'documentType must be "cpr" or "passport"')
+
+    # Validate attempt number max 3 attempts
     if attempt_number > 3:
         logger.error(f"Maximum verification attempts exceeded: {attempt_number}")
         return error_response(400, 'Maximum verification attempts (3) exceeded. Please use manual override or end session.')
-    
-    # If manual override, validate reason
-    if manual_override and not override_reason.strip():
-        logger.error("Manual override requested but no reason provided")
-        return error_response(400, 'overrideReason is required when manualOverride is true')
-    
-    # Verify files exist in S3 before proceeding
+
+    # Prevent using same file for document and person photo
+    if document_key == person_photo_key:
+        logger.error("The documentKey and personPhotoKey cannot be the same file.")
+        return error_response(400, "The document and person photo must be different files. Please upload distinct images.")
+
+    # Validate manual override reason when override enabled
+    if manual_override:
+        if not override_reason or len(override_reason.strip()) < 10:
+            logger.error("Manual override requested but overrideReason is missing or too short")
+            return error_response(400, 'overrideReason must be at least 10 characters when manualOverride is true')
+
+    # Verify files exist in S3
     logger.info("\n--- Verifying S3 objects exist ---")
     if not verify_s3_object_exists(document_key):
         return error_response(404, f'Document not found in S3: {document_key}')
@@ -116,94 +92,125 @@ def handle_verification_request(event, context):
     if not verify_s3_object_exists(person_photo_key):
         return error_response(404, f'Person photo not found in S3: {person_photo_key}')
     
-    # ==========================================
-    # STEP 1: EXTRACT CPR NUMBER AND NAME FROM DOCUMENT
-    # ==========================================
+    # STEP 1: Extract CPR and Name OR Use Manual Data
     logger.info("\n" + "=" * 60)
-    logger.info("STEP 1: Extracting CPR number and name from document")
+    logger.info("STEP 1: Processing document data")
     logger.info("=" * 60)
-    
-    extraction_result = extract_data_from_document(document_key)
-    
-    if not extraction_result['success']:
-        logger.error("Failed to extract data from document")
-        return error_response(500, 'Failed to extract data from document', extraction_result)
-    
-    cpr_number = extraction_result['cprNumber']
-    extracted_name = extraction_result['extractedName']
-    extracted_text = extraction_result['extractedText']
-    nationality = extraction_result.get('nationality', 'Unknown')
-    
-    if manual_override and participant_name:
-        final_person_name = participant_name
-        final_cpr_number = participant_cpr if participant_cpr else cpr_number
-        final_nationality = participant_nationality if participant_nationality else nationality
+
+    if manual_override:
+        logger.info("Manual override enabled - using provided participant data")
+        
+        # Use manually provided data instead of extracting from document
+        cpr_number = participant_cpr
+        extracted_name = participant_name
+        nationality = participant_nationality
+        extracted_text = "Manual override - document validation skipped"
+        
+        # For manual override,  save some basic document info
+        extraction_result = {
+            'success': True,
+            'cprNumber': cpr_number,
+            'extractedName': extracted_name,
+            'nationality': nationality,
+            'extractedText': extracted_text,
+            'rawResponse': {'manual_override': True}
+        }
+        
+        logger.info(f"✓ Using manual data - CPR: {cpr_number}, Name: {extracted_name}, Nationality: {nationality}")
+        
     else:
+        # Normal flow: extract data from document
+        logger.info("Extracting data from document using Textract")
+        extraction_result = extract_data_from_document(document_key, document_type)
+        if not extraction_result['success']:
+            logger.error("Failed to extract data from document")
+            return error_response(400, extraction_result.get('error', 'Failed to extract data from document'), {
+                'details': extraction_result.get('details', ''),
+                'extractedText': extraction_result.get('extractedText', '')
+            })
+
+        cpr_number = extraction_result['cprNumber']
+        extracted_name = extraction_result['extractedName']
+        extracted_text = extraction_result['extractedText']
+        nationality = extraction_result.get('nationality', 'Unknown')
+        logger.info(f"✓ Data extracted from document - CPR: {cpr_number}, Name: {extracted_name}, Nationality: {nationality}")
+
+    # Determine final values to use
+    if manual_override:
+        # For manual override, always use the manually provided data
+        final_person_name = participant_name
+        final_cpr_number = participant_cpr
+        final_nationality = participant_nationality
+        logger.info(f"✓ Manual override - Using provided data: Name: {final_person_name}, CPR: {final_cpr_number}, Nationality: {final_nationality}")
+    else:
+        # Normal flow
         final_person_name = person_name if person_name else extracted_name
         final_cpr_number = cpr_number
         final_nationality = nationality
-    
-    logger.info(f"✓ CPR extracted: {cpr_number}")
-    logger.info(f"✓ Name extracted: {extracted_name}")
-    logger.info(f"✓ Nationality extracted: {nationality}")
-    logger.info(f"✓ Final person name: {final_person_name}")
-    
-    # Save Textract results
-    textract_result_key = f"cases/{case_id}/sessions/{session_id}/01-identity-verification/extraction-results/{cpr_number}_textract-results.json"
+        logger.info(f"✓ Using extracted data: Name: {final_person_name}, CPR: {final_cpr_number}, Nationality: {final_nationality}")
+
+    # Save extraction results (Textract or manual override)
+    if manual_override:
+        textract_result_key = f"cases/{case_id}/sessions/{session_id}/01-identity-verification/manual-override-results/{final_cpr_number}_manual-override.json"
+        result_data = {
+            'manualOverride': True,
+            'participantName': participant_name,
+            'participantCPR': participant_cpr,
+            'participantNationality': participant_nationality,
+            'overrideReason': override_reason,
+            'timestamp': datetime.utcnow().isoformat()
+        }
+    else:
+        textract_result_key = f"cases/{case_id}/sessions/{session_id}/01-identity-verification/extraction-results/{final_cpr_number}_textract-results.json"
+        result_data = extraction_result['rawResponse']
+
     s3.put_object(
         Bucket=BUCKET_NAME,
         Key=textract_result_key,
-        Body=json.dumps(extraction_result['rawResponse'], default=str, indent=2),
+        Body=json.dumps(result_data, default=str, indent=2),
         ContentType='application/json'
     )
-    logger.info(f"✓ Textract results saved to: {textract_result_key}")
-    
-    # ==========================================
-    # STEP 2: CHECK FOR REFERENCE PHOTO AND GENERATE PRESIGNED URL
-    # ==========================================
+    logger.info(f"✓ Extraction results saved to: {textract_result_key}")
+
+    # STEP 2: Check reference photo
     logger.info("\n" + "=" * 60)
     logger.info("STEP 2: Checking for reference photo in global-assets")
     logger.info("=" * 60)
-    
+
     reference_result = check_reference_photo(cpr_number)
     reference_exists = reference_result['exists']
     reference_photo_key = reference_result.get('referencePhotoKey')
     reference_photo_url = reference_result.get('referencePhotoUrl')
-    
+
     logger.info(f"Reference photo exists: {reference_exists}")
     if reference_exists:
         logger.info(f"Reference photo key: {reference_photo_key}")
         logger.info(f"Reference photo presigned URL generated (expires in 1 hour)")
-    
-    # ==========================================
-    # STEP 3: DETERMINE SOURCE PHOTO
-    # ==========================================
+
+    # STEP 3: Determine source photo
     logger.info("\n" + "=" * 60)
     logger.info("STEP 3: Determining source photo for comparison")
     logger.info("=" * 60)
-    
+
     if reference_exists:
         source_photo_key = reference_photo_key
         photo_source = "global-assets"
         logger.info(f"✓ Using reference photo from global-assets: {source_photo_key}")
     else:
-        # Use the uploaded document directly 
         source_photo_key = document_key
         photo_source = "citizen-id-document"
         logger.info(f"✓ Using citizen ID document for comparison: {source_photo_key}")
-    
-    # ==========================================
-    # STEP 4: COMPARE FACES (Skip if manual override)
-    # ==========================================
+
+    # STEP 4: Face comparison (skip if manual override)
     logger.info("\n" + "=" * 60)
     logger.info("STEP 4: Face comparison")
     logger.info("=" * 60)
-    
+
     if manual_override:
         logger.info("⚠ Manual override enabled - skipping face comparison")
         comparison_result = {
             'success': True,
-            'match': True,  # Force match due to manual override
+            'match': True,
             'similarity': 0,
             'confidence': 'MANUAL_OVERRIDE',
             'faceMatches': 0,
@@ -221,22 +228,19 @@ def handle_verification_request(event, context):
             person_type=person_type,
             attempt_number=attempt_number
         )
-        
+
         if not comparison_result['success']:
             logger.error("Face comparison failed")
-            # Return user-friendly error message
             error_msg = comparison_result.get('error', 'Failed to compare faces')
             return error_response(400, error_msg, {'details': comparison_result.get('details', '')})
-        
+
         logger.info(f"✓ Comparison complete. Match: {comparison_result['match']}, Similarity: {comparison_result.get('similarity', 0)}%")
-    
-    # ==========================================
-    # STEP 5: UPDATE SESSION METADATA
-    # ==========================================
+
+    # STEP 5: Update session metadata
     logger.info("\n" + "=" * 60)
     logger.info("STEP 5: Updating session metadata")
     logger.info("=" * 60)
-    
+
     session_metadata = create_or_update_session_metadata(
         case_id=case_id,
         session_id=session_id,
@@ -249,18 +253,18 @@ def handle_verification_request(event, context):
         manual_override=manual_override,
         participant_name=participant_name if manual_override else None,
         participant_cpr=participant_cpr if manual_override else None,
-        participant_nationality=participant_nationality if manual_override else None
+        participant_nationality=participant_nationality if manual_override else None,
+        document_type=document_type
+        
     )
-    
+
     logger.info(f"Session metadata updated")
-    
-    # ==========================================
-    # STEP 6: CREATE VERIFICATION SUMMARY
-    # ==========================================
+
+    # STEP 6: Create verification summary
     logger.info("\n" + "=" * 60)
     logger.info("STEP 6: Creating verification summary")
     logger.info("=" * 60)
-    
+
     verification_summary = {
         'caseId': case_id,
         'sessionId': session_id,
@@ -271,9 +275,9 @@ def handle_verification_request(event, context):
         'providedName': person_name,
         'manuallyEnteredName': participant_name if manual_override else None,
         'manuallyEnteredCPR': participant_cpr if manual_override else None,
-        'manuallyEnteredNationality': participant_nationality if manual_override else None, 
-        'nationality': final_nationality,  
-
+        'manuallyEnteredNationality': participant_nationality if manual_override else None,
+        'nationality': final_nationality,
+        'documentType': document_type,
         'verificationTimestamp': datetime.utcnow().isoformat(),
         'attemptNumber': attempt_number,
         'manualOverride': manual_override,
@@ -322,25 +326,21 @@ def handle_verification_request(event, context):
             'overrideReason': override_reason if manual_override else None
         }
     }
-    
-    # Save verification summary
+
     summary_key = f"cases/{case_id}/sessions/{session_id}/01-identity-verification/verification-summary_{person_type}_{cpr_number}_attempt{attempt_number}.json"
-    
+
     s3.put_object(
         Bucket=BUCKET_NAME,
         Key=summary_key,
         Body=json.dumps(verification_summary, default=str, indent=2),
         ContentType='application/json'
     )
-    
+
     logger.info(f"Workflow complete. Summary saved to: {summary_key}")
     logger.info("=" * 60)
     logger.info("=== IDENTITY VERIFICATION WORKFLOW COMPLETED SUCCESSFULLY ===")
     logger.info("=" * 60)
-    
-    # ==========================================
-    # RETURN RESPONSE
-    # ==========================================
+
     response_data = {
         'success': True,
         'cprNumber': final_cpr_number,
@@ -361,12 +361,11 @@ def handle_verification_request(event, context):
         'verificationSummaryKey': summary_key,
         'verificationResultKey': comparison_result.get('verificationResultKey')
     }
-    
-    # Add reference photo presigned URL to response if it exists
+
     if reference_exists and reference_photo_url:
         response_data['referencePhotoUrl'] = reference_photo_url
         logger.info(f"✓ Added reference photo presigned URL to response (expires in 1 hour)")
-    
+
     return {
         'statusCode': 200,
         'headers': {
@@ -375,7 +374,6 @@ def handle_verification_request(event, context):
         },
         'body': json.dumps(response_data)
     }
-
 
 def handle_cleanup_request(event, context):
     """Handle cleanup of previous verification files"""
@@ -510,10 +508,10 @@ def verify_s3_object_exists(s3_key):
         return False
 
 
-def extract_data_from_document(document_key):
+def extract_data_from_document(document_key, document_type='cpr'):
     """Extract CPR number and person name from document using Textract"""
     try:
-        logger.info(f"Calling Textract for: {document_key}")
+        logger.info(f"Calling Textract for: {document_key} (document_type: {document_type})")
         
         response = textract.detect_document_text(
             Document={
@@ -532,32 +530,59 @@ def extract_data_from_document(document_key):
         full_text = ' '.join(extracted_lines)
         logger.info(f"Extracted {len(extracted_lines)} lines of text")
         
-        # Check if this looks like just a person photo (very little text)
-        if len(extracted_lines) < 3 and len(full_text) < 50:
-            logger.error("Document appears to be a person photo, not an ID document")
+        # Log ALL extracted lines
+        logger.info("=" * 80)
+        logger.info("ALL EXTRACTED LINES FROM TEXTRACT:")
+        logger.info("=" * 80)
+        for idx, line in enumerate(extracted_lines):
+            logger.info(f"Line {idx:3d}: {line}")
+        logger.info("=" * 80)
+        logger.info(f"FULL TEXT: {full_text}")
+        logger.info("=" * 80)
+        
+        # Validate document is not just a photo
+        has_significant_numbers = bool(re.search(r'\d{5,}', full_text))
+        
+        if len(extracted_lines) < 3 and len(full_text) < 100 and not has_significant_numbers:
+            logger.error("Document appears to be invalid")
             return {
                 'success': False,
-                'error': 'This appears to be a person photo, not an identity document. Please upload a CPR or passport document that contains text and identification information.',
+                'error': 'This appears to be invalid document. Please upload a valid CPR card or passport that contains identification information and numbers.',
                 'extractedText': full_text
             }
         
-        # Extract CPR number
+        # Validate document type matches uploaded document
+        document_validation = validate_document_type(extracted_lines, full_text, document_type)
+        if not document_validation['valid']:
+            return {
+                'success': False,
+                'error': document_validation['error'],
+                'extractedText': full_text
+            }
+        
+        # Extract CPR number (9 digits)
         cpr_pattern = r'\b\d{9}\b'
         cpr_matches = re.findall(cpr_pattern, full_text)
         
         if not cpr_matches:
             logger.error("CPR number not found in document")
+            logger.error(f"Extracted text was: {full_text}")
             return {
                 'success': False,
-                'error': 'No CPR number found in the document. Please ensure you uploaded a valid CPR or passport document with visible identification numbers, not a person photo.',
+                'error': 'No CPR number (9 digits) found in the document. Please ensure you uploaded a valid CPR card or passport, not just a person photo.',
                 'extractedText': full_text
             }
         
         cpr_number = cpr_matches[0]
         logger.info(f"Found CPR: {cpr_number}")
         
+        # Extract nationality
         nationality = extract_nationality_from_text(extracted_lines, full_text)
-        extracted_name = extract_name_from_text(extracted_lines, full_text)
+        logger.info(f"Extracted nationality: {nationality}")
+        
+        # Extract name using unified function
+        extracted_name = extract_name_unified(extracted_lines, full_text, document_type)
+        logger.info(f"FINAL EXTRACTED NAME: {extracted_name}")
         
         return {
             'success': True,
@@ -568,56 +593,285 @@ def extract_data_from_document(document_key):
             'rawResponse': response
         }
         
-    except textract.exceptions.InvalidParameterException as e:
-        logger.error(f"Invalid parameter for Textract: {str(e)}", exc_info=True)
-        return {
-            'success': False,
-            'error': 'Unable to read the document. Please ensure you uploaded a valid document image or PDF, not a person photo.',
-            'details': str(e)
-        }
-    except textract.exceptions.InvalidS3ObjectException as e:
-        logger.error(f"Invalid S3 object for Textract: {str(e)}", exc_info=True)
-        return {
-            'success': False,
-            'error': 'Unable to process the uploaded document. Please ensure the file is a valid image or PDF.',
-            'details': str(e)
-        }
-    except textract.exceptions.DocumentTooLargeException as e:
-        logger.error(f"Document too large: {str(e)}", exc_info=True)
-        return {
-            'success': False,
-            'error': 'The document file is too large. Please upload a document smaller than 10MB.',
-            'details': str(e)
-        }
     except Exception as e:
         logger.error(f"Error extracting data from document: {str(e)}", exc_info=True)
         return {
             'success': False,
-            'error': 'Failed to extract information from the document. Please ensure you uploaded a valid identity document.',
+            'error': 'Failed to extract information from the document. Please ensure you uploaded a valid identity document with clear text.',
             'details': str(e)
         }
-
-
-def extract_nationality_from_text(lines, full_text):
-    """Extract nationality from document text"""
+def validate_document_type(lines, full_text, expected_type):
+    """Validate that uploaded document matches the expected type (CPR or Passport)"""
     try:
-        nationality_keywords = ['Nationality', 'الجنسية', 'nationality', 'NATIONALITY']
+        # Keywords that indicate a CPR card
+        cpr_indicators = [
+            'KINGDOM OF BAHRAIN',
+            'IDENTITY CARD',
+            'البطاقة الشخصية',
+            'Personal Number',
+            'الرقم الشخصي'
+        ]
         
+        # Keywords that indicate a Passport
+        passport_indicators = [
+            'PASSPORT',
+            'جواز سفر',
+            'KINGDOM OF BAHRAIN-PASSPORT',
+            'KINGDOM OF BAHRAIN - PASSPORT',
+            'TYPE',
+            'ISSUING STATE',
+            'PASSPORT No',
+            'NAME OF BEARER',
+            'DATE OF EXPIRY'
+        ]
+        
+        full_text_upper = full_text.upper()
+        
+        # Count indicators
+        cpr_count = sum(1 for indicator in cpr_indicators if indicator.upper() in full_text_upper)
+        passport_count = sum(1 for indicator in passport_indicators if indicator.upper() in full_text_upper)
+        
+        logger.info(f"Document validation - CPR indicators: {cpr_count}, Passport indicators: {passport_count}")
+        
+        # Determine detected document type
+        if passport_count >= 2:
+            detected_type = 'passport'
+        elif cpr_count >= 1:
+            detected_type = 'cpr'
+        else:
+            # Cannot reliably determine - allow it but log warning
+            logger.warning("Could not reliably determine document type from text")
+            return {'valid': True}
+        
+        # Validate match
+        if expected_type == 'passport' and detected_type == 'cpr':
+            return {
+                'valid': False,
+                'error': f'Document type mismatch: You selected Passport but uploaded a CPR card. Please upload a valid passport document or change document type to CPR.'
+            }
+        
+        if expected_type == 'cpr' and detected_type == 'passport':
+            return {
+                'valid': False,
+                'error': f'Document type mismatch: You selected CPR but uploaded a Passport. Please upload a valid CPR card or change document type to Passport.'
+            }
+        
+        logger.info(f"Document type validation passed: expected {expected_type}, detected {detected_type}")
+        return {'valid': True}
+        
+    except Exception as e:
+        logger.error(f"Error in document type validation: {str(e)}")
+        # Don't block the process if validation fails
+        return {'valid': True}
+
+def extract_name_unified(lines, full_text, document_type):
+    """Unified function to extract person name from both CPR and Passport documents"""
+    try:
+        if document_type == 'passport':
+            logger.info("=== PASSPORT NAME EXTRACTION START ===")
+            logger.info(f"Total lines extracted: {len(lines)}")
+            
+            # Log all lines for debugging
+            for idx, line in enumerate(lines):
+                logger.info(f"Line {idx}: {line}")
+            
+            # METHOD 1 (HIGHEST PRIORITY): Parse from Machine Readable Zone (MRZ)
+            logger.info("Trying MRZ extraction method (PRIORITY 1)...")
+            
+            for line in lines:
+                # Look for MRZ line starting with PCBHR
+                if 'PCBHR' in line.upper():
+                    logger.info(f"Found MRZ line: {line}")
+                    
+                    # Extract the name part
+                    # Format: PCBHR[SURNAME]<<[GIVEN_NAMES_WITH_<_SEPARATORS]
+                    mrz_pattern = r'PCBHR([A-Z]+)<+([A-Z<]+)'
+                    match = re.search(mrz_pattern, line.upper())
+                    
+                    if match:
+                        surname = match.group(1)  
+                        given_names_raw = match.group(2)  
+                        
+                        # Clean up: remove trailing < and replace < with spaces
+                        given_names = given_names_raw.rstrip('<').replace('<', ' ').strip()
+                        
+                        # Combine: Given names + Surname (Western order)
+                        full_name = f"{given_names} {surname}"
+                        cleaned_name = clean_name(full_name)
+                        
+                        logger.info(f"✓ Extracted name from MRZ: {cleaned_name}")
+                        return cleaned_name
+            
+            # METHOD 2: Look for "NAME OF BEARER" and extract a valid name from subsequent lines
+            logger.info("MRZ not found, trying NAME OF BEARER method (PRIORITY 2)...")
+            
+            for i, line in enumerate(lines):
+                line_upper = line.upper().strip()
+                
+                if 'NAME OF BEARER' in line_upper:
+                    logger.info(f"Found 'NAME OF BEARER' at line {i}: {line}")
+                    
+                    # Search the next 3 lines for a valid name
+                    for offset in range(1, 4):
+                        if i + offset >= len(lines):
+                            break
+                        
+                        candidate_line = lines[i + offset].strip()
+                        logger.info(f"Checking line {i + offset}: {candidate_line}")
+                        
+                        # Remove Arabic text if present
+                        candidate_cleaned = re.sub(r'[\u0600-\u06FF]+', '', candidate_line).strip()
+                        
+                        # Validate: must be all letters, at least 3 words, minimum 15 characters
+                        # Remove special characters for validation
+                        alpha_only = re.sub(r'[^A-Za-z\s]', '', candidate_cleaned)
+                        
+                        if (alpha_only and 
+                            len(alpha_only) >= 15 and  # Minimum length
+                            len(alpha_only.split()) >= 3 and  # At least 3 words (typical Arabic names)
+                            not any(keyword in alpha_only.upper() for keyword in 
+                                   ['NATIONALITY', 'BAHRAINI', 'DATE', 'BIRTH', 'OCCUPATION', 'PLACE'])):
+                            
+                            cleaned_name = clean_name(alpha_only)
+                            logger.info(f"✓ Extracted name from NAME OF BEARER method: {cleaned_name}")
+                            return cleaned_name
+            
+            # METHOD 3: Look for a line with all uppercase letters (backup)
+            logger.info("Trying uppercase letter pattern method (PRIORITY 3)...")
+            
+            for i, line in enumerate(lines):
+                line_stripped = line.strip()
+                
+                # Remove Arabic characters
+                line_no_arabic = re.sub(r'[\u0600-\u06FF\s]+', '', line_stripped)
+                
+             
+                if (line_no_arabic and
+                    line_no_arabic.isupper() and
+                    line_no_arabic.isalpha() and
+                    len(line_no_arabic) >= 15 and
+                    len(line_stripped.split()) >= 3):
+                    
+                    # Exclude headers
+                    excluded_keywords = ['KINGDOM', 'BAHRAIN', 'PASSPORT', 'NATIONALITY', 
+                                       'DATE OF BIRTH', 'NAME OF BEARER', 'PLACE OF BIRTH',
+                                       'DATE OF ISSUE', 'DATE OF EXPIRY', 'OCCUPATION', 'ISSUING']
+                    
+                    if not any(keyword in line_stripped.upper() for keyword in excluded_keywords):
+                        cleaned_name = clean_name(line_stripped)
+                        logger.info(f"✓ Extracted name from uppercase pattern: {cleaned_name}")
+                        return cleaned_name
+            
+            logger.warning("Could not extract name from passport using any method")
+        
+        # CPR extraction or fallback
+        logger.info("=== CPR NAME EXTRACTION START ===")
+        name_keywords = ['Name', 'الاسم', 'name', 'NAME', 'Full Name', 'Names']
+        
+        for i, line in enumerate(lines):
+            for keyword in name_keywords:
+                if keyword in line:
+                    logger.info(f"Found name keyword '{keyword}' in line: {line}")
+                    
+                    # Check if name is on the same line after colon
+                    if ':' in line:
+                        parts = line.split(':', 1)
+                        if len(parts) > 1:
+                            name = parts[1].strip()
+                            if name and len(name) > 2:
+                                cleaned_name = clean_name(name)
+                                if cleaned_name != "Unknown":
+                                    logger.info(f"✓ Extracted name from CPR (same line): {cleaned_name}")
+                                    return cleaned_name
+                    
+                    # Check the next line
+                    if i + 1 < len(lines):
+                        next_line = lines[i + 1].strip()
+                        
+                        if (next_line and 
+                            not any(char.isdigit() for char in next_line[:5]) and
+                            len(next_line) > 2):
+                            cleaned_name = clean_name(next_line)
+                            if cleaned_name and cleaned_name != "Unknown":
+                                logger.info(f"✓ Extracted name from CPR (next line): {cleaned_name}")
+                                return cleaned_name
+        
+        logger.warning("Could not extract name from document")
+        return "Unknown"
+        
+    except Exception as e:
+        logger.error(f"Error extracting name: {str(e)}", exc_info=True)
+        return "Unknown"
+def extract_nationality_from_text(lines, full_text):
+    """Extract nationality from document text - ENHANCED VERSION"""
+    try:
+        # Method 1: Look for nationality keywords in both English and Arabic
+        nationality_keywords = [
+            'Nationality', 'الجنسية', 'nationality', 'NATIONALITY',
+            'Nat.', 'NAT.', 'nat.'
+        ]
+        
+        # First pass: Look for keyword followed by value on same line or next line
         for i, line in enumerate(lines):
             for keyword in nationality_keywords:
                 if keyword in line:
+                    logger.info(f"Found nationality keyword '{keyword}' in line: {line}")
+                    
+                    # Check if nationality is on the same line after the keyword
                     if ':' in line:
                         parts = line.split(':', 1)
                         if len(parts) > 1:
                             nationality = parts[1].strip()
-                            if nationality and len(nationality) > 2:
-                                return clean_nationality(nationality)
+                            if nationality and len(nationality) > 2 and not nationality.isdigit():
+                                cleaned = clean_nationality(nationality)
+                                if cleaned and cleaned != 'Unknown':
+                                    logger.info(f"Extracted nationality from same line: {cleaned}")
+                                    return cleaned
                     
+                    # Check the next line
                     if i + 1 < len(lines):
                         next_line = lines[i + 1].strip()
+                        logger.info(f"Checking next line for nationality: {next_line}")
+                        
                         if next_line and not any(char.isdigit() for char in next_line[:5]):
-                            return clean_nationality(next_line)
+                            cleaned = clean_nationality(next_line)
+                            if cleaned and cleaned != 'Unknown':
+                                logger.info(f"Extracted nationality from next line: {cleaned}")
+                                return cleaned
         
+        # Method 2: Look for common nationality patterns (country names)
+        common_nationalities = [
+            'Indian', 'INDIAN', 'هندي',
+            'Pakistani', 'PAKISTANI', 'باكستاني',
+            'Bangladeshi', 'BANGLADESHI', 'بنغلاديشي',
+            'Filipino', 'FILIPINO', 'فلبيني',
+            'Egyptian', 'EGYPTIAN', 'مصري',
+            'Bahraini', 'BAHRAINI', 'بحريني',
+            'Saudi', 'SAUDI', 'سعودي',
+            'Emirati', 'EMIRATI', 'إماراتي'
+        ]
+        
+        for nationality in common_nationalities:
+            if nationality in full_text:
+                cleaned = clean_nationality(nationality)
+                logger.info(f"Found nationality by pattern matching: {cleaned}")
+                return cleaned
+        
+        # Method 3: Look for text that appears between "Nationality" and "Name" sections
+        nationality_match = re.search(
+            r'(?:Nationality|الجنسية|NATIONALITY|NAT\.)[:\s]*([A-Za-z\u0600-\u06FF\s]+?)(?:\s*(?:Name|الاسم|NAME)|$)',
+            full_text,
+            re.IGNORECASE | re.UNICODE
+        )
+        
+        if nationality_match:
+            extracted = nationality_match.group(1).strip()
+            logger.info(f"Found nationality by regex pattern: {extracted}")
+            cleaned = clean_nationality(extracted)
+            if cleaned and cleaned != 'Unknown':
+                return cleaned
+        
+        logger.warning("Could not extract nationality from document")
         return "Unknown"
         
     except Exception as e:
@@ -627,51 +881,74 @@ def extract_nationality_from_text(lines, full_text):
 
 def clean_nationality(nationality):
     """Clean and format extracted nationality"""
+    if not nationality:
+        return "Unknown"
+    
+    # Remove extra whitespace
     nationality = ' '.join(nationality.split())
-    nationality = re.sub(r'[^\w\s\-]', '', nationality)
-    return nationality.title().strip()
-
-
-def extract_name_from_text(lines, full_text):
-    """Extract person name from document text"""
-    try:
-        name_keywords = ['Name', 'الاسم', 'name', 'NAME', 'Full Name']
-        
-        for i, line in enumerate(lines):
-            for keyword in name_keywords:
-                if keyword in line:
-                    if ':' in line:
-                        parts = line.split(':', 1)
-                        if len(parts) > 1:
-                            name = parts[1].strip()
-                            if name and len(name) > 2:
-                                return clean_name(name)
-                    
-                    if i + 1 < len(lines):
-                        next_line = lines[i + 1].strip()
-                        if next_line and not any(char.isdigit() for char in next_line[:5]):
-                            return clean_name(next_line)
-        
+    
+    # Remove special characters but keep Arabic characters
+    nationality = re.sub(r'[^\w\s\-\u0600-\u06FF]', '', nationality)
+    
+    # Remove any remaining numbers
+    nationality = re.sub(r'\d+', '', nationality)
+    
+    # Strip whitespace
+    nationality = nationality.strip()
+    
+    # Filter out invalid entries
+    invalid_entries = ['', 'Unknown', 'N/A', 'NA', '-']
+    if nationality in invalid_entries or len(nationality) < 3:
         return "Unknown"
-        
-    except Exception as e:
-        logger.error(f"Error extracting name: {str(e)}", exc_info=True)
-        return "Unknown"
+    
+    # Capitalize properly (handle both English and Arabic)
+    if re.search(r'[A-Za-z]', nationality):  # If contains English letters
+        nationality = nationality.title()
+    
+    return nationality
+
 
 
 def clean_name(name):
     """Clean and format extracted name"""
+    if not name:
+        return "Unknown"
+    
+    # Remove Arabic characters
+    name = re.sub(r'[\u0600-\u06FF]+', '', name)
+    
+    # Remove extra whitespace
     name = ' '.join(name.split())
+    
+    # Remove special characters but keep spaces and hyphens
     name = re.sub(r'[^\w\s\-]', '', name)
-    return name.title().strip()
-
+    
+    # Remove any digits
+    name = re.sub(r'\d+', '', name)
+    
+    # Remove common non-name words that might appear
+    excluded_words = ['KINGDOM', 'BAHRAIN', 'PASSPORT', 'NAME', 'BEARER', 
+                     'NATIONALITY', 'DATE', 'BIRTH', 'ISSUE', 'EXPIRY']
+    
+    words = name.split()
+    cleaned_words = [word for word in words if word.upper() not in excluded_words]
+    name = ' '.join(cleaned_words)
+    
+    name = name.strip()
+    
+    # Validate
+    if not name or len(name) < 3:
+        return "Unknown"
+    
+    # Title case for proper capitalization
+    return name.title()
 
 def check_reference_photo(cpr_number):
     """Check if reference photo exists in global-assets and generate presigned URL"""
     try:
         possible_extensions = ['.jpg', '.jpeg', '.png']
         found_key = None
-        
+
         for ext in possible_extensions:
             reference_key = f"global-assets/reference-photos/{cpr_number}_reference-photo{ext}"
             
@@ -724,7 +1001,7 @@ def compare_faces(source_photo_key, target_photo_key, case_id, session_id, cpr_n
         logger.info(f"Comparing faces (Attempt {attempt_number}):")
         logger.info(f"  Source: {source_photo_key}")
         logger.info(f"  Target: {target_photo_key}")
-        
+
         # Detect face quality in target photo
         try:
             quality_response = rekognition.detect_faces(
@@ -893,11 +1170,11 @@ def compare_faces(source_photo_key, target_photo_key, case_id, session_id, cpr_n
         }
 
 
-def create_or_update_session_metadata(case_id, session_id, cpr_number, person_name, person_type, verification_result, nationality, attempt_number=1, manual_override=False, participant_name=None, participant_cpr=None,participant_nationality=None):
+def create_or_update_session_metadata(case_id, session_id, cpr_number, person_name, person_type, verification_result, nationality, attempt_number=1, manual_override=False, participant_name=None, participant_cpr=None, participant_nationality=None, document_type='cpr'):
     """Update existing session metadata with verification results"""
     try:
         metadata_key = f"cases/{case_id}/sessions/{session_id}/session-metadata.json"
-        
+
         # Get existing session metadata 
         try:
             response = s3.get_object(Bucket=BUCKET_NAME, Key=metadata_key)
@@ -914,6 +1191,7 @@ def create_or_update_session_metadata(case_id, session_id, cpr_number, person_na
             'personName': person_name,
             'cprNumber': cpr_number,
             'nationality': nationality,
+            'documentType': document_type ,
             'attemptNumber': attempt_number,
             'verificationTimestamp': current_timestamp,
             'match': verification_result['match'],
@@ -925,6 +1203,7 @@ def create_or_update_session_metadata(case_id, session_id, cpr_number, person_na
             'manuallyEnteredName': participant_name if manual_override else None,
             'manuallyEnteredCPR': participant_cpr if manual_override else None,
             'manuallyEnteredNationality': participant_nationality if manual_override else None
+
         }
         # Update the existing metadata
         metadata = existing_metadata
@@ -960,14 +1239,16 @@ def create_or_update_session_metadata(case_id, session_id, cpr_number, person_na
     except Exception as e:
         logger.error(f"Error updating session metadata: {str(e)}", exc_info=True)
         return None
+
+
 def error_response(status_code, message, additional_data=None):
     """Helper function to create error responses"""
     body = {'error': message}
     if additional_data:
         body.update(additional_data)
-    
+
     logger.error(f"Returning error response: {status_code} - {message}")
-    
+
     return {
         'statusCode': status_code,
         'headers': {

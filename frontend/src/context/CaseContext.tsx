@@ -11,6 +11,9 @@ export interface CaseContextType {
   currentPersonName: string | null;
   setCurrentPersonName: (name: string | null) => void;
 
+  currentPersonType: string | null;
+  setCurrentPersonType: (type: string | null) => void;
+
   // Loading states
   isLoading: boolean;
 
@@ -59,6 +62,9 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [currentPersonName, setCurrentPersonName] = useState<string | null>(
+    null
+  );
+  const [currentPersonType, setCurrentPersonType] = useState<string | null>(
     null
   );
   /**
@@ -284,6 +290,7 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({
     setAllCases([]);
     setError(null);
     setCurrentPersonName(null);
+    setCurrentPersonType(null);
     console.log("Cleared case context");
   }, []);
 
@@ -291,6 +298,7 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({
     currentCase,
     currentSession,
     currentPersonName,
+    currentPersonType,
     allCases,
     isLoading,
     error,
@@ -305,6 +313,7 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({
     updateCaseStatus,
     setCurrentCaseDirectly,
     setCurrentPersonName,
+    setCurrentPersonType,
   };
 
   return <CaseContext.Provider value={value}>{children}</CaseContext.Provider>;

@@ -1,0 +1,98 @@
+/* PDF Page Styles */
+.pdf-page {
+  box-sizing: border-box;
+  overflow: hidden;
+  position: relative;
+  background-color: white;
+  font-family: Arial, "Segoe UI", "Noto Sans", "Noto Sans Arabic", "Noto Sans Devanagari", sans-serif;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #000000;
+}
+
+/* PDF Header Styles */
+.pdf-header {
+  text-align: center;
+  margin-bottom: 30px;
+  border-bottom: 2px solid #333;
+  padding-bottom: 20px;
+}
+
+.pdf-header h1 {
+  font-size: 22px;
+  margin: 0 0 8px 0;
+  color: #333;
+  font-weight: bold;
+}
+
+.pdf-header p {
+  font-size: 11px;
+  color: #666;
+  margin: 0;
+}
+
+/* PDF Section Title */
+.pdf-section-title {
+  margin-bottom: 20px;
+}
+
+.pdf-section-title h2 {
+  font-size: 16px;
+  margin: 0 0 12px 0;
+  color: #444;
+  font-weight: bold;
+}
+
+/* Transcript Entry Styles */
+.transcript-entry {
+  margin-bottom: 12px;
+  page-break-inside: avoid;
+}
+
+.transcript-entry strong {
+  font-size: 11px;
+  color: #000;
+  display: block;
+  margin-bottom: 4px;
+}
+
+.transcript-text-box {
+  margin: 0;
+  padding: 8px 15px;
+  background: #f5f5f5;
+  border-left: 4px solid #4A90E2;
+  font-size: 12px;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  white-space: pre-wrap;
+}
+
+/* PDF Footer Styles */
+.pdf-footer {
+  position: absolute;
+  padding-top: 20px;
+  border-top: 1px solid #ccc;
+  text-align: center;
+}
+
+.pdf-footer p {
+  font-size: 10px;
+  color: #999;
+  margin: 0;
+}
+
+/* Measurement Helper */
+.measure-helper {
+  position: absolute;
+  visibility: hidden;
+  font-family: Arial, "Segoe UI", "Noto Sans", "Noto Sans Arabic", "Noto Sans Devanagari", sans-serif;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+/* Button Styles */
+.export-buttons-container {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
