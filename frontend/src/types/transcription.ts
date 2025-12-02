@@ -14,13 +14,16 @@ export interface TranscriptionResult {
   speaker: string;
   formattedTranscript: string;
   timeStamp: string;
+  avgWitnessConfidenceLevel: number;
+  witnessWordCount: number;
+  investigatorWordCount: number;
 }
 
 export type Sources = "display" | "microphone"|"both";
 
 export type Speakers = "Investigator" | "Witness";
 
-export type sessionType = "standard" | "multi";
+export type SessionType = "standard" | "multi";
 
 export const getSpeakerFromSource = (source: Sources): Speakers => {
   return source === "microphone" ? "Investigator" : "Witness";
@@ -68,17 +71,17 @@ export const ErrorTypeLabels: Record<ErrorType, string> = {
 
 
 
-  export interface SaveTranscriptionRequest {
-    caseId: string | undefined;
-    sessionId: string;
-    transcription: string;
-    metadata?: {
-      duration?: string;
-      language?: string;
-      participants?: string[];
-      [key: string]: any;
-    };
-  }
+export interface SaveTranscriptionRequest {
+  caseId?: string;
+  sessionId: string;
+  transcription: string;
+  metadata?: {
+    duration?: string;
+    language?: string;
+    participants?: string[];
+    [key: string]: any;
+  };
+}
 export interface LanguagePreferences {
   languageMode: "unified" | "separate";
   sharedLanguage: string ; // For unified mode
@@ -87,12 +90,26 @@ export interface LanguagePreferences {
 }
 
 
-export interface sourceSettings {
+export interface SourceSettings {
   source: "display" | "microphone";
   transcribeClient: TranscribeStreamingClient;
   stream: MediaStream;
   maxAttempts: number;
   selectedLanguage?: string;
-  speakerMode?: sessionType;
+  speakerMode?: SessionType;
   detectionLanguages?: string;
+}
+
+export interface TranscriptionStats {
+  avgWitnessConfidenceLevel: number;
+  //avgInvestigatorConfidenceLevel: number;
+  witnessWordCount: number;
+  investigatorWordCount: number;
+  totalWordCount: number;
+}
+
+export interface FormattedTranscript {
+  speaker: string;
+  formattedTranscript: string;
+  timeStamp?: string;
 }

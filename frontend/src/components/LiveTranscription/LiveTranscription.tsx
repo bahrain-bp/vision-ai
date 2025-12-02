@@ -4,20 +4,21 @@ import { useTranscription } from "../../hooks/useTranscription";
 import {
   RecordingStatus,
   TranscriptionStatus,
-  sessionType,
-  LanguagePreferences
+  SessionType,
+  LanguagePreferences,
 } from "../../types/";
-import PDFExporter from "./PDFExporter";
+import PDFExporter from "../RealTime/TranslationPDFExporter"; 
 import ErrorDisplay from "./ErrorDisplay";
 import { useState } from "react";
+import {useCaseContext} from "../../hooks/useCaseContext"
 
 interface LiveTranscriptionProps {
   startRecordingProp: boolean;
   setSessionState: (state: RecordingStatus) => void;
   languagePreferences: LanguagePreferences;
-  detectionLanguages?:string[];
-  setSessionType: (sesType: sessionType) => void;
-  sessionType: sessionType;
+  detectionLanguages?: string[];
+  setSessionType: (sesType: SessionType) => void;
+  sessionType: SessionType;
 }
 
 const LiveTranscription: React.FC<LiveTranscriptionProps> = ({
@@ -30,6 +31,10 @@ const LiveTranscription: React.FC<LiveTranscriptionProps> = ({
 }) => {
   const { audioStatus, recordingStatus, startRecording, getFullTranscript } =
     useTranscription();
+
+    const {currentCase,currentSession} = useCaseContext();
+
+    
   const [error, setError] = useState<TranscriptionStatus | null>(null);
 
   const [isStarting, setIsStarting] = useState(false);
@@ -154,7 +159,8 @@ const LiveTranscription: React.FC<LiveTranscriptionProps> = ({
         <PDFExporter
           transcript={getFullTranscript}
           title={"Investigation Transcript"}
-          fileName={"Transcript"}
+          fileName={"transcript-"+currentCase?.caseId+"-"+currentSession?.sessionId}
+          sessionDate={new Date().toLocaleDateString()}
         />
         <button className="action-btn">
           <Copy className="btn-icon" />

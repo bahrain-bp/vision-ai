@@ -12,10 +12,10 @@ import {
   //Speakers,
   TranscriptionStatus,
   TranscriptionError,
-  sessionType,
+  SessionType,
   SaveTranscriptionRequest,
   LanguagePreferences,
-  sourceSettings,
+  SourceSettings,
 } from "../../types";
 import { LanguageCode } from "@aws-sdk/client-transcribe-streaming";
 import StreamManager from "./StreamManager";
@@ -31,22 +31,22 @@ class TranscribeService {
 
   private mediaManager = StreamManager;
 
-  private microphoneAttempts: number = 15;
+  private  readonly microphoneAttempts: number = 15;
 
-  private displayAttempts: number = 15;
+  private  readonly displayAttempts: number = 15;
 
   private transcribeClient: TranscribeStreamingClient | null = null;
 
-  private micSettings: sourceSettings | null = null;
+  private micSettings: SourceSettings | null = null;
 
-  private displaySettings: sourceSettings | null = null;
+  private displaySettings: SourceSettings | null = null;
 
   private transcriptCallback: ((result: TranscriptionResult) => void) | null =
     null;
 
   private static instance: TranscribeService;
 
-  constructor() {}
+  private constructor() {}
 
   static getInstance(): TranscribeService {
     if (!TranscribeService.instance) {
@@ -80,7 +80,7 @@ class TranscribeService {
   async startRecording(
     onTranscriptUpdate?: (text: TranscriptionResult) => void,
     languagePreferences?: LanguagePreferences,
-    sessionType?: sessionType,
+    sessionType?: SessionType,
     detectionLanguages?: string
   ): Promise<TranscriptionStatus> {
     this.transcriptCallback = onTranscriptUpdate || null;
@@ -201,7 +201,7 @@ class TranscribeService {
   }
 
   async attemptConnection(
-    settings: sourceSettings
+    settings: SourceSettings
   ): Promise<TranscriptionError> {
     let attempts = settings.maxAttempts;
 
@@ -287,8 +287,8 @@ class TranscribeService {
     stream: MediaStream,
     source: "display" | "microphone",
     sampleRate: number,
-    selectedLanguage?: String,
-    speakerMode?: sessionType,
+    selectedLanguage?: string,
+    speakerMode?: SessionType,
     detectionLanguages?: string
   ): Promise<TranscriptionError> {
     const microphoneStream: MicrophoneStream = new MicrophoneStream();
@@ -355,9 +355,9 @@ class TranscribeService {
   }
 
   private async processStream(
-    stream: any,
+    stream: AsyncIterable<any>,
     source: "display" | "microphone",
-    speakerMode?: sessionType
+    speakerMode?: SessionType
   ) {
     try {
       for await (const event of stream) {
@@ -409,6 +409,17 @@ class TranscribeService {
             sentences: transcriptWords.map((item) => item.content).join(" "),
             speaker,
             timeStamp: timeStamp,
+            avgWitnessConfidenceLevel:
+              speaker !== "Investigator"
+                ? transcriptWords.reduce(
+                    (prev, word) => prev + (word.confidence || 0),
+                    0
+                  ) / transcriptWords.length
+                : 0,
+            witnessWordCount:
+              speaker !== "Investigator" ? transcriptWords.length : 0,
+            investigatorWordCount:
+              speaker === "Investigator" ? transcriptWords.length : 0,
             formattedTranscript:
               `[${timeStamp}] ${speaker}: ` +
               transcriptWords
@@ -417,6 +428,8 @@ class TranscribeService {
                 .trim() +
               `\n`,
           };
+
+          //console.table(fullDetailTranscript)
 
           if (this.transcriptCallback) {
             this.transcriptCallback(fullDetailTranscript);
@@ -457,7 +470,7 @@ class TranscribeService {
     this.mediaManager.stopStreams();
     this.recordingStatus = "off";
   }
-  toggleRecordingPause(isPaused: boolean) {
+  toggleRecordingPause(isPaused: boolean):void {
     this.recordingStatus = isPaused ? "paused" : "on";
   }
 
@@ -465,15 +478,16 @@ class TranscribeService {
     return this.recordingStatus;
   }
 
-  getIsRecording(): boolean {
-    return this.recordingStatus === "on" ? true : false;
+  isRecording(): boolean {
+    return this.recordingStatus === "on";
   }
 
-  getDisplayStatus(): boolean {
-    return this.displayStatus === "on" ? true : false;
+  isDisplayActive(): boolean {
+    return this.displayStatus === "on";
   }
-  getAudioStatus(): boolean {
-    return this.audioStatus === "on" ? true : false;
+
+  isAudioActive(): boolean {
+    return this.audioStatus === "on";
   }
 }
 
