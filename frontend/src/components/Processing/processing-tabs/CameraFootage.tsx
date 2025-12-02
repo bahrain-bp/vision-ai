@@ -662,20 +662,44 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
                   <div className="video-info">
                     {videoFile?.name} • {formatTime(getVideoDuration())}
                   </div>
-                  <button
-                    onClick={startAnalysis}
-                    disabled={isAnalyzing || videoDuration === null}
-                    className={`continue-btn ${isAnalyzing ? "analyzing" : ""}`}
-                  >
-                    {isAnalyzing ? (
-                      <>
-                        <span className="processing-spinner">⟳</span>
-                        Analyzing...
-                      </>
-                    ) : (
-                      "Start Analysis"
-                    )}
-                  </button>
+
+                  {!analysisResult ? (
+                    // Show Start Analysis button before analysis
+                    <button
+                      onClick={startAnalysis}
+                      disabled={isAnalyzing || videoDuration === null}
+                      className={`continue-btn ${
+                        isAnalyzing ? "analyzing" : ""
+                      }`}
+                    >
+                      {isAnalyzing ? (
+                        <>
+                          <span className="processing-spinner">⟳</span>
+                          Analyzing...
+                        </>
+                      ) : (
+                        "Start Analysis"
+                      )}
+                    </button>
+                  ) : (
+                    // Show Upload Another Video button after analysis
+                    <button
+                      className="continue-btn"
+                      onClick={() => {
+                        // Reset all states
+                        setVideoFile(null);
+                        setVideoUrl(null);
+                        setAnalysisResult(null);
+                        setEditedResults(null);
+                        setExpandedChapter(null);
+                        setPollingStatus("");
+                        setVideoS3Key("");
+                        setVideoDuration(null);
+                      }}
+                    >
+                      Upload Another Video
+                    </button>
+                  )}
                 </div>
               </div>
             )}
