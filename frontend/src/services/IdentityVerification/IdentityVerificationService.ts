@@ -1,14 +1,15 @@
-import axios, { AxiosError, AxiosRequestConfig } from "axios";
+import axios from "axios";
 import {
   UploadUrlRequest,
   UploadUrlResponse,
   VerificationRequest,
   VerificationResponse,
-  ApiError,
   PersonType,
   FileValidation,
   ProgressCallback,
   DEFAULT_CONFIG,
+  AxiosError,
+  AxiosRequestConfig,
 } from "../../types/identityVerification";
 
 const API_BASE_URL = process.env.REACT_APP_API_ENDPOINT;
@@ -35,8 +36,8 @@ const getFileMimeType = (file: File): string => {
 };
 
 const handleApiError = (error: unknown, context: string): never => {
-  if (axios.isAxiosError(error)) {
-    const axiosError = error as AxiosError<ApiError>;
+  if (error && typeof error === "object" && "response" in error) {
+    const axiosError = error as AxiosError;
     const status = axiosError.response?.status;
     const errorMessage = axiosError.response?.data?.error || axiosError.message;
     const errorDetails = axiosError.response?.data?.details;
@@ -180,7 +181,7 @@ export const uploadFileToS3 = async (
       headers: {
         "Content-Type": getFileMimeType(file),
       },
-      onUploadProgress: (progressEvent) => {
+      onUploadProgress: (progressEvent: any) => {
         if (onProgress && progressEvent.total) {
           const progress = Math.round(
             (progressEvent.loaded * 100) / progressEvent.total
@@ -190,7 +191,12 @@ export const uploadFileToS3 = async (
       },
     });
   } catch (error) {
-    if (axios.isAxiosError(error) && error.code === "ECONNABORTED") {
+    if (
+      error &&
+      typeof error === "object" &&
+      "code" in error &&
+      (error as any).code === "ECONNABORTED"
+    ) {
       throw new IdentityVerificationError(
         "Upload timeout. Please try again.",
         "UPLOAD_TIMEOUT",
@@ -294,6 +300,7 @@ export const completeIdentityVerification = async (
   }
 
   // Step 4: Trigger verification
+
   const verificationResult = await verifyIdentity({
     caseId,
     sessionId,
