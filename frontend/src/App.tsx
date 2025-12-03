@@ -7,6 +7,7 @@ import authService from "./services/authService";
 import awsConfig from "./aws-config";
 import { User } from "./types";
 import { TranscriptionProvider } from "./context/TranscriptionContext";
+import { CaseProvider } from "./context/CaseContext";
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'; 
 
 
@@ -130,6 +131,7 @@ const App: React.FC = () => {
   }
 
   return (
+    <CaseProvider>
     <Router>
     <Routes>
       {/* Main app route */}
@@ -161,6 +163,7 @@ const App: React.FC = () => {
       />
     </Routes>
   </Router>
+  </CaseProvider>
   );
 };
 
