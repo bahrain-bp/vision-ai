@@ -51,7 +51,7 @@ const ProcessingView: React.FC<ProcessingViewProps> = ({ sessionData, selectedLa
     {
       id: "CameraFootage",
       label: "Camera Footage",
-      render: () => <CameraFootage />,
+      render: () => <CameraFootage sessionData={sessionData} language={selectedLanguage} />,
     },
     {
       id: "AISuggestions",
@@ -61,7 +61,7 @@ const ProcessingView: React.FC<ProcessingViewProps> = ({ sessionData, selectedLa
     {
       id: "Contradictions",
       label: "Contradictions",
-      render: () => <Contradictions />,
+      render: () => <Contradictions language={selectedLanguage} />,
     },
     {
       id: "Outcome",

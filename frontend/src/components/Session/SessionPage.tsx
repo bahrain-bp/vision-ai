@@ -35,6 +35,7 @@ interface SessionData {
   language: string;
   duration: string;
   witness: string;
+  participant: string;
   status: string;
   witnessData?: WitnessData;
   identityData?: IdentityData;
@@ -84,6 +85,7 @@ const SessionPage: React.FC<SessionPageProps> = ({
     language: "Arabic",
     duration: "00:00",
     witness: "Not set",
+    participant: "Not set",
     status: "Active",
   };
  
@@ -248,6 +250,7 @@ const SessionPage: React.FC<SessionPageProps> = ({
             onIdentityDataChange={updateIdentityData}
             onTranslationSettingsChange={updateTranslationSettings}
             onVerifyIdentity={handleVerifyIdentity}
+            triggerSummarization={false}
           />
         ) : (
           <ProcessingView 
@@ -261,6 +264,7 @@ const SessionPage: React.FC<SessionPageProps> = ({
         <SessionSummaryModal
           sessionData={currentSessionData}
           onClose={handleCloseSummary}
+          onGenerateSummary={() => {}}
         />
       )}
     </div>

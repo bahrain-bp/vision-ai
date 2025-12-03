@@ -22,6 +22,10 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData, selectedLanguage }) => {
   const [error, setError] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string>("");
 
+  // Helper function for bilingual text (like Classification)
+  const isArabic = selectedLanguage === "ar";
+  const t = (en: string, ar: string) => (isArabic ? ar : en);
+
   // Simple translation function (basic word replacement for common terms)
   const translateToEnglish = (arabicText: string): string => {
     if (!arabicText) return arabicText;
@@ -370,11 +374,7 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData, selectedLanguage }) => {
   const handleRewrite = async () => {
     setLoading(true);
     setError(null);
-    setStatusMessage(
-      selectedLanguage === "ar" 
-        ? "جارٍ بدء عملية إعادة الكتابة..." 
-        : "Starting rewrite job..."
-    );
+    setStatusMessage(t("Starting rewrite job...", "جارٍ بدء عملية إعادة الكتابة..."));
 
     try {
       // Get API endpoint
@@ -416,11 +416,7 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData, selectedLanguage }) => {
       // Check if we got a jobId (async mode)
       if (data.jobId) {
         console.log("Job started with ID:", data.jobId);
-        setStatusMessage(
-          selectedLanguage === "ar" 
-            ? "جارٍ بدء العملية. مراجعة الحالة..." 
-            : "Job started. Checking status..."
-        );
+        setStatusMessage(t("Job started. Checking status...", "جارٍ بدء العملية. مراجعة الحالة..."));
         
         // Step 2: Poll for status
         pollJobStatus(data.jobId, apiGatewayEndpoint);
@@ -433,7 +429,7 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData, selectedLanguage }) => {
       }
     } catch (err) {
       const errorMessage =
-        err instanceof Error ? err.message : "Failed to start rewrite job";
+        err instanceof Error ? err.message : t("Failed to start rewrite job", "فشل في بدء عملية إعادة الكتابة");
       setError(errorMessage);
       console.error("Rewrite error:", err);
       setLoading(false);
@@ -464,52 +460,29 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData, selectedLanguage }) => {
 
         if (statusData.status === "COMPLETED") {
           clearInterval(pollInterval);
-          setStatusMessage(
-            selectedLanguage === "ar" 
-              ? "تمت إعادة الكتابة بنجاح!" 
-              : "Rewrite completed!"
-          );
+          setStatusMessage(t("Rewrite completed!", "تمت إعادة الكتابة بنجاح!"));
           
           if (statusData.rewrittenText) {
             handleRewriteSuccess(statusData.rewrittenText);
           } else {
-            setError(
-              selectedLanguage === "ar" 
-                ? "تمت إعادة الكتابة ولكن لم يتم إرجاع النص" 
-                : "Rewrite completed but no text returned"
-            );
+            setError(t("Rewrite completed but no text returned", "تمت إعادة الكتابة ولكن لم يتم إرجاع النص"));
             setLoading(false);
           }
         } else if (statusData.status === "FAILED") {
           clearInterval(pollInterval);
-          setError(
-            selectedLanguage === "ar" 
-              ? `فشلت إعادة الكتابة: ${statusData.error || "خطأ غير محدد"}`
-              : statusData.error || "Rewrite job failed"
-          );
+          const failMsg = statusData.error || t("Rewrite job failed", "فشلت عملية إعادة الكتابة");
+          setError(isArabic ? `فشلت إعادة الكتابة: ${failMsg}` : failMsg);
           setLoading(false);
           setStatusMessage("");
         } else if (statusData.status === "PROCESSING") {
-          setStatusMessage(
-            selectedLanguage === "ar" 
-              ? "جارٍ معالجة التقرير... الرجاء الانتظار." 
-              : "Processing your report... Please wait."
-          );
+          setStatusMessage(t("Processing your report... Please wait.", "جارٍ معالجة التقرير... الرجاء الانتظار."));
         } else {
-          setStatusMessage(
-            selectedLanguage === "ar" 
-              ? `الحالة: ${statusData.status}`
-              : `Status: ${statusData.status}`
-          );
+          setStatusMessage(isArabic ? `الحالة: ${statusData.status}` : `Status: ${statusData.status}`);
         }
       } catch (err) {
         clearInterval(pollInterval);
         const errorMessage =
-          err instanceof Error ? err.message : (
-            selectedLanguage === "ar" 
-              ? "فشل في فحص حالة العملية"
-              : "Failed to check job status"
-          );
+          err instanceof Error ? err.message : t("Failed to check job status", "فشل في فحص حالة العملية");
         setError(errorMessage);
         console.error("Status check error:", err);
         setLoading(false);
@@ -521,11 +494,10 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData, selectedLanguage }) => {
     setTimeout(() => {
       clearInterval(pollInterval);
       if (loading) {
-        setError(
-          selectedLanguage === "ar" 
-            ? "انتهت مهلة العملية: استغرقت وقتًا طويلاً. الرجاء المحاولة مرة أخرى." 
-            : "Job timeout: Processing took too long. Please try again."
-        );
+        setError(t(
+          "Job timeout: Processing took too long. Please try again.",
+          "انتهت مهلة العملية: استغرقت وقتًا طويلاً. الرجاء المحاولة مرة أخرى."
+        ));
         setLoading(false);
         setStatusMessage("");
       }
@@ -565,12 +537,10 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData, selectedLanguage }) => {
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <h2 className="rewrite-heading">
-              {selectedLanguage === "ar" ? "إعادة الكتابة" : "Rewrite"}
+              {t("Rewrite", "إعادة الكتابة")}
             </h2>
             <p className="rewrite-subheading">
-              {selectedLanguage === "ar" 
-                ? "إعادة كتابة وتحسين تقارير التحقيق" 
-                : "Rewrite and improve investigation reports"}
+              {t("Rewrite and improve investigation reports", "إعادة كتابة وتحسين تقارير التحقيق")}
             </p>
           </div>
         </div>
@@ -592,13 +562,13 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData, selectedLanguage }) => {
 
         <div className="rewrite-body">
           <label className="rewrite-section-label">
-            {selectedLanguage === "ar" ? "التقرير المُعاد كتابته" : "Rewritten Report"}
+            {t("Rewritten Report", "التقرير المُعاد كتابته")}
           </label>
           {/* Case Number Display - Only show when case number is extracted */}
           {caseNumber && (
             <div className="case-number-banner">
               <div className="case-number-label">
-                {selectedLanguage === "ar" ? "القضية رقم" : "Case Number"}
+                {t("Case Number", "القضية رقم")}
               </div>
               <div className="case-number-value">{caseNumber}</div>
             </div>
@@ -614,7 +584,7 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData, selectedLanguage }) => {
                 }}
                 style={{ flex: 1 }}
               >
-                <span>{selectedLanguage === "ar" ? "📄 تصدير PDF" : "📄 Export PDF"}</span>
+                <span>{t("📄 Export PDF", "📄 تصدير PDF")}</span>
               </button>
               <button
                 type="button"
@@ -624,7 +594,7 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData, selectedLanguage }) => {
                 }}
                 style={{ flex: 1 }}
               >
-                <span>{selectedLanguage === "ar" ? "📝 تصدير Word" : "📝 Export Word"}</span>
+                <span>{t("📝 Export Word", "📝 تصدير Word")}</span>
               </button>
               <button
                 type="button"
@@ -632,7 +602,7 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData, selectedLanguage }) => {
                 onClick={handlePrint}
                 style={{ flex: 1 }}
               >
-                <span>{selectedLanguage === "ar" ? "🖨️ طباعة" : "🖨️ Print"}</span>
+                <span>{t("🖨️ طباعة", "🖨️ Print")}</span>
               </button>
             </div>
           )}
@@ -658,8 +628,8 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData, selectedLanguage }) => {
           <Lock size={18} className="rewrite-btn-icon" />
           <span>
             {loading 
-              ? (selectedLanguage === "ar" ? "جارٍ إعادة الكتابة..." : "Rewriting...") 
-              : (selectedLanguage === "ar" ? "إعادة كتابة التقرير" : "Rewrite Report")}
+              ? t("Rewriting...", "جارٍ إعادة الكتابة...") 
+              : t("Rewrite Report", "إعادة كتابة التقرير")}
           </span>
         </button>
       </div>

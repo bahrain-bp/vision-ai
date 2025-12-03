@@ -1,4 +1,4 @@
-import axios, { AxiosError } from "axios";
+import axios from "axios";
 
 const API_BASE_URL = process.env.REACT_APP_API_ENDPOINT;
 
@@ -44,7 +44,7 @@ class CaseService {
 
     this.axiosInstance.interceptors.response.use(
       (response) => response,
-      (error: AxiosError) => {
+      (error: any) => {
         console.error("API Error:", {
           message: error.message,
           status: error.response?.status,
