@@ -27,12 +27,6 @@ def error_response(status_code, message):
     }
 
 
-def get_user_sub(event):
-    authorizer = event.get("requestContext", {}).get("authorizer", {}) or {}
-    claims = authorizer.get("claims") or authorizer.get("jwt", {}).get("claims") or {}
-    return claims.get("sub")
-
-
 def handler(event, context):
     """
     Store extracted text from the classification flow into S3 as a .txt object.
@@ -41,10 +35,6 @@ def handler(event, context):
       { "sessionId": "...", "extracted_text": "..." }
     """
     try:
-        caller_sub = get_user_sub(event)
-        if not caller_sub:
-            return error_response(401, "Unauthorized")
-
         body = json.loads(event.get("body", "{}"))
         session_id = body.get("sessionId")
         extracted_text = body.get("extracted_text")
@@ -55,7 +45,7 @@ def handler(event, context):
         safe_session = str(session_id).replace("/", "_")
         timestamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
         unique_id = uuid.uuid4()
-        key = f"classification/extracted/{caller_sub}/{safe_session}/{timestamp}-{unique_id}.txt"
+        key = f"classification/extracted/{safe_session}/{timestamp}-{unique_id}.txt"
 
         s3.put_object(
             Bucket=BUCKET_NAME,

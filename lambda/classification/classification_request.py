@@ -25,15 +25,9 @@ logger.setLevel(logging.INFO)
 CORS_HEADERS = {
     "Content-Type": "application/json",
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "Content-Type,Authorization",
+    "Access-Control-Allow-Headers": "Content-Type",
     "Access-Control-Allow-Methods": "OPTIONS,POST",
 }
-
-
-def get_user_sub(event: Dict[str, Any]) -> str | None:
-    authorizer = event.get("requestContext", {}).get("authorizer", {}) or {}
-    claims = authorizer.get("claims") or authorizer.get("jwt", {}).get("claims") or {}
-    return claims.get("sub")
 
 
 def error_response(status: int, message: str) -> Dict[str, Any]:
@@ -153,10 +147,6 @@ def handler(event, context):
         if event.get("httpMethod", "").upper() == "OPTIONS":
             return {"statusCode": 200, "headers": CORS_HEADERS, "body": ""}
 
-        user_sub = get_user_sub(event)
-        if not user_sub:
-            return error_response(401, "Unauthorized")
-
         body = parse_body(event)
         session_id = (body.get("sessionId") or "").strip()
         extracted_text = (body.get("extracted_text") or body.get("text") or "").strip()
@@ -166,7 +156,7 @@ def handler(event, context):
         if not extracted_text:
             return error_response(400, "extracted_text is required")
 
-        logger.info("Classifying report for user=%s session=%s (inline text)", user_sub, session_id)
+        logger.info("Classifying report for session=%s (inline text)", session_id)
 
         if not extracted_text.strip():
             return error_response(400, "Extracted text is empty")

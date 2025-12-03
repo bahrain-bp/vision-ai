@@ -2,7 +2,6 @@ import React, { useState, useRef } from "react";
 import { Upload } from "lucide-react";
 import "./Classification.css";
 import { SessionData } from "../ProcessingView";
-import authService from "../../../services/authService";
 
 interface ClassificationProps {
   sessionData: SessionData;
@@ -89,28 +88,14 @@ const Classification: React.FC<ClassificationProps> = ({
     setConfidence(null);
   };
 
-  const getTokens = async () => {
-    const sessionResult = await authService.getSession();
-    const idToken = sessionResult.session?.tokens?.idToken?.toString();
-    const accessToken = sessionResult.session?.tokens?.accessToken?.toString();
-    if (!sessionResult.success || !idToken) {
-      throw new Error(
-        t("Not authenticated. Please sign in again.", "يرجى تسجيل الدخول والمحاولة مرة أخرى.")
-      );
-    }
-    return { idToken, accessToken };
-  };
-
   const getUploadUrl = async (selectedFile: File) => {
     if (!sessionData.sessionId) {
       throw new Error(t("Missing session id.", "لم يتم العثور على رقم الجلسة."));
     }
 
-    const { idToken } = await getTokens();
-
     const res = await fetch(uploadUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         fileName: selectedFile.name,
         fileType: selectedFile.type,
@@ -137,19 +122,11 @@ const Classification: React.FC<ClassificationProps> = ({
       throw new Error(t("Missing session id.", "لم يتم العثور على رقم الجلسة."));
     }
 
-    const { idToken, accessToken } = await getTokens();
-
     const targetUrl = extractFnUrl || extractUrl;
-    const tokenForThisCall = extractFnUrl ? accessToken : idToken;
-    if (!tokenForThisCall) {
-      throw new Error(t("Missing auth token for extraction.", " تعذر العثور على رمز المصادقة."));
-    }
-
     const res = await fetch(targetUrl, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${tokenForThisCall}`,
+        "Content-Type": "application/json"
       },
       body: JSON.stringify({
         key,
@@ -162,11 +139,9 @@ const Classification: React.FC<ClassificationProps> = ({
   };
 
   const storeExtractedText = async (textToStore: string) => {
-    const { idToken } = await getTokens();
-
     const res = await fetch(storeUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         sessionId: sessionData.sessionId,
         extracted_text: textToStore,
@@ -253,11 +228,9 @@ const Classification: React.FC<ClassificationProps> = ({
   };
 
   const classifyExtractedText = async (textToClassify: string) => {
-    const { idToken } = await getTokens();
-
     const res = await fetch(classifyUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         sessionId: sessionData.sessionId,
         extracted_text: textToClassify,
@@ -397,3 +370,5 @@ const Classification: React.FC<ClassificationProps> = ({
 };
 
 export default Classification;
+
+

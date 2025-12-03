@@ -29,7 +29,6 @@ os.environ.setdefault("TESSDATA_PREFIX", "/opt/tesseract/share")
 pytesseract.pytesseract.tesseract_cmd = os.environ.get("TESSERACT_CMD", "/opt/bin/tesseract")
 
 s3 = boto3.client("s3")
-cognito_idp = boto3.client("cognito-idp")
 bedrock = boto3.client(
     "bedrock-runtime",
     region_name=os.environ.get("AWS_REGION", "us-east-1"),
@@ -146,27 +145,6 @@ Here is the raw extracted text:
 """.strip()
 
 
-def get_user_sub(event):
-    authorizer = event.get("requestContext", {}).get("authorizer", {}) or {}
-    claims = authorizer.get("claims") or authorizer.get("jwt", {}).get("claims") or {}
-    sub = claims.get("sub")
-    if sub:
-        return sub
-
-    headers = event.get("headers") or {}
-    auth_header = headers.get("authorization") or headers.get("Authorization")
-    if auth_header and isinstance(auth_header, str):
-        token = auth_header.split()[-1]
-        try:
-            resp = cognito_idp.get_user(AccessToken=token)
-            for attr in resp.get("UserAttributes", []):
-                if attr.get("Name") == "sub":
-                    return attr.get("Value")
-        except Exception:
-            logger.warning("Access token validation failed")
-    return None
-
-
 def error_response(message, status=500):
     return {
         "statusCode": status,
@@ -192,10 +170,6 @@ def handler(event, context):
       { "extracted_text": "..." }
     """
     try:
-        caller_sub = get_user_sub(event)
-        if not caller_sub:
-            return error_response("Unauthorized", status=401)
-
         body = json.loads(event.get("body", "{}"))
         s3_key = unquote_plus(body["key"])
         session_id = body.get("sessionId")
@@ -206,14 +180,12 @@ def handler(event, context):
         if ".." in s3_key.split("/"):
             return error_response("Invalid s3 key", status=400)
 
-        allowed_prefix = f"classification/upload/{caller_sub}/"
-        if not s3_key.startswith(allowed_prefix):
-            return error_response("Access to the requested key is not allowed", status=403)
-
+        if not s3_key.startswith("classification/upload/"):
+            return error_response("Invalid key prefix", status=400)
         if f"/{safe_session}/" not in s3_key:
-            return error_response("Key does not belong to the provided session", status=403)
+            return error_response("Key does not belong to the provided session", status=400)
 
-        logger.info("User %s extracting from s3://%s/%s", caller_sub, BUCKET_NAME, s3_key)
+        logger.info("Extracting from s3://%s/%s (session=%s)", BUCKET_NAME, s3_key, safe_session)
 
         filename = s3_key.split("/")[-1].lower()
 

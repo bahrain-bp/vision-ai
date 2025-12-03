@@ -4,10 +4,8 @@ from aws_cdk import (
     aws_lambda as _lambda,
     aws_apigateway as apigateway,
     aws_iam as iam,
-    aws_cognito as cognito,
     Duration,
     CfnOutput,
-    Fn,
 )
 from constructs import Construct
 
@@ -31,18 +29,6 @@ class classificationStack(Stack):
             rest_api_id=shared_api_id,
             root_resource_id=shared_api_root_resource_id
         )        
-
-        user_pool = cognito.UserPool.from_user_pool_id(
-            self,
-            "ClassificationUserPool",
-            Fn.import_value("vision-aiUserPoolId"),
-        )
-
-        authorizer = apigateway.CognitoUserPoolsAuthorizer(
-            self,
-            "ClassificationAuthorizer",
-            cognito_user_pools=[user_pool],
-        )
 
         # === Create IAM Role for Lambda ===
         lambda_role = iam.Role(
@@ -74,12 +60,6 @@ class classificationStack(Stack):
         resources=["*"],  
     )
         )
-
-        lambda_role.add_to_policy(iam.PolicyStatement(
-            effect=iam.Effect.ALLOW,
-            actions=["cognito-idp:GetUser"],
-            resources=["*"],
-        ))
 
         docx_layer = _lambda.LayerVersion(
             self,
@@ -194,9 +174,7 @@ class classificationStack(Stack):
             allow_headers=[
                 "Content-Type",
                 "X-Amz-Date",
-                "Authorization",
-                "X-Api-Key",
-                "X-Amz-Security-Token",
+                "X-Requested-With",
                 "Content-Length"
             ],
             allow_credentials=False,
@@ -211,10 +189,7 @@ class classificationStack(Stack):
             allow_methods=["OPTIONS", "POST"],
             allow_headers=[
                 "Content-Type",
-                "Authorization",
                 "X-Amz-Date",
-                "X-Api-Key",
-                "X-Amz-Security-Token",
                 "X-Requested-With"
             ]
         )
@@ -223,8 +198,7 @@ class classificationStack(Stack):
         upload_resource.add_method(
             "POST",
             apigateway.LambdaIntegration(get_upload_url_lambda),
-            authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=authorizer,
+            authorization_type=apigateway.AuthorizationType.NONE,
         )
 
         #2- for text extraction /classification/exreact
@@ -234,10 +208,7 @@ class classificationStack(Stack):
             allow_methods=["OPTIONS", "POST"],
             allow_headers=[
                 "Content-Type",
-                "Authorization",
                 "X-Amz-Date",
-                "X-Api-Key",
-                "X-Amz-Security-Token",
                 "X-Requested-With"
             ]
         )
@@ -245,8 +216,7 @@ class classificationStack(Stack):
         extract_resource.add_method(
             "POST",
             apigateway.LambdaIntegration(extract_text_lambda),
-            authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=authorizer,
+            authorization_type=apigateway.AuthorizationType.NONE,
         )
 
         extract_fn_url = extract_text_lambda.add_function_url(
@@ -256,11 +226,8 @@ class classificationStack(Stack):
                 allowed_methods=[_lambda.HttpMethod.POST],    
                 allowed_headers=[
                     "content-type",
-                    "authorization",
                     "x-amz-date",
-                    "x-api-key",
-                    "x-amz-security-token",
-                   "x-requested-with"
+                    "x-requested-with"
                 ]
             )
         )
@@ -271,10 +238,7 @@ class classificationStack(Stack):
             allow_methods=["OPTIONS", "POST"],
             allow_headers=[
                 "Content-Type",
-                "Authorization",
                 "X-Amz-Date",
-                "X-Api-Key",
-                "X-Amz-Security-Token",
                 "X-Requested-With"
             ]
         )
@@ -282,8 +246,7 @@ class classificationStack(Stack):
         store_resource.add_method(
             "POST",
             apigateway.LambdaIntegration(store_text_lambda),
-            authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=authorizer,
+            authorization_type=apigateway.AuthorizationType.NONE,
         )
 
         classify_resource = classification_resource.add_resource("categorize")
@@ -292,10 +255,7 @@ class classificationStack(Stack):
             allow_methods=["OPTIONS", "POST"],
             allow_headers=[
                 "Content-Type",
-                "Authorization",
                 "X-Amz-Date",
-                "X-Api-Key",
-                "X-Amz-Security-Token",
                 "X-Requested-With"
             ]
         )
@@ -303,8 +263,7 @@ class classificationStack(Stack):
         classify_resource.add_method(
             "POST",
             apigateway.LambdaIntegration(classify_lambda),
-            authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=authorizer,
+            authorization_type=apigateway.AuthorizationType.NONE,
         )
 
 
