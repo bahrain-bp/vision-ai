@@ -1,5 +1,6 @@
 import React from "react";
 import { XCircle, AlertTriangle } from "lucide-react";
+import { useLanguage } from "../../../context/LanguageContext";
 
 interface ConfirmationPopupProps {
   isOpen: boolean;
@@ -16,12 +17,10 @@ const ConfirmationPopup: React.FC<ConfirmationPopupProps> = ({
   isOpen,
   onClose,
   onConfirm,
-  title,
-  message,
-  confirmText = "Confirm",
-  cancelText = "Cancel",
+
   type = "warning",
 }) => {
+  const { t } = useLanguage();
   if (!isOpen) return null;
 
   const getIcon = () => {
@@ -57,11 +56,11 @@ const ConfirmationPopup: React.FC<ConfirmationPopupProps> = ({
       <div className="confirmation-popup-container">
         <div className="confirmation-popup-header">
           {getIcon()}
-          <h3 className="confirmation-popup-title">{title}</h3>
+          <h3 className="confirmation-popup-title">{t("popup.title")}</h3>
         </div>
 
         <div className="confirmation-popup-content">
-          <p className="confirmation-popup-message">{message}</p>
+          <p className="confirmation-popup-message">{t("popup.message")}</p>
         </div>
 
         <div className="confirmation-popup-actions">
@@ -70,14 +69,14 @@ const ConfirmationPopup: React.FC<ConfirmationPopupProps> = ({
             className="confirmation-popup-btn-cancel"
             type="button"
           >
-            {cancelText}
+            {t("popup.cancel")}
           </button>
           <button
             onClick={onConfirm}
             className={`confirmation-popup-btn-confirm ${getButtonClass()}`}
             type="button"
           >
-            {confirmText}
+            {t("popup.confirm")}
           </button>
         </div>
       </div>

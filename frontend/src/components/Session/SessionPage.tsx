@@ -6,7 +6,8 @@ import SessionSummaryModal from "../RealTime/SessionSummaryModal";
 import { User, RecordingStatus } from "../../types/";
 import { useTranscription } from "../../hooks/useTranscription";
 import { useCaseContext } from "../../hooks/useCaseContext";
-import {getTimeString} from "../common/Timer/Timer"; 
+import { useLanguage } from "../../context/LanguageContext";
+import { getTimeString } from "../common/Timer/Timer";
 
 interface ParticipantData {
   fullName: string;
@@ -57,6 +58,7 @@ const SessionPage: React.FC<SessionPageProps> = ({
   sessionData,
   onEndSession,
 }) => {
+  const { t } = useLanguage();
   const {
     currentCase,
     currentSession,
@@ -68,12 +70,14 @@ const SessionPage: React.FC<SessionPageProps> = ({
   const [activeMainTab, setActiveMainTab] = useState<MainTab>("real-time");
   const [sessionState, setSessionState] = useState<RecordingStatus>("off");
   const [showSummaryModal, setShowSummaryModal] = useState<boolean>(false);
-  const [triggerSummarization, setTriggerSummarization] = useState<boolean>(false);
-  const { stopRecording,toggleRecordingPause,toggleReset} = useTranscription();
-  
-const [isPaused, setIsPaused] = useState(false);
- const [timerMs, setTimerMs] = useState(0);
- const [timerString, setTimerString] = useState("00:00:00");
+  const [triggerSummarization, setTriggerSummarization] =
+    useState<boolean>(false);
+  const { stopRecording, toggleRecordingPause, toggleReset } =
+    useTranscription();
+
+  const [isPaused, setIsPaused] = useState(false);
+  const [timerMs, setTimerMs] = useState(0);
+  const [timerString, setTimerString] = useState("00:00:00");
 
   const [setupData, setSetupData] = useState<SetupData>({
     witnessData: {
@@ -92,11 +96,11 @@ const [isPaused, setIsPaused] = useState(false);
     },
   });
 
-    const getInvestigatorName = () => {
-      if (user?.username) return user.username;
-      return "Unknown Investigator";
-    };
-    
+  const getInvestigatorName = () => {
+    if (user?.username) return user.username;
+    return "Unknown Investigator";
+  };
+
   useEffect(() => {
     let intervalId: any;
 
@@ -113,8 +117,6 @@ const [isPaused, setIsPaused] = useState(false);
     const formatted = getTimeString(timerMs);
     setTimerString(formatted);
   }, [timerMs]);
-
-
 
   const currentSessionData: SessionData = currentSession
     ? {
@@ -142,7 +144,7 @@ const [isPaused, setIsPaused] = useState(false);
 
   const handleEndSession = async () => {
     stopRecording(setSessionState);
-    
+
     if (currentSession && currentCase) {
       try {
         await updateSessionStatus(
@@ -258,20 +260,20 @@ const [isPaused, setIsPaused] = useState(false);
           <div className="nav-items">
             <button onClick={handleBackToHome} className="back-button">
               <ArrowLeft className="icon" />
-              <span>Back to Home</span>
+              <span>{t("session.backToHome")}</span>
             </button>
 
             <div className="nav-center">
               <h1 className="app-logo-text">VISION-AI</h1>
               <div className="session-info-header">
-                <span className="session-label">Session</span>
+                <span className="session-label">{t("session.session")}</span>
                 <span className="session-id">
                   {currentSessionData.sessionId}
                 </span>
                 {sessionState === "on" && (
                   <span className="live-indicator">
                     <span className="live-dot"></span>
-                    <span>LIVE</span>
+                    <span>{t("session.live")}</span>
                   </span>
                 )}
               </div>
@@ -280,17 +282,13 @@ const [isPaused, setIsPaused] = useState(false);
               </p>
               {currentCase && (
                 <p className="case-info">
-                  Case: {currentCase.caseTitle} ({currentCase.caseId})
+                  {t("session.case")}: {currentCase.caseTitle} (
+                  {currentCase.caseId})
                 </p>
               )}
             </div>
 
             <div className="nav-controls">
-              <div className="language-controls">
-                <span className="language-label">Language:</span>
-                <button className="lang-btn active">EN</button>
-                <button className="lang-btn">AR</button>
-              </div>
               <div className="time-display">
                 <Clock className="icon" />
                 <span>{currentSessionData.duration}</span>
@@ -325,7 +323,7 @@ const [isPaused, setIsPaused] = useState(false);
                   </button>
 
                   <button
-                    onClick={()=> toggleReset()}
+                    onClick={() => toggleReset()}
                     className="reset-btn"
                     style={{
                       padding: "10px 20px",
@@ -368,7 +366,7 @@ const [isPaused, setIsPaused] = useState(false);
               activeMainTab === "real-time" ? "active" : ""
             }`}
           >
-            Real-time
+            {t("session.realTime")}
           </button>
           <button
             onClick={() => setActiveMainTab("processing")}
@@ -376,7 +374,7 @@ const [isPaused, setIsPaused] = useState(false);
               activeMainTab === "processing" ? "active" : ""
             }`}
           >
-            Processing
+            {t("session.processing")}
           </button>
         </div>
       </div>

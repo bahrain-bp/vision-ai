@@ -1,19 +1,19 @@
 import React, { useState, useEffect } from "react";
-import {
-  User,
-  ChevronUp,
-  ChevronDown,
-  FileText,
-} from "lucide-react";
+import { User, ChevronUp, ChevronDown, FileText } from "lucide-react";
 import LiveTranscription from "../LiveTranscription/LiveTranscription";
 import Translation from "./Translation";
 import SessionInfo from "./SessionInfo";
 import IdentityVerification from "./IdentityVerification/IdentityVerification";
-import TranscriptionSessionSetup from "../LiveTranscription/TranscriptionSessionSetup"
-import QuestionGenerator from './AIAssistant/QuestionGenerator';
-import { TranslationProvider } from '../../context/TranslationContext';
-import { RecordingStatus, sessionType, LanguagePreferences } from "../../types/";
+import TranscriptionSessionSetup from "../LiveTranscription/TranscriptionSessionSetup";
+import QuestionGenerator from "./AIAssistant/QuestionGenerator";
+import { TranslationProvider } from "../../context/TranslationContext";
+import {
+  RecordingStatus,
+  sessionType,
+  LanguagePreferences,
+} from "../../types/";
 import SummarizationReport from "./SummarizationReport";
+import { useLanguage } from "../../context/LanguageContext";
 
 interface SessionData {
   sessionId: string;
@@ -77,9 +77,10 @@ const RealTimeView: React.FC<RealTimeViewProps> = ({
   sessionData,
   triggerSummarization,
 }) => {
-  const [activeTab, setActiveTab] = useState<"identity" | "transcription" | "summarization">(
-    "identity"
-  );
+  const { t } = useLanguage();
+  const [activeTab, setActiveTab] = useState<
+    "identity" | "transcription" | "summarization"
+  >("identity");
   const [aiExpanded, setAiExpanded] = useState(false);
   const [isIdentityVerified, setIsIdentityVerified] = useState(false);
   const [startRecording, setStartRecording] = useState(false);
@@ -178,7 +179,7 @@ const RealTimeView: React.FC<RealTimeViewProps> = ({
             disabled={isIdentityVerified}
           >
             <User className="btn-icon" />
-            <span>Identity Verification</span>
+            <span>{t("identity.title")}</span>
           </button>
 
           <button
@@ -190,7 +191,7 @@ const RealTimeView: React.FC<RealTimeViewProps> = ({
             <User className="btn-icon" />
             <span>Transcription & Translation</span>
           </button>
-          
+
           <button
             onClick={() => setActiveTab("summarization")}
             className={`sidebar-btn ${
