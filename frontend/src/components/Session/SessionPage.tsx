@@ -1,12 +1,25 @@
 import React, { useState, useEffect } from "react";
-import { ArrowLeft, Clock, Pause, Play, RotateCcw } from "lucide-react";
+import {
+  ArrowLeft,
+  Clock,
+  Pause,
+  Play,
+  RotateCcw,
+  ArrowRight,
+} from "lucide-react";
 import RealTimeView from "../RealTime/RealTimeView";
 import ProcessingView from "../Processing/ProcessingView";
 import SessionSummaryModal from "../RealTime/SessionSummaryModal";
 import { User, RecordingStatus } from "../../types/";
 import { useTranscription } from "../../hooks/useTranscription";
 import { useCaseContext } from "../../hooks/useCaseContext";
-import {getTimeString} from "../common/Timer/Timer"; 
+
+import { useLanguage } from "../../context/LanguageContext";
+import { getTimeString } from "../common/Timer/Timer";
+
+import { getTimeString } from "../common/Timer/Timer";
+import { CameraFootageProvider } from "../../context/CameraFootageContext";
+
 
 interface ParticipantData {
   fullName: string;
@@ -57,6 +70,7 @@ const SessionPage: React.FC<SessionPageProps> = ({
   sessionData,
   onEndSession,
 }) => {
+  const { t } = useLanguage();
   const {
     currentCase,
     currentSession,
@@ -69,15 +83,17 @@ const SessionPage: React.FC<SessionPageProps> = ({
   const [activeMainTab, setActiveMainTab] = useState<MainTab>("real-time");
   const [sessionState, setSessionState] = useState<RecordingStatus>("off");
   const [showSummaryModal, setShowSummaryModal] = useState<boolean>(false);
-  const { stopRecording, toggleRecordingPause, toggleReset } = useTranscription();
+  const { stopRecording, toggleRecordingPause, toggleReset } =
+    useTranscription();
 
   const [language, setLanguage] = useState<"en" | "ar">("en");
 
-  const [triggerSummarization, setTriggerSummarization] = useState<boolean>(false);
-  
-const [isPaused, setIsPaused] = useState(false);
- const [timerMs, setTimerMs] = useState(0);
- const [timerString, setTimerString] = useState("00:00:00");
+  const [triggerSummarization, setTriggerSummarization] =
+    useState<boolean>(false);
+
+  const [isPaused, setIsPaused] = useState(false);
+  const [timerMs, setTimerMs] = useState(0);
+  const [timerString, setTimerString] = useState("00:00:00");
 
   const [setupData, setSetupData] = useState<SetupData>({
     witnessData: {
@@ -96,11 +112,11 @@ const [isPaused, setIsPaused] = useState(false);
     },
   });
 
-    const getInvestigatorName = () => {
-      if (user?.username) return user.username;
-      return "Unknown Investigator";
-    };
-    
+  const getInvestigatorName = () => {
+    if (user?.username) return user.username;
+    return "Unknown Investigator";
+  };
+
   useEffect(() => {
     let intervalId: any;
 
@@ -117,8 +133,6 @@ const [isPaused, setIsPaused] = useState(false);
     const formatted = getTimeString(timerMs);
     setTimerString(formatted);
   }, [timerMs]);
-
-
 
   const currentSessionData: SessionData = currentSession
     ? {
@@ -146,7 +160,7 @@ const [isPaused, setIsPaused] = useState(false);
 
   const handleEndSession = async () => {
     stopRecording(setSessionState);
-    
+
     if (currentSession && currentCase) {
       try {
         await updateSessionStatus(
@@ -254,41 +268,53 @@ const [isPaused, setIsPaused] = useState(false);
 
   return (
     <div className="session-page-container">
-      <nav className="session-nav">
+      <nav className="session-nav" dir={language === "ar" ? "rtl" : "ltr"}>
         <div className="nav-content">
           <div className="nav-items">
             <button onClick={handleBackToHome} className="back-button">
-              <ArrowLeft className="icon" />
-              <span>Back to Home</span>
+              {language === "ar" ? (
+                <ArrowRight className="icon" />
+              ) : (
+                <ArrowLeft className="icon" />
+              )}
+              <span>
+                {language === "ar"
+                  ? "العودة إلى الصفحة الرئيسية"
+                  : "Back to Home"}
+              </span>
             </button>
 
             <div className="nav-center">
               <h1 className="app-logo-text">VISION-AI</h1>
               <div className="session-info-header">
-                <span className="session-label">Session</span>
+                <span className="session-label">{t("session.session")}</span>
                 <span className="session-id">
                   {currentSessionData.sessionId}
-                  </span>
+                </span>
                 {sessionState === "on" && (
                   <span className="live-indicator">
                     <span className="live-dot"></span>
-                    <span>LIVE</span>
+                    <span>{t("session.live")}</span>
                   </span>
                 )}
               </div>
               <p className="investigator-info">
-                Investigator: {currentSessionData.investigator}
+                {language === "ar" ? "المحقق" : "Investigator"}:{" "}
+                {currentSessionData.investigator}
               </p>
               {currentCase && (
                 <p className="case-info">
-                  Case: {currentCase.caseTitle} ({currentCase.caseId})
+                  {t("session.case")}: {currentCase.caseTitle} (
+                  {currentCase.caseId})
                 </p>
               )}
             </div>
 
             <div className="nav-controls">
               <div className="language-controls">
-                <span className="language-label">Language:</span>
+                <span className="language-label">
+                  {language === "ar" ? "اللغة:" : "Language:"}
+                </span>
                 <button
                   className={`lang-btn ${language === "en" ? "active" : ""}`}
                   onClick={() => setLanguage("en")}
@@ -336,7 +362,7 @@ const [isPaused, setIsPaused] = useState(false);
                   </button>
 
                   <button
-                    onClick={()=> toggleReset()}
+                    onClick={() => toggleReset()}
                     className="reset-btn"
                     style={{
                       padding: "10px 20px",
@@ -379,7 +405,7 @@ const [isPaused, setIsPaused] = useState(false);
               activeMainTab === "real-time" ? "active" : ""
             }`}
           >
-            Real-time
+            {t("session.realTime")}
           </button>
           <button
             onClick={() => setActiveMainTab("processing")}
@@ -387,29 +413,33 @@ const [isPaused, setIsPaused] = useState(false);
               activeMainTab === "processing" ? "active" : ""
             }`}
           >
-            Processing
+            {t("session.processing")}
           </button>
         </div>
       </div>
 
       <div className="session-main-content">
-     {activeMainTab === "real-time" ? (
-     <RealTimeView
-      sessionState={sessionState}
-      setSessionState={setSessionState}
-      sessionData={currentSessionData}
-      setupData={setupData}
-      onWitnessDataChange={updateWitnessData}
-      onIdentityDataChange={updateIdentityData}
-      onTranslationSettingsChange={updateTranslationSettings}
-      onVerifyIdentity={handleVerifyIdentity}
+        {activeMainTab === "real-time" ? (
+          <RealTimeView
+            sessionState={sessionState}
+            setSessionState={setSessionState}
+            sessionData={currentSessionData}
+            setupData={setupData}
+            onWitnessDataChange={updateWitnessData}
+            onIdentityDataChange={updateIdentityData}
+            onTranslationSettingsChange={updateTranslationSettings}
+            onVerifyIdentity={handleVerifyIdentity}
             triggerSummarization={triggerSummarization}
-     />
-     ) : (
-     <ProcessingView sessionData={currentSessionData} language={language} />
-      )}
+          />
+        ) : (
+          <CameraFootageProvider>
+            <ProcessingView
+              sessionData={currentSessionData}
+              language={language}
+            />
+          </CameraFootageProvider>
+        )}
       </div>
-
 
       {showSummaryModal && (
         <SessionSummaryModal

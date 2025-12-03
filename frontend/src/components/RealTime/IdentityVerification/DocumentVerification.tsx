@@ -1,6 +1,7 @@
 import React, { useRef, useState, useCallback, useMemo } from "react";
 import { useCaseContext } from "../../../hooks/useCaseContext";
 import ConfirmationPopup from "./ConfirmationPopup";
+import { useLanguage } from "../../../context/LanguageContext";
 import {
   CheckCircle,
   RefreshCw,
@@ -72,6 +73,7 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
   sessionId,
   personType,
 }) => {
+  const { t } = useLanguage();
   const { setCurrentPersonName, setCurrentPersonType } = useCaseContext();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const documentInputRef = useRef<HTMLInputElement>(null);
@@ -115,7 +117,7 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
     useState<boolean>(false);
 
   const documentDisplayName = useMemo(() => {
-    return documentType === "cpr" ? "CPR" : "Passport";
+    return documentType === "cpr" ? t("identity.cpr") : t("identity.passport");
   }, [documentType]);
 
   const currentDocument = useMemo(() => {
@@ -684,12 +686,12 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
   return (
     <div className="identity-verification-container">
       <div className="session-card">
-        <h2 className="card-title">Identity Verification</h2>
-
         {/* Attempts Counter */}
         {verificationAttempts > 0 && (
           <div className="verification-attempts">
-            <span className="attempts-label">Verification Attempts:</span>
+            <span className="attempts-label">
+              {t("identity.verificationAttempts")}
+            </span>
             <span
               className={`attempts-count ${
                 verificationAttempts >= MAX_VERIFICATION_ATTEMPTS
@@ -701,12 +703,12 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
             </span>
             {attemptsRemaining > 0 && (
               <span className="attempts-remaining text-sm text-gray-600 ml-2">
-                ({attemptsRemaining} remaining)
+                ({attemptsRemaining} {t("identity.remainingAttempts")})
               </span>
             )}
             {verificationAttempts >= MAX_VERIFICATION_ATTEMPTS && (
               <span className="text-sm text-red-600 ml-2 font-semibold">
-                - Maximum attempts reached
+                {t("identity.maximumAttempts")}
               </span>
             )}
           </div>
@@ -725,7 +727,7 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
           <div className="success-banner">
             <CheckCircle size={20} />
             <span>
-              Identity Verified Successfully!
+              {t("identity.successAttempt")}
               {verificationState.verificationResult.manualOverride &&
                 " (Manual Override)"}
             </span>
@@ -735,11 +737,8 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
         <div className="space-y-8">
           {/* Person Photo Section */}
           <div className="verification-section">
-            <label className="form-label">Person Photo *</label>
-            <p className="form-description">
-              Upload a clear photo of the person for identity verification
-              during the investigation
-            </p>
+            <label className="form-label">{t("identity.referencePhoto")}</label>
+            <p className="form-description">{t("identity.uploadPhoto")}</p>
 
             <div
               className="file-upload-area"
@@ -766,7 +765,9 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
               />
 
               <div className="upload-icon">📁</div>
-              <p className="upload-text">Upload a clear photo of the person</p>
+              <p className="upload-text">
+                {t("identity.uploadPhotoDescription")}
+              </p>
 
               <button
                 className="upload-button"
@@ -775,7 +776,7 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
                 }
                 type="button"
               >
-                Upload Person Photo
+                {t("identity.uploadPhotoBtn")}
               </button>
               <p className="file-types">JPG, PNG (Max 10MB)</p>
 
@@ -783,7 +784,8 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
                 <div className="upload-success">
                   <CheckCircle size={16} />
                   <span>
-                    {identityData.referencePhoto.name} uploaded successfully
+                    {identityData.referencePhoto.name}{" "}
+                    {t("identity.uploadSuccess")}
                   </span>
                 </div>
               )}
@@ -793,9 +795,7 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
           {/* Document Section */}
           <div className="verification-section">
             <div className="document-header">
-              <label className="form-label">
-                {documentDisplayName} Document *
-              </label>
+              <label className="form-label">{documentDisplayName}</label>
               <button
                 onClick={toggleDocumentType}
                 className="toggle-document-btn"
@@ -804,21 +804,18 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
               >
                 {documentType === "passport" && (
                   <div className="passport-disclaimer text-sm text-yellow-700 bg-yellow-100 p-2 rounded mb-4">
-                    Note: Passport verification is currently optimized for
-                    Bahraini passports only. For other nationalities, we
-                    recommend using CPR card for best results.
+                    {t("identity.passportWarning")}
                   </div>
                 )}
                 <RefreshCw size={16} />
-                Verify with {documentType === "cpr" ? "Passport" : "CPR"}{" "}
-                instead
+                {t("identity.verifyWith")}{" "}
+                {documentType === "cpr"
+                  ? t("identity.passport")
+                  : t("identity.cpr")}
               </button>
             </div>
 
-            <p className="form-description">
-              Upload {documentDisplayName.toLowerCase()} document for identity
-              verification
-            </p>
+            <p className="form-description">{t("identity.uploadDocument")}</p>
 
             <div
               className="file-upload-area"
@@ -846,7 +843,8 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
 
               <div className="upload-icon">📄</div>
               <p className="upload-text">
-                Upload {documentDisplayName.toLowerCase()} document
+                {t("identity.uploadDocumentDescription")}{" "}
+                {documentDisplayName.toLowerCase()}
               </p>
 
               <button
@@ -856,14 +854,16 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
                 }
                 type="button"
               >
-                Upload {documentDisplayName}
+                {t("identity.uploadButton")}
               </button>
               <p className="file-types">JPG, PNG, PDF (Max 10MB)</p>
 
               {currentDocument && (
                 <div className="upload-success">
                   <CheckCircle size={16} />
-                  <span>{currentDocument.name} uploaded successfully</span>
+                  <span>
+                    {currentDocument.name} {t("identity.uploadSuccess")}
+                  </span>
                 </div>
               )}
             </div>
@@ -876,11 +876,15 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
             <div className="verification-result-container">
               {verificationState.verificationResult && (
                 <>
-                  <h3 className="result-title">Verification Results</h3>
+                  <h3 className="result-title">
+                    {t("identity.VerificationResults")}
+                  </h3>
 
                   <div className="image-comparison-grid">
                     <div className="comparison-image-card">
-                      <div className="image-label">Uploaded Photo</div>
+                      <div className="image-label">
+                        {t("identity.UploadedPicture")}
+                      </div>
                       {uploadedPhotoPreview ? (
                         <img
                           src={uploadedPhotoPreview}
@@ -890,14 +894,15 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
                       ) : (
                         <div className="image-placeholder">
                           <ImageIcon size={48} />
-                          <span>No preview available</span>
+                          <span>{t("identity.noPreview")}</span>
                         </div>
                       )}
                     </div>
 
                     <div className="comparison-image-card">
                       <div className="image-label">
-                        Comparison Source (
+                        {" "}
+                        {t("identity.comparisonSource")}(
                         {verificationState.verificationResult.photoSource})
                       </div>
                       {verificationState.verificationResult.photoSource ===
@@ -905,7 +910,7 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
                         loadingReferencePhoto ? (
                           <div className="image-placeholder">
                             <Loader2 size={48} className="animate-spin" />
-                            <span>Loading reference photo...</span>
+                            <span>{t("identity.referenceLoading")}</span>
                           </div>
                         ) : comparisonPhotoPreview ? (
                           <img
@@ -917,7 +922,7 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
                         ) : (
                           <div className="image-placeholder">
                             <ImageIcon size={48} />
-                            <span>Reference photo from database</span>
+                            <span>{t("identity.databaseReference")}</span>
                           </div>
                         )
                       ) : comparisonPhotoPreview ? (
@@ -929,7 +934,7 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
                       ) : (
                         <div className="image-placeholder">
                           <ImageIcon size={48} />
-                          <span>Loading document photo...</span>
+                          <span>{t("identity.documentLoading")}</span>
                         </div>
                       )}
                     </div>
@@ -937,37 +942,49 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
 
                   <div className="result-details">
                     <div className="result-row">
-                      <span className="result-label">Name:</span>
+                      <span className="result-label">
+                        {t("sessionInfo.participantName")}:
+                      </span>
                       <span className="result-value">
                         {verificationState.verificationResult.personName}
                       </span>
                     </div>
                     <div className="result-row">
-                      <span className="result-label">CPR Number:</span>
+                      <span className="result-label">
+                        {t("identity.cprNumber")}:
+                      </span>
                       <span className="result-value">
                         {verificationState.verificationResult.cprNumber}
                       </span>
                     </div>
                     <div className="result-row">
-                      <span className="result-label">Nationality:</span>
+                      <span className="result-label">
+                        {t("identity.nationality")}:
+                      </span>
                       <span className="result-value">
                         {verificationState.verificationResult.nationality}
                       </span>
                     </div>
                     <div className="result-row">
-                      <span className="result-label">Similarity Score:</span>
+                      <span className="result-label">
+                        {t("identity.similarityScore")}:
+                      </span>
                       <span className="result-value">
                         {verificationState.verificationResult.similarity}%
                       </span>
                     </div>
                     <div className="result-row">
-                      <span className="result-label">Confidence:</span>
+                      <span className="result-label">
+                        {t("identity.confidence")}:
+                      </span>
                       <span className="result-value">
                         {verificationState.verificationResult.confidence}
                       </span>
                     </div>
                     <div className="result-row">
-                      <span className="result-label">Status:</span>
+                      <span className="result-label">
+                        {t("identity.status")}:
+                      </span>
                       <span
                         className={`result-value ${
                           verificationState.verificationResult.match
@@ -976,13 +993,15 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
                         }`}
                       >
                         {verificationState.verificationResult.match
-                          ? "✓ VERIFIED"
-                          : "✗ NOT VERIFIED"}
+                          ? t("identity.verified")
+                          : t("identity.notVerified")}
                       </span>
                     </div>
                     {verificationState.verificationResult.manualOverride && (
                       <div className="result-row">
-                        <span className="result-label">Override Reason:</span>
+                        <span className="result-label">
+                          {t("identity.overrideReason")}:
+                        </span>
                         <span className="result-value text-orange-600">
                           {verificationState.verificationResult.overrideReason}
                         </span>
@@ -1005,8 +1024,11 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
                       type="button"
                     >
                       <RefreshCw size={18} />
-                      Retry Verification ({attemptsRemaining}{" "}
-                      {attemptsRemaining === 1 ? "attempt" : "attempts"} left)
+                      {t("identity.retryVerification")} ({attemptsRemaining}{" "}
+                      {attemptsRemaining === 1
+                        ? t("identity.attempt")
+                        : t("identity.attempts")}{" "}
+                      left)
                     </button>
                   )}
 
@@ -1016,13 +1038,12 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
                         <AlertCircle size={20} className="warning-icon" />
                         <div className="warning-content">
                           <p className="warning-title">
-                            Maximum verification attempts (
-                            {MAX_VERIFICATION_ATTEMPTS}) reached.
+                            {t("identity.overrideWarning")}
                           </p>
                           <p className="warning-description">
                             {verificationState.verificationResult
-                              ? "The automated verification has failed. Choose one of the following options to proceed:"
-                              : "An error occurred during verification. Choose one of the following options to proceed:"}
+                              ? t("identity.overrideWarningDescription")
+                              : t("identity.verificationError")}
                           </p>
                         </div>
                       </div>
@@ -1031,18 +1052,15 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
                         <div className="override-option-card option-accept">
                           <h4 className="option-title">
                             <CheckCircle size={18} />
-                            Option 1: Accept Verification with Manual Entry
+                            {t("identity.optionOne")}
                           </h4>
                           <p className="option-description">
-                            If you believe the identity is correct despite the
-                            failed automated verification, manually enter the
-                            participant's details and provide a detailed reason
-                            for approval.
+                            {t("identity.optionOneDescription")}
                           </p>
 
                           <div className="form-field">
                             <label className="field-label">
-                              Participant Full Name *
+                              {t("sessionInfo.participantName")} *
                             </label>
                             <input
                               type="text"
@@ -1050,14 +1068,16 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
                               onChange={(e) =>
                                 setManualParticipantName(e.target.value)
                               }
-                              placeholder="Enter full name as shown on document"
+                              placeholder={t("identity.enterFullName")}
                               className="field-input"
                               disabled={verificationState.isVerifying}
                             />
                           </div>
 
                           <div className="form-field">
-                            <label className="field-label">CPR Number *</label>
+                            <label className="field-label">
+                              {t("identity.cpr")} *
+                            </label>
                             <input
                               type="text"
                               value={manualParticipantCPR}
@@ -1067,23 +1087,27 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
                                   .slice(0, 9);
                                 setManualParticipantCPR(value);
                               }}
-                              placeholder="Enter 9-digit CPR number"
+                              placeholder={t("identity.enterCPR")}
                               maxLength={9}
                               className="field-input"
                               disabled={verificationState.isVerifying}
                             />
-                            <p className="field-hint">9 digits only</p>
+                            <p className="field-hint">
+                              {t("identity.digitsOnly")}
+                            </p>
                           </div>
 
                           <div className="form-field">
-                            <label className="field-label">Nationality *</label>
+                            <label className="field-label">
+                              {t("identity.nationality")} *
+                            </label>
                             <input
                               type="text"
                               value={manualParticipantNationality}
                               onChange={(e) =>
                                 setManualParticipantNationality(e.target.value)
                               }
-                              placeholder="Enter nationality (e.g., Bahraini, Indian, etc.)"
+                              placeholder={t("identity.enterNationality")}
                               className="field-input"
                               disabled={verificationState.isVerifying}
                             />
@@ -1091,14 +1115,14 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
 
                           <div className="form-field">
                             <label className="field-label">
-                              Reason for Manual Override *
+                              {t("identity.reasonForManualOverride")}
                             </label>
                             <textarea
                               value={manualOverrideReason}
                               onChange={(e) =>
                                 setManualOverrideReason(e.target.value)
                               }
-                              placeholder="Enter detailed reason for manual approval"
+                              placeholder={t("identity.enterReason")}
                               className="field-textarea"
                               rows={4}
                               disabled={verificationState.isVerifying}
@@ -1119,13 +1143,13 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
                           >
                             {verificationState.isVerifying ? (
                               <>
-                                <Loader2 size={18} className="spinner-icon" />{" "}
-                                Processing Manual Approval...
+                                <Loader2 size={18} className="spinner-icon" />
+                                {t("identity.processingManualApproval")}
                               </>
                             ) : (
                               <>
-                                <CheckCircle size={18} /> Accept and Proceed to
-                                Investigation
+                                <CheckCircle size={18} />{" "}
+                                {t("identity.acceptAndProceed")}
                               </>
                             )}
                           </button>
@@ -1134,12 +1158,10 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
                         <div className="override-option-card option-end">
                           <h4 className="option-title">
                             <XCircle size={18} />
-                            Option 2: End This Session
+                            {t("identity.opetionTwo")}
                           </h4>
                           <p className="option-description">
-                            If you cannot verify the identity or believe the
-                            verification has failed legitimately, you can end
-                            this session. All data will be reset.
+                            {t("identity.optionTwoDescription")}
                           </p>
 
                           <button
@@ -1148,7 +1170,7 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
                             type="button"
                             disabled={verificationState.isVerifying}
                           >
-                            <XCircle size={18} /> End Session and Start Over
+                            <XCircle size={18} /> {t("identity.endSession")}
                           </button>
                         </div>
                       </div>
@@ -1168,8 +1190,8 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
             >
               {verificationState.isVerifying ? (
                 <>
-                  <Loader2 size={18} className="animate-spin" /> Verifying
-                  Identity...
+                  <Loader2 size={18} className="animate-spin" />{" "}
+                  {t("identity.verifyingIdentity")}
                 </>
               ) : verificationAttempts >= MAX_VERIFICATION_ATTEMPTS ? (
                 <>
@@ -1177,7 +1199,8 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
                 </>
               ) : (
                 <>
-                  Complete Identity Verification <ArrowRight size={18} />
+                  {t("identity.completeVerification")}
+                  <ArrowRight size={18} />
                 </>
               )}
             </button>
@@ -1189,7 +1212,7 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
               className="btn-primary"
               type="button"
             >
-              Proceed to Investigation <ArrowRight size={18} />
+              {t("identity.startInvestigation")} <ArrowRight size={18} />
             </button>
           )}
         </div>
@@ -1199,10 +1222,10 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
         isOpen={showEndSessionPopup}
         onClose={handleEndSessionCancel}
         onConfirm={handleEndSessionConfirm}
-        title="End Session"
-        message="Are you sure you want to end this session? All verification data will be lost and you'll be redirected to the homepage. This action cannot be undone."
-        confirmText="End Session"
-        cancelText="Cancel"
+        title={t("popup.title")}
+        message={t("popup.message")}
+        confirmText={t("popup.confirm")}
+        cancelText={t("popup.cancel")}
         type="danger"
       />
     </div>
