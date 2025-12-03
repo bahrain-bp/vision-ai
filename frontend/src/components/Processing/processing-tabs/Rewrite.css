@@ -137,6 +137,38 @@
   flex-shrink: 0;
 }
 
+/* Status message for async processing */
+.rewrite-status-message {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  margin-bottom: 18px;
+  background-color: #eff6ff;
+  border: 1.5px solid #93c5fd;
+  border-radius: 12px;
+  color: #1e40af;
+  font-size: 14px;
+  font-weight: 500;
+  box-shadow: 0 2px 8px rgba(147, 197, 253, 0.15);
+  animation: slideDown 0.3s ease-out;
+}
+
+/* Spinner animation */
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid #bfdbfe;
+  border-top: 2px solid #1e40af;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
 @keyframes slideDown {
   from {
     opacity: 0;

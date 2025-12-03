@@ -6,18 +6,210 @@ import "./Rewrite.css";
 
 interface SessionData {
   sessionId: string;
+  extractedText?: string;  // Add extracted text field
 }
 
 interface RewriteProps {
   sessionData: SessionData;
+  selectedLanguage: "en" | "ar";
 }
 
-const Rewrite: React.FC<RewriteProps> = ({ sessionData }) => {
+const Rewrite: React.FC<RewriteProps> = ({ sessionData, selectedLanguage }) => {
   const [rewrittenText, setRewrittenText] = useState("");
+  const [originalRewrittenText, setOriginalRewrittenText] = useState(""); // Store original Arabic
   const [caseNumber, setCaseNumber] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState<string>("");
 
+  // Simple translation function (basic word replacement for common terms)
+  const translateToEnglish = (arabicText: string): string => {
+    if (!arabicText) return arabicText;
+    
+    // Keep markdown structure intact
+    let translated = arabicText;
+    
+    // Common translations - expand this dictionary for better coverage
+    const translations: Record<string, string> = {
+      // Headers and sections
+      "بيانات القضية": "Case Information",
+      "رقم البلاغ": "Report Number",
+      "رقم القضية": "Case Number",
+      "نوع القضية": "Case Type",
+      "الجهة": "Authority",
+      "نيابة العاصمة": "Capital Prosecution",
+      "مركز شرطة الحورة": "Al Hoora Police Station",
+      "تاريخ ووقت فتح المحضر": "Date and Time of Report Opening",
+      "الأطراف": "Parties",
+      "الصفة": "Role",
+      "الاسم الكامل": "Full Name",
+      "الجنسية": "Nationality",
+      "الرقم الشخصي": "Personal ID Number",
+      "الهاتف": "Phone Number",
+      
+      // Roles
+      "مبلغ": "Reporter",
+      "مدعى عليه": "Accused",
+      "ضابط": "Officer",
+      "محرر محضر": "Report Writer",
+      "محرر المحضر": "Report Writer",
+      "وكيل نيابة": "Prosecutor",
+      "رائد": "Major",
+      "عريف": "Corporal",
+      "ملازم": "Lieutenant",
+      "مساعد ملازم": "Assistant Lieutenant",
+      "رئيس عرفاء": "Chief Corporal",
+      
+      // Sections
+      "ملخص الحادث": "Incident Summary",
+      "مسرح الحادث": "Crime Scene",
+      "المضبوطات": "Seized Items",
+      "الأضرار": "Damages",
+      "الأقوال": "Statements",
+      "أقوال المبلغ": "Reporter's Statement",
+      "أقوال المدعى عليه": "Accused's Statement",
+      "أقوال الشهود": "Witnesses' Statements",
+      "إجراءات الشرطة": "Police Procedures",
+      "التنازل أو الصلح": "Waiver or Settlement",
+      "إجراءات وقرارات النيابة": "Prosecution Decisions",
+      "تسليم المضبوطات": "Delivery of Seized Items",
+      "التواريخ المهمة": "Important Dates",
+      "التوقيعات والمحررين": "Signatures and Authors",
+      "محررو المحاضر": "Report Writers",
+      "الضباط المشرفين": "Supervising Officers",
+      "وكلاء النيابة": "Prosecutors",
+      "أخصائيي التحقيق": "Investigation Specialists",
+      "ملاحق إضافية": "Additional Attachments",
+      
+      // Witness-related (must come before verb "saw")
+      "شاهد": "Witness",
+      
+      // Common phrases
+      "غير مذكور": "Not mentioned",
+      "لا يوجد": "None",
+      "في حوالي الساعة": "at approximately",
+      "بتاريخ": "on date",
+      "حضر": "attended",
+      "أفاد": "stated",
+      "قام": "did",
+      "توجه": "went to",
+      "وجد": "found",
+      "تم": "was done",
+      "يحال": "is referred",
+      "للتصرف": "for action",
+      "بناء على": "based on",
+      "قرار": "decision",
+      "إحالة": "referral",
+      "حفظ": "archive",
+      "توقيف": "detention",
+      "إفراج": "release",
+      
+      // Nationalities
+      "مصري": "Egyptian",
+      "مصرية": "Egyptian",
+      "مغربي": "Moroccan",
+      "مغربية": "Moroccan",
+      "بحريني": "Bahraini",
+      "بحرينية": "Bahraini",
+      "سعودي": "Saudi",
+      "سعودية": "Saudi",
+      "هندي": "Indian",
+      "هندية": "Indian",
+      "باكستاني": "Pakistani",
+      "باكستانية": "Pakistani",
+      "فلبيني": "Filipino",
+      "فلبينية": "Filipino",
+      
+      // Places
+      "مملكة البحرين": "Kingdom of Bahrain",
+      "النيابة العامة": "Public Prosecution",
+      "العاصمة": "Capital Governorate",
+      "الحورة": "Al Hoora",
+      "المنطقة": "Area",
+      "المجمع": "Block",
+      "الشارع": "Road",
+      "طريق": "Road",
+      "المبنى": "Building",
+      "الشقة": "Apartment",
+      "الطابق": "Floor",
+      
+      // Crime related
+      "إتلاف": "damage",
+      "إتلاف عمدا": "deliberate damage",
+      "سرقة": "theft",
+      "اعتداء": "assault",
+      "احتيال": "fraud",
+      "تهديد": "threat",
+      "تزوير": "forgery",
+      
+      // Time
+      "صباحا": "AM",
+      "صباحًا": "AM",
+      "مساء": "PM",
+      "مساءً": "PM",
+      "الساعة": "at",
+      "يوم": "day",
+      "الأحد": "Sunday",
+      "الإثنين": "Monday",
+      "الثلاثاء": "Tuesday",
+      "الأربعاء": "Wednesday",
+      "الخميس": "Thursday",
+      "الجمعة": "Friday",
+      "السبت": "Saturday",
+      
+      // Actions
+      "فتح المحضر": "Opening the report",
+      "إغلاق المحضر": "Closing the report",
+      "إقفال المحضر": "Closing the report",
+      "إعادة فتح المحضر": "Reopening the report",
+      "تدوين الأقوال": "Recording statements",
+      "المعاينة": "inspection",
+      "التصوير": "photography",
+      "التحقيق": "investigation",
+      "الكشف": "examination",
+      
+      // Documents
+      "المحضر": "the report",
+      "البلاغ": "complaint",
+      "القضية": "case",
+      "التقرير": "report",
+      "الإجراءات": "procedures",
+      "القرار": "decision",
+      
+      // Common verbs in past
+      "حضر إلى": "came to",
+      "توجه إلى": "went to",
+      "أبلغ": "informed",
+      "قام بـ": "did",
+      "أفاد بأن": "stated that",
+      "ذكر أن": "mentioned that",
+      
+      // Yes/No
+      "نعم": "Yes",
+      "لا": "No"
+    };
+    
+    // Replace each Arabic term with English
+    Object.entries(translations).forEach(([ar, en]) => {
+      const regex = new RegExp(ar, 'g');
+      translated = translated.replace(regex, en);
+    });
+    
+    return translated;
+  };
+
+  // Effect to handle language change
+  React.useEffect(() => {
+    if (originalRewrittenText && selectedLanguage === "en") {
+      // Use dictionary-based translation
+      const englishVersion = translateToEnglish(originalRewrittenText);
+      setRewrittenText(englishVersion);
+    } else if (originalRewrittenText && selectedLanguage === "ar") {
+      // Show original Arabic
+      setRewrittenText(originalRewrittenText);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedLanguage, originalRewrittenText]);
 
 
   // Function to extract case number from Arabic text
@@ -178,33 +370,39 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData }) => {
   const handleRewrite = async () => {
     setLoading(true);
     setError(null);
-
-    // Set a timeout for the request (30 seconds)
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    setStatusMessage(
+      selectedLanguage === "ar" 
+        ? "جارٍ بدء عملية إعادة الكتابة..." 
+        : "Starting rewrite job..."
+    );
 
     try {
-      // Get API endpoint from environment or construct from window location
-      const apiEndpoint =
-        process.env.REACT_APP_API_ENDPOINT ||
+      // Get API endpoint
+      const apiGatewayEndpoint = process.env.REACT_APP_API_ENDPOINT ||
         `${window.location.origin.replace("localhost", "localhost").split(":")[0]}://${window.location.hostname}:3000`;
 
-      // For now, use mock S3 key - later will be extractedText key from Classification
+      // Prepare request body
+      // Exact S3 path for the file
+      const s3Key = `classification/extracted/session-20251202225417-34b3d6db/20251202-230047-5fe049bd-9142-4f73-9a30-da104eeb0771.txt`;
+      
       const requestBody = {
         sessionId: sessionData.sessionId,
-        s3Key: "rewritten/report.txt",
+        s3Key: s3Key,
+        language: selectedLanguage
       };
 
-      const response = await fetch(`${apiEndpoint}/rewrite`, {
+      // Step 1: Start the rewrite job
+      const requestUrl = `${apiGatewayEndpoint}/rewrite`;
+      console.log("Starting rewrite job:", requestUrl);
+      console.log("Request body:", requestBody);
+      
+      const response = await fetch(requestUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(requestBody),
-        signal: controller.signal,
       });
-
-      clearTimeout(timeoutId);
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -214,45 +412,146 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData }) => {
       }
 
       const data = await response.json();
-
-      if (data.status === "success") {
-        if (data.rewrittenText && data.rewrittenText.trim().length > 0) {
-          // Clean and deduplicate the text first
-          const cleanedText = cleanRewrittenText(data.rewrittenText);
-          setRewrittenText(cleanedText);
-          // Extract case number from the rewritten text
-          console.log("Rewritten text received, extracting case number...");
-          const extractedCaseNumber = extractCaseNumber(cleanedText);
-          console.log("Extracted case number:", extractedCaseNumber);
-          setCaseNumber(extractedCaseNumber);
-          // Log S3 output path (not displayed in UI)
-          if (data.outputS3Key) {
-            console.log("S3 Output Path:", data.outputS3Key);
-          }
-        } else {
-          // success but empty payload
-          const msg = data.message || "No rewritten text returned from the server.";
-          setError(msg);
-        }
+      
+      // Check if we got a jobId (async mode)
+      if (data.jobId) {
+        console.log("Job started with ID:", data.jobId);
+        setStatusMessage(
+          selectedLanguage === "ar" 
+            ? "جارٍ بدء العملية. مراجعة الحالة..." 
+            : "Job started. Checking status..."
+        );
+        
+        // Step 2: Poll for status
+        pollJobStatus(data.jobId, apiGatewayEndpoint);
+      } 
+      // Fallback: if server returns old sync format (for compatibility)
+      else if (data.status === "success" && data.rewrittenText) {
+        handleRewriteSuccess(data.rewrittenText);
       } else {
-        throw new Error(data.message || "Unknown error from API");
+        throw new Error(data.message || "Unexpected response format");
       }
     } catch (err) {
-      clearTimeout(timeoutId);
-      
-      // Handle timeout specifically
-      if (err instanceof Error && err.name === 'AbortError') {
-        setError("Request timed out. The document may be too large. Try with a smaller document or try again.");
-        console.error("Rewrite timeout");
-      } else {
-        const errorMessage =
-          err instanceof Error ? err.message : "Failed to rewrite report";
-        setError(errorMessage);
-        console.error("Rewrite error:", err);
-      }
-    } finally {
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to start rewrite job";
+      setError(errorMessage);
+      console.error("Rewrite error:", err);
       setLoading(false);
+      setStatusMessage("");
     }
+  };
+
+  // Poll job status every 10 seconds
+  const pollJobStatus = async (jobId: string, apiEndpoint: string) => {
+    const pollInterval = setInterval(async () => {
+      try {
+        const statusUrl = `${apiEndpoint}/rewrite/status/${jobId}`;
+        console.log("Polling status:", statusUrl);
+        
+        const response = await fetch(statusUrl, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error(`Status check failed: ${response.statusText}`);
+        }
+
+        const statusData = await response.json();
+        console.log("Status response:", statusData);
+
+        if (statusData.status === "COMPLETED") {
+          clearInterval(pollInterval);
+          setStatusMessage(
+            selectedLanguage === "ar" 
+              ? "تمت إعادة الكتابة بنجاح!" 
+              : "Rewrite completed!"
+          );
+          
+          if (statusData.rewrittenText) {
+            handleRewriteSuccess(statusData.rewrittenText);
+          } else {
+            setError(
+              selectedLanguage === "ar" 
+                ? "تمت إعادة الكتابة ولكن لم يتم إرجاع النص" 
+                : "Rewrite completed but no text returned"
+            );
+            setLoading(false);
+          }
+        } else if (statusData.status === "FAILED") {
+          clearInterval(pollInterval);
+          setError(
+            selectedLanguage === "ar" 
+              ? `فشلت إعادة الكتابة: ${statusData.error || "خطأ غير محدد"}`
+              : statusData.error || "Rewrite job failed"
+          );
+          setLoading(false);
+          setStatusMessage("");
+        } else if (statusData.status === "PROCESSING") {
+          setStatusMessage(
+            selectedLanguage === "ar" 
+              ? "جارٍ معالجة التقرير... الرجاء الانتظار." 
+              : "Processing your report... Please wait."
+          );
+        } else {
+          setStatusMessage(
+            selectedLanguage === "ar" 
+              ? `الحالة: ${statusData.status}`
+              : `Status: ${statusData.status}`
+          );
+        }
+      } catch (err) {
+        clearInterval(pollInterval);
+        const errorMessage =
+          err instanceof Error ? err.message : (
+            selectedLanguage === "ar" 
+              ? "فشل في فحص حالة العملية"
+              : "Failed to check job status"
+          );
+        setError(errorMessage);
+        console.error("Status check error:", err);
+        setLoading(false);
+        setStatusMessage("");
+      }
+    }, 10000); // Poll every 10 seconds
+
+    // Set a maximum timeout of 5 minutes
+    setTimeout(() => {
+      clearInterval(pollInterval);
+      if (loading) {
+        setError(
+          selectedLanguage === "ar" 
+            ? "انتهت مهلة العملية: استغرقت وقتًا طويلاً. الرجاء المحاولة مرة أخرى." 
+            : "Job timeout: Processing took too long. Please try again."
+        );
+        setLoading(false);
+        setStatusMessage("");
+      }
+    }, 300000); // 5 minutes
+  };
+
+  // Handle successful rewrite
+  const handleRewriteSuccess = (rawText: string) => {
+    const cleanedText = cleanRewrittenText(rawText);
+    setOriginalRewrittenText(cleanedText); // Store original Arabic
+    
+    // Apply language preference
+    if (selectedLanguage === "en") {
+      const englishVersion = translateToEnglish(cleanedText);
+      setRewrittenText(englishVersion);
+    } else {
+      setRewrittenText(cleanedText);
+    }
+    
+    console.log("Rewritten text received, extracting case number...");
+    const extractedCaseNumber = extractCaseNumber(cleanedText);
+    console.log("Extracted case number:", extractedCaseNumber);
+    setCaseNumber(extractedCaseNumber);
+    
+    setLoading(false);
+    setStatusMessage("");
   };
 
 
@@ -265,9 +564,13 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData }) => {
             <Sparkles size={28} />
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <h2 className="rewrite-heading">Rewrite</h2>
+            <h2 className="rewrite-heading">
+              {selectedLanguage === "ar" ? "إعادة الكتابة" : "Rewrite"}
+            </h2>
             <p className="rewrite-subheading">
-              Rewrite and improve investigation reports
+              {selectedLanguage === "ar" 
+                ? "إعادة كتابة وتحسين تقارير التحقيق" 
+                : "Rewrite and improve investigation reports"}
             </p>
           </div>
         </div>
@@ -279,12 +582,24 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData }) => {
           </div>
         )}
 
+        {/* Status Message for async processing */}
+        {statusMessage && !error && (
+          <div className="rewrite-status-message">
+            <div className="spinner"></div>
+            <span>{statusMessage}</span>
+          </div>
+        )}
+
         <div className="rewrite-body">
-          <label className="rewrite-section-label">Rewritten Report</label>
+          <label className="rewrite-section-label">
+            {selectedLanguage === "ar" ? "التقرير المُعاد كتابته" : "Rewritten Report"}
+          </label>
           {/* Case Number Display - Only show when case number is extracted */}
           {caseNumber && (
             <div className="case-number-banner">
-              <div className="case-number-label">القضية رقم</div>
+              <div className="case-number-label">
+                {selectedLanguage === "ar" ? "القضية رقم" : "Case Number"}
+              </div>
               <div className="case-number-value">{caseNumber}</div>
             </div>
           )}
@@ -299,7 +614,7 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData }) => {
                 }}
                 style={{ flex: 1 }}
               >
-                <span>📄 Export PDF</span>
+                <span>{selectedLanguage === "ar" ? "📄 تصدير PDF" : "📄 Export PDF"}</span>
               </button>
               <button
                 type="button"
@@ -309,7 +624,7 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData }) => {
                 }}
                 style={{ flex: 1 }}
               >
-                <span>📝 Export Word</span>
+                <span>{selectedLanguage === "ar" ? "📝 تصدير Word" : "📝 Export Word"}</span>
               </button>
               <button
                 type="button"
@@ -317,17 +632,18 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData }) => {
                 onClick={handlePrint}
                 style={{ flex: 1 }}
               >
-                <span>🖨️ Print</span>
+                <span>{selectedLanguage === "ar" ? "🖨️ طباعة" : "🖨️ Print"}</span>
               </button>
             </div>
           )}
-          {/* Preview formatted Markdown output */}
+          {/* Preview formatted output - clean and simple */}
           <div style={{
             background: '#ffffff',
             color: '#1a1a1a',
             transition: 'all 0.3s ease',
             borderRadius: 14,
-            padding: 0
+            padding: '24px',
+            minHeight: '200px'
           }}>
             <MarkdownPreview markdown={rewrittenText} />
           </div>
@@ -340,7 +656,11 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData }) => {
           disabled={loading}
         >
           <Lock size={18} className="rewrite-btn-icon" />
-          <span>{loading ? "Rewriting..." : "Rewrite Report"}</span>
+          <span>
+            {loading 
+              ? (selectedLanguage === "ar" ? "جارٍ إعادة الكتابة..." : "Rewriting...") 
+              : (selectedLanguage === "ar" ? "إعادة كتابة التقرير" : "Rewrite Report")}
+          </span>
         </button>
       </div>
     </div>
@@ -562,7 +882,10 @@ function simpleMarkdownToHtmlForExport(md: string): string {
 </head>
 <body>
   <div class="header">
-    <div class="header-text">مملكة البحرين</div>
+    <div class="header-text">
+      <div style="margin-bottom: 8px;">مملكة البحرين</div>
+      <div style="font-size: 20px; font-weight: normal; color: #4b5563;">Kingdom of Bahrain</div>
+    </div>
     <img class="header-logo" src="https://upload.wikimedia.org/wikipedia/commons/thumb/2/2c/Flag_of_Bahrain.svg/320px-Flag_of_Bahrain.svg.png" alt="Bahrain Flag">
   </div>
   <div class="content">

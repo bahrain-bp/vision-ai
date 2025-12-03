@@ -4,54 +4,75 @@ interface MarkdownPreviewProps {
   markdown: string;
 }
 
-// Enhanced Markdown to HTML converter for headings, bold, hr, and accurate tables
+// Enhanced Markdown to HTML converter optimized for Arabic legal documents
 function simpleMarkdownToHtml(md: string): string {
   let html = md;
+  
   // Headings
   html = html.replace(/^### (.*)$/gm, '<h3>$1</h3>');
   html = html.replace(/^## (.*)$/gm, '<h2>$1</h2>');
   html = html.replace(/^# (.*)$/gm, '<h1>$1</h1>');
+  
   // Bold
   html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+  
   // Horizontal rule
   html = html.replace(/^---+$/gm, '<hr />');
 
-  // Table detection: first, handle pipe-delimited Markdown tables as before
+  // Table detection: Enhanced for Arabic RTL legal documents
   html = html.replace(/((?:^.*\|.*\n)+)/gm, (block) => {
     const lines = block.trim().split(/\n/).filter(l => l.includes('|'));
     if (lines.length < 2) return block;
     
-    // Remove separator lines (---...) and clean lines
-    const cleanLines = lines.filter(l => !/^[-|\s]+$/.test(l));
+    // Remove separator lines (---) but keep header and data rows
+    const cleanLines = lines.filter(l => !/^[\s|\-]+$/.test(l));
     if (cleanLines.length < 2) return block;
     
-    // Parse rows and normalize - split by | and filter empty cells from start/end
+    // Parse rows: split by | and trim each cell
     const rows = cleanLines.map(line => {
-      // Normalize: trim, split by |, filter empty strings from edges
       let cells = line.split('|').map(cell => cell.trim());
-      // Remove leading/trailing empty cells (from | at start/end of line)
+      // Remove empty cells from start/end caused by leading/trailing pipes
       while (cells.length > 0 && cells[0] === '') cells.shift();
       while (cells.length > 0 && cells[cells.length - 1] === '') cells.pop();
       return cells;
     });
     
-    if (rows.length < 2) return block;
+    if (rows.length < 1) return block;
     
-    // Find max column count to normalize all rows
+    // Normalize column count
     const maxCols = Math.max(...rows.map(r => r.length));
-    
-    // Pad rows to have same number of columns
     const normalizedRows = rows.map(row => {
       while (row.length < maxCols) row.push('');
       return row;
     });
     
-    // Build table
-    let table = '<table class="markdown-table"><thead><tr>';
-    table += normalizedRows[0].map(cell => `<th>${cell}</th>`).join('');
+    const headerRow = normalizedRows[0];
+    const bodyRows = normalizedRows.slice(1).filter(r => r.some(c => c.trim() !== ''));
+
+    // Remove 'الحالة' column if all body cells are empty
+    let effectiveHeader = [...headerRow];
+    let effectiveBody = bodyRows.map(r => [...r]);
+    
+    for (let colIdx = effectiveHeader.length - 1; colIdx >= 0; colIdx--) {
+      const normalizedHeader = effectiveHeader[colIdx].replace(/\s+/g, '');
+      if (normalizedHeader === 'الحالة') {
+        const allEmpty = effectiveBody.every(r => !r[colIdx] || r[colIdx].trim() === '');
+        if (allEmpty) {
+          effectiveHeader.splice(colIdx, 1);
+          effectiveBody = effectiveBody.map(r => {
+            r.splice(colIdx, 1);
+            return r;
+          });
+        }
+      }
+    }
+    
+    // Build HTML table with RTL support
+    let table = '<table class="markdown-table" dir="rtl"><thead><tr>';
+    table += effectiveHeader.map(cell => `<th>${cell}</th>`).join('');
     table += '</tr></thead><tbody>';
-    for (let i = 1; i < normalizedRows.length; i++) {
-      table += '<tr>' + normalizedRows[i].map(cell => `<td>${cell}</td>`).join('') + '</tr>';
+    for (const r of effectiveBody) {
+      table += '<tr>' + r.map(cell => `<td>${cell}</td>`).join('') + '</tr>';
     }
     table += '</tbody></table>';
     return table;
@@ -210,34 +231,51 @@ if (typeof window !== 'undefined' && !document.head.querySelector('style.markdow
 .markdown-table {
   border-collapse: collapse;
   width: 100%;
-  margin: 24px 0;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-  border-radius: 8px;
+  margin: 28px 0;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+  border-radius: 10px;
   overflow: hidden;
+  direction: rtl;
+  font-family: 'IBM Plex Sans Arabic', 'Cairo', 'Noto Sans Arabic', sans-serif;
 }
 .markdown-table th, .markdown-table td {
-  border: 1px solid #e2e8f0;
-  padding: 14px 16px;
+  border: 1.5px solid #d1dce6;
+  padding: 16px 20px;
   text-align: center;
-  font-size: 1.05rem;
+  font-size: 1.08rem;
+  vertical-align: middle;
 }
 .markdown-table th {
-  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  background: linear-gradient(180deg, #f8fafc 0%, #e8eef5 100%);
   font-weight: 700;
   color: #0f172a;
-  border-bottom: 2px solid #cbd5e1;
-  font-size: 1.08rem;
+  border-bottom: 2.5px solid #94a3b8;
+  font-size: 1.12rem;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.markdown-table tbody tr:nth-child(odd) {
+  background-color: #ffffff;
 }
 .markdown-table tbody tr:nth-child(even) {
-  background-color: #f9fafb;
+  background-color: #f8fafc;
 }
 .markdown-table tbody tr:hover {
-  background-color: #f0f4f8;
+  background-color: #e8f0f7;
   transition: background-color 0.2s ease;
 }
 .markdown-table td {
   color: #1e293b;
   font-weight: 500;
+  line-height: 1.8;
+}
+.markdown-table td:first-child,
+.markdown-table th:first-child {
+  border-right: 2px solid #cbd5e1;
+}
+.markdown-table td:last-child,
+.markdown-table th:last-child {
+  border-left: 2px solid #cbd5e1;
 }
 `;
   document.head.appendChild(style);
