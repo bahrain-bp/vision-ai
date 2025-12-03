@@ -26,7 +26,7 @@ def create_response(status_code: int, body: Dict[str, Any]) -> Dict:
     return {
         "statusCode": status_code,
         "headers": {
-            "Content-Type": "application/json",
+            "Content-Type": "application/json; charset=utf-8",
             "Access-Control-Allow-Origin": "*",
             "Access-Control-Allow-Headers": "Content-Type,Authorization",
             "Access-Control-Allow-Methods": "GET,OPTIONS"
@@ -50,14 +50,27 @@ def get_job_status(job_id: str) -> Optional[Dict]:
         raise
 
 
-def get_result_text(job_id: str) -> Optional[str]:
-    """Retrieve rewritten text from S3."""
+def get_result_text(job_id: str, status_data: Dict[str, Any]) -> Optional[str]:
+    """Retrieve rewritten text from S3.
+
+    Prefer explicit resultKey from status.json when available.
+    Fallback to legacy path rewrite-jobs/{job_id}/result.txt.
+    """
+    # Try explicit resultKey first
+    result_key = status_data.get("resultKey")
     try:
-        result_key = f"rewrite-jobs/{job_id}/result.txt"
-        obj = s3_client.get_object(Bucket=BUCKET_NAME, Key=result_key)
+        if result_key:
+            logger.info(f"Fetching result via explicit key: {result_key}")
+            obj = s3_client.get_object(Bucket=BUCKET_NAME, Key=result_key)
+            return obj["Body"].read().decode("utf-8")
+
+        # Fallback to legacy location
+        legacy_key = f"rewrite-jobs/{job_id}/result.txt"
+        logger.info(f"Fetching result via legacy key: {legacy_key}")
+        obj = s3_client.get_object(Bucket=BUCKET_NAME, Key=legacy_key)
         return obj["Body"].read().decode("utf-8")
     except s3_client.exceptions.NoSuchKey:
-        logger.warning(f"Result file not found for job {job_id}")
+        logger.warning(f"Result file not found for job {job_id} (key={result_key or legacy_key})")
         return None
     except Exception as e:
         logger.error(f"Error reading result for job {job_id}: {e}")
@@ -108,7 +121,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict:
         
         # If job is completed, fetch the result
         if job_status == "COMPLETED":
-            result_text = get_result_text(job_id)
+            result_text = get_result_text(job_id, status_data)
             
             if result_text:
                 response_data = {

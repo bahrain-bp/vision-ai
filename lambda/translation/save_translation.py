@@ -82,7 +82,7 @@ def build_response(status_code, body):
             'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
             'Access-Control-Allow-Headers': 'Content-Type, X-Amz-Date, Authorization, X-Api-Key, X-Amz-Security-Token, Content-Length',
             'Access-Control-Allow-Credentials': 'false',
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json; charset=utf-8'
         },
         'body': json.dumps(body, ensure_ascii=False)
     }

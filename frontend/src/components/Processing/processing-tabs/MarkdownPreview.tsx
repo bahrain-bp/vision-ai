@@ -223,6 +223,25 @@ if (typeof window !== 'undefined' && !document.head.querySelector('style.markdow
   font-weight: 700;
   color: #0f172a;
 }
+/* Q&A Section Styling */
+.markdown-preview p strong:first-child {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 6px;
+  margin-left: 8px;
+}
+.markdown-preview p strong:contains('سؤال'),
+.markdown-preview p strong:contains('Question') {
+  background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+  color: #1e40af;
+  border-right: 4px solid #3b82f6;
+}
+.markdown-preview p strong:contains('جواب'),
+.markdown-preview p strong:contains('Answer') {
+  background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+  color: #065f46;
+  border-right: 4px solid #10b981;
+}
 .markdown-preview hr {
   border: none;
   border-top: 2px solid #e2e8f0;

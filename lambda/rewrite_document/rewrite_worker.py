@@ -41,6 +41,97 @@ def get_safe_log_info(text: str, session_id: Optional[str] = None) -> Dict[str, 
     }
 
 
+def find_latest_extracted_folder(bucket: str) -> Optional[str]:
+    """Find the most recently modified folder in classification/extracted/."""
+    try:
+        prefix = "classification/extracted/"
+        logger.info(f"🔍 Finding latest folder in: s3://{bucket}/{prefix}")
+        
+        response = s3_client.list_objects_v2(
+            Bucket=bucket,
+            Prefix=prefix,
+            Delimiter='/'
+        )
+        
+        if 'CommonPrefixes' not in response:
+            logger.warning(f"❌ No folders found in s3://{bucket}/{prefix}")
+            return None
+        
+        folders = [p['Prefix'] for p in response['CommonPrefixes']]
+        logger.info(f"📂 Found {len(folders)} folders")
+        
+        if not folders:
+            return None
+        
+        # Get the last modified time of each folder by checking its contents
+        folder_times = []
+        for folder in folders:
+            folder_response = s3_client.list_objects_v2(
+                Bucket=bucket,
+                Prefix=folder,
+                MaxKeys=1
+            )
+            if 'Contents' in folder_response and folder_response['Contents']:
+                last_modified = folder_response['Contents'][0]['LastModified']
+                folder_times.append((folder, last_modified))
+                logger.info(f"  📁 {folder} - Last modified: {last_modified}")
+        
+        if not folder_times:
+            logger.warning("No folders with contents found")
+            return None
+        
+        # Sort by last modified time, most recent first
+        folder_times.sort(key=lambda x: x[1], reverse=True)
+        latest_folder = folder_times[0][0]
+        
+        logger.info(f"✅ Latest folder: {latest_folder}")
+        return latest_folder
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to find latest folder: {e}", exc_info=True)
+        return None
+
+
+def find_text_file_in_folder(bucket: str, folder_prefix: str) -> Optional[str]:
+    """Find the first .txt file in an S3 folder."""
+    try:
+        # Ensure folder prefix ends with /
+        if not folder_prefix.endswith('/'):
+            folder_prefix += '/'
+        
+        logger.info(f"🔍 Searching for .txt files in: s3://{bucket}/{folder_prefix}")
+        
+        response = s3_client.list_objects_v2(
+            Bucket=bucket,
+            Prefix=folder_prefix,
+            MaxKeys=100
+        )
+        
+        if 'Contents' not in response:
+            logger.warning(f"❌ No files found in s3://{bucket}/{folder_prefix}")
+            logger.warning(f"📝 Response: {response}")
+            return None
+        
+        # Log all found objects for debugging
+        logger.info(f"📂 Found {len(response['Contents'])} objects:")
+        for obj in response['Contents']:
+            logger.info(f"  - {obj['Key']}")
+        
+        # Find first .txt file
+        for obj in response['Contents']:
+            key = obj['Key']
+            if key.endswith('.txt') and not key.endswith('/'):
+                logger.info(f"✅ Found text file: {key}")
+                return key
+        
+        logger.warning(f"⚠️ No .txt files found in s3://{bucket}/{folder_prefix}")
+        return None
+    except Exception as e:
+        logger.error(f"❌ Failed to list files in s3://{bucket}/{folder_prefix} - {e}")
+        logger.error(f"Error details: {str(e)}", exc_info=True)
+        return None
+
+
 def read_text_from_s3(bucket: str, key: str) -> str:
     """Read text file from S3 bucket."""
     try:
@@ -501,9 +592,10 @@ def update_job_status(job_id: str, status: str, data: Optional[Dict] = None) -> 
     logger.info(f"Updated job {job_id} status to {status}")
 
 
-def save_rewritten_result(job_id: str, rewritten_text: str, original_length: int) -> str:
+def save_rewritten_result(job_id: str, session_id: str, rewritten_text: str, original_length: int) -> str:
     """Save the rewritten text to S3 and return the key."""
-    result_key = f"rewrite-jobs/{job_id}/result.txt"
+    # Save to rewritten/{sessionId}.txt (single latest per session)
+    result_key = f"rewritten/{session_id}.txt"
     
     s3_client.put_object(
         Bucket=BUCKET_NAME,
@@ -512,6 +604,7 @@ def save_rewritten_result(job_id: str, rewritten_text: str, original_length: int
         ContentType="text/plain; charset=utf-8",
         Metadata={
             "jobId": job_id,
+            "sessionId": session_id,
             "originalLength": str(original_length),
             "rewrittenLength": str(len(rewritten_text))
         }
@@ -540,11 +633,43 @@ def lambda_handler(event: Dict, context: Any) -> None:
             return
         
         logger.info(f"🔄 Processing rewrite job {job_id} for session {session_id}")
+        logger.info(f"📋 Event details: text={bool(text)}, s3_key={s3_key}")
         
         # Get input text
         if not text:
             if s3_key:
-                text = read_text_from_s3(BUCKET_NAME, s3_key)
+                # Check if s3_key is a folder or a file
+                actual_key = s3_key
+                
+                # If it looks like a folder, find the text file inside
+                if not s3_key.endswith('.txt'):
+                    logger.info(f"📁 s3_key appears to be a folder: '{s3_key}'")
+                    
+                    # First try to find .txt file in the specified folder
+                    found_key = find_text_file_in_folder(BUCKET_NAME, s3_key)
+                    
+                    # If no .txt file found in specified folder, try the latest folder
+                    if not found_key:
+                        logger.warning(f"⚠️ No .txt file in specified folder, searching latest folder...")
+                        latest_folder = find_latest_extracted_folder(BUCKET_NAME)
+                        
+                        if latest_folder:
+                            logger.info(f"🔄 Trying latest folder: {latest_folder}")
+                            found_key = find_text_file_in_folder(BUCKET_NAME, latest_folder)
+                    
+                    if not found_key:
+                        logger.error(f"❌ No .txt file found in folder: {s3_key} or latest folder")
+                        update_job_status(job_id, "FAILED", {
+                            "error": f"No .txt file found. Please ensure text has been extracted from the document.",
+                            "sessionId": session_id,
+                            "searchedPath": s3_key
+                        })
+                        return
+                    
+                    actual_key = found_key
+                    logger.info(f"✅ Using file: {actual_key}")
+                
+                text = read_text_from_s3(BUCKET_NAME, actual_key)
                 logger.info(f"➡ Loaded text from S3: {get_safe_log_info(text, session_id)}")
             else:
                 logger.error(f"No text or s3Key provided for job {job_id}")
@@ -578,7 +703,7 @@ def lambda_handler(event: Dict, context: Any) -> None:
             rewritten_text = bedrock_output
         
         # Save result to S3
-        result_key = save_rewritten_result(job_id, rewritten_text, len(text))
+        result_key = save_rewritten_result(job_id, session_id, rewritten_text, len(text))
         
         # Update status to COMPLETED
         update_job_status(job_id, "COMPLETED", {

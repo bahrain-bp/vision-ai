@@ -39,6 +39,7 @@ class RewriteStack(Stack):
         # Grant permissions to S3 bucket
         investigation_bucket.grant_read(rewrite_worker_lambda)
         investigation_bucket.grant_write(rewrite_worker_lambda, "rewrite-jobs/*")
+        investigation_bucket.grant_write(rewrite_worker_lambda, "rewritten/*")
         
         # Grant Bedrock permissions
         rewrite_worker_lambda.add_to_role_policy(iam.PolicyStatement(
@@ -79,6 +80,7 @@ class RewriteStack(Stack):
         
         # Grant S3 read permissions for job status and results
         investigation_bucket.grant_read(rewrite_status_lambda, "rewrite-jobs/*")
+        investigation_bucket.grant_read(rewrite_status_lambda, "rewritten/*")
         
         # Import shared API
         shared_api = apigateway.RestApi.from_rest_api_attributes(

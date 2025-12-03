@@ -19,7 +19,8 @@ def lambda_handler(event, context):
             'headers': {
                 'Access-Control-Allow-Origin': '*',
                 'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
-                'Access-Control-Allow-Methods': 'OPTIONS,POST'
+                'Access-Control-Allow-Methods': 'OPTIONS,POST',
+                'Content-Type': 'application/json; charset=utf-8'
             },
             'body': ''
         }
@@ -44,7 +45,7 @@ def lambda_handler(event, context):
         return {
             'statusCode': 200,
             'headers': {
-                'Content-Type': 'application/json',
+                'Content-Type': 'application/json; charset=utf-8',
                 'Access-Control-Allow-Origin': '*',
                 'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
                 'Access-Control-Allow-Methods': 'OPTIONS,POST'
@@ -55,19 +56,19 @@ def lambda_handler(event, context):
                 'case_id': case_id,
                 'session_id': session_id,
                 'user_id': user_id
-            })
+            }, ensure_ascii=False)
         }
         
     except Exception as e:
         return {
             'statusCode': 500,
             'headers': {
-                'Content-Type': 'application/json',
+                'Content-Type': 'application/json; charset=utf-8',
                 'Access-Control-Allow-Origin': '*',
                 'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
                 'Access-Control-Allow-Methods': 'OPTIONS,POST'
             },
-            'body': json.dumps({'error': str(e)})
+            'body': json.dumps({'error': str(e)}, ensure_ascii=False)
         }
 
 def generate_summary(text, length, language):

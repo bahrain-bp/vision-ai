@@ -154,13 +154,13 @@ Generate 7–10 items total, using zero-padded ids: q01, q02, ..."""
             'statusCode': 200,
             'headers': {
                 'Access-Control-Allow-Origin': '*',
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json; charset=utf-8'
             },
             'body': json.dumps({
                 'sessionId': session_id,
                 'questions': questions,
                 's3ObjectKey': s3_key
-            })
+            }, ensure_ascii=False)
         }
         
     except Exception as e:
@@ -169,10 +169,10 @@ Generate 7–10 items total, using zero-padded ids: q01, q02, ..."""
             'statusCode': 500,
             'headers': {
                 'Access-Control-Allow-Origin': '*',
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json; charset=utf-8'
             },
             'body': json.dumps({
                 'error': 'Failed to generate questions',
                 'details': str(e)
-            })
+            }, ensure_ascii=False)
         }

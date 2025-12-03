@@ -3,6 +3,7 @@ import MarkdownPreview from "./MarkdownPreview";
 import { exportMarkdownToPDF, exportMarkdownToDocx } from "./ExportUtils";
 import { Sparkles, Lock, AlertCircle } from "lucide-react";
 import "./Rewrite.css";
+import { translationService } from "../../../services/LiveTranslation/TranslationService";
 
 interface SessionData {
   sessionId: string;
@@ -14,207 +15,88 @@ interface RewriteProps {
   selectedLanguage: "en" | "ar";
 }
 
+type TranslationPhase = "idle" | "loading" | "ready" | "error";
+
 const Rewrite: React.FC<RewriteProps> = ({ sessionData, selectedLanguage }) => {
   const [rewrittenText, setRewrittenText] = useState("");
   const [originalRewrittenText, setOriginalRewrittenText] = useState(""); // Store original Arabic
+  const [translatedText, setTranslatedText] = useState("");
+  const [, setTranslationPhase] = useState<TranslationPhase>("idle");
   const [caseNumber, setCaseNumber] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string>("");
+  const translationCacheRef = React.useRef<{ source: string; result: string }>({
+    source: "",
+    result: ""
+  });
 
   // Helper function for bilingual text (like Classification)
   const isArabic = selectedLanguage === "ar";
   const t = (en: string, ar: string) => (isArabic ? ar : en);
 
-  // Simple translation function (basic word replacement for common terms)
-  const translateToEnglish = (arabicText: string): string => {
-    if (!arabicText) return arabicText;
-    
-    // Keep markdown structure intact
-    let translated = arabicText;
-    
-    // Common translations - expand this dictionary for better coverage
-    const translations: Record<string, string> = {
-      // Headers and sections
-      "بيانات القضية": "Case Information",
-      "رقم البلاغ": "Report Number",
-      "رقم القضية": "Case Number",
-      "نوع القضية": "Case Type",
-      "الجهة": "Authority",
-      "نيابة العاصمة": "Capital Prosecution",
-      "مركز شرطة الحورة": "Al Hoora Police Station",
-      "تاريخ ووقت فتح المحضر": "Date and Time of Report Opening",
-      "الأطراف": "Parties",
-      "الصفة": "Role",
-      "الاسم الكامل": "Full Name",
-      "الجنسية": "Nationality",
-      "الرقم الشخصي": "Personal ID Number",
-      "الهاتف": "Phone Number",
-      
-      // Roles
-      "مبلغ": "Reporter",
-      "مدعى عليه": "Accused",
-      "ضابط": "Officer",
-      "محرر محضر": "Report Writer",
-      "محرر المحضر": "Report Writer",
-      "وكيل نيابة": "Prosecutor",
-      "رائد": "Major",
-      "عريف": "Corporal",
-      "ملازم": "Lieutenant",
-      "مساعد ملازم": "Assistant Lieutenant",
-      "رئيس عرفاء": "Chief Corporal",
-      
-      // Sections
-      "ملخص الحادث": "Incident Summary",
-      "مسرح الحادث": "Crime Scene",
-      "المضبوطات": "Seized Items",
-      "الأضرار": "Damages",
-      "الأقوال": "Statements",
-      "أقوال المبلغ": "Reporter's Statement",
-      "أقوال المدعى عليه": "Accused's Statement",
-      "أقوال الشهود": "Witnesses' Statements",
-      "إجراءات الشرطة": "Police Procedures",
-      "التنازل أو الصلح": "Waiver or Settlement",
-      "إجراءات وقرارات النيابة": "Prosecution Decisions",
-      "تسليم المضبوطات": "Delivery of Seized Items",
-      "التواريخ المهمة": "Important Dates",
-      "التوقيعات والمحررين": "Signatures and Authors",
-      "محررو المحاضر": "Report Writers",
-      "الضباط المشرفين": "Supervising Officers",
-      "وكلاء النيابة": "Prosecutors",
-      "أخصائيي التحقيق": "Investigation Specialists",
-      "ملاحق إضافية": "Additional Attachments",
-      
-      // Witness-related (must come before verb "saw")
-      "شاهد": "Witness",
-      
-      // Common phrases
-      "غير مذكور": "Not mentioned",
-      "لا يوجد": "None",
-      "في حوالي الساعة": "at approximately",
-      "بتاريخ": "on date",
-      "حضر": "attended",
-      "أفاد": "stated",
-      "قام": "did",
-      "توجه": "went to",
-      "وجد": "found",
-      "تم": "was done",
-      "يحال": "is referred",
-      "للتصرف": "for action",
-      "بناء على": "based on",
-      "قرار": "decision",
-      "إحالة": "referral",
-      "حفظ": "archive",
-      "توقيف": "detention",
-      "إفراج": "release",
-      
-      // Nationalities
-      "مصري": "Egyptian",
-      "مصرية": "Egyptian",
-      "مغربي": "Moroccan",
-      "مغربية": "Moroccan",
-      "بحريني": "Bahraini",
-      "بحرينية": "Bahraini",
-      "سعودي": "Saudi",
-      "سعودية": "Saudi",
-      "هندي": "Indian",
-      "هندية": "Indian",
-      "باكستاني": "Pakistani",
-      "باكستانية": "Pakistani",
-      "فلبيني": "Filipino",
-      "فلبينية": "Filipino",
-      
-      // Places
-      "مملكة البحرين": "Kingdom of Bahrain",
-      "النيابة العامة": "Public Prosecution",
-      "العاصمة": "Capital Governorate",
-      "الحورة": "Al Hoora",
-      "المنطقة": "Area",
-      "المجمع": "Block",
-      "الشارع": "Road",
-      "طريق": "Road",
-      "المبنى": "Building",
-      "الشقة": "Apartment",
-      "الطابق": "Floor",
-      
-      // Crime related
-      "إتلاف": "damage",
-      "إتلاف عمدا": "deliberate damage",
-      "سرقة": "theft",
-      "اعتداء": "assault",
-      "احتيال": "fraud",
-      "تهديد": "threat",
-      "تزوير": "forgery",
-      
-      // Time
-      "صباحا": "AM",
-      "صباحًا": "AM",
-      "مساء": "PM",
-      "مساءً": "PM",
-      "الساعة": "at",
-      "يوم": "day",
-      "الأحد": "Sunday",
-      "الإثنين": "Monday",
-      "الثلاثاء": "Tuesday",
-      "الأربعاء": "Wednesday",
-      "الخميس": "Thursday",
-      "الجمعة": "Friday",
-      "السبت": "Saturday",
-      
-      // Actions
-      "فتح المحضر": "Opening the report",
-      "إغلاق المحضر": "Closing the report",
-      "إقفال المحضر": "Closing the report",
-      "إعادة فتح المحضر": "Reopening the report",
-      "تدوين الأقوال": "Recording statements",
-      "المعاينة": "inspection",
-      "التصوير": "photography",
-      "التحقيق": "investigation",
-      "الكشف": "examination",
-      
-      // Documents
-      "المحضر": "the report",
-      "البلاغ": "complaint",
-      "القضية": "case",
-      "التقرير": "report",
-      "الإجراءات": "procedures",
-      "القرار": "decision",
-      
-      // Common verbs in past
-      "حضر إلى": "came to",
-      "توجه إلى": "went to",
-      "أبلغ": "informed",
-      "قام بـ": "did",
-      "أفاد بأن": "stated that",
-      "ذكر أن": "mentioned that",
-      
-      // Yes/No
-      "نعم": "Yes",
-      "لا": "No"
-    };
-    
-    // Replace each Arabic term with English
-    Object.entries(translations).forEach(([ar, en]) => {
-      const regex = new RegExp(ar, 'g');
-      translated = translated.replace(regex, en);
-    });
-    
-    return translated;
-  };
+  const translateRewrittenReport = React.useCallback(async (text: string) => {
+    if (!text.trim()) {
+      setTranslatedText("");
+      setTranslationPhase("idle");
+      return;
+    }
 
-  // Effect to handle language change
+    const sourceText = text;
+
+    if (
+      translationCacheRef.current.source === sourceText &&
+      translationCacheRef.current.result
+    ) {
+      setTranslatedText(translationCacheRef.current.result);
+      setTranslationPhase("ready");
+      return;
+    }
+
+    setTranslationPhase("loading");
+
+    try {
+      const chunks = splitTextForTranslation(sourceText);
+      const translatedChunks: string[] = [];
+
+      for (const chunk of chunks) {
+        const translatedChunk = await translationService.translateText(
+          chunk,
+          "auto",
+          "en"
+        );
+        translatedChunks.push(translatedChunk);
+      }
+
+      const combined = translatedChunks.join("");
+      translationCacheRef.current = {
+        source: sourceText,
+        result: combined,
+      };
+
+      setTranslatedText(combined);
+      setTranslationPhase("ready");
+    } catch (translateErr) {
+      console.error("Report translation failed:", translateErr);
+      translationCacheRef.current = { source: "", result: "" };
+      setTranslatedText("");
+      setTranslationPhase("error");
+    }
+  }, []);
+
   React.useEffect(() => {
-    if (originalRewrittenText && selectedLanguage === "en") {
-      // Use dictionary-based translation
-      const englishVersion = translateToEnglish(originalRewrittenText);
-      setRewrittenText(englishVersion);
-    } else if (originalRewrittenText && selectedLanguage === "ar") {
-      // Show original Arabic
+    if (selectedLanguage === "en" && originalRewrittenText) {
+      translateRewrittenReport(originalRewrittenText);
+    }
+  }, [selectedLanguage, originalRewrittenText, translateRewrittenReport]);
+
+  React.useEffect(() => {
+    if (!originalRewrittenText) {
+      setRewrittenText("");
+    } else {
       setRewrittenText(originalRewrittenText);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedLanguage, originalRewrittenText]);
-
+  }, [originalRewrittenText]);
 
   // Function to extract case number from Arabic text
   const extractCaseNumber = (text: string): string => {
@@ -274,31 +156,108 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData, selectedLanguage }) => {
 
   // Function to clean and deduplicate the rewritten text
   const cleanRewrittenText = (text: string): string => {
+    // Remove unwanted headers like "الجزء 1 من 2" or "الجزء الثاني"
+    text = text.replace(/الجزء\s*\d+\s*من\s*\d+/g, '');
+    text = text.replace(/الجزء\s+(الأول|الثاني|الثالث|الرابع|الخامس)/g, '');
+    
     // Remove page numbers in all variations including bold markers
     text = text.replace(/\*?\*?رقم الصفحة:\s*\d+\*?\*?/g, '');
     text = text.replace(/\*?\*?\d+\s*\/\s*\d+\s*صفحة\s*:?\*?\*?/g, '');
     text = text.replace(/صفحة\s*:?\s*\d+\s*\/?\s*\d*/g, '');
     text = text.replace(/\*?\*?التاريخ والوقت:\*?\*?\s*\d+\s*\/\s*\d+/g, '');
-    text = text.replace(/\*?\*?\d+\s*\/\s*\d+\s*صفحة\s*:?\*?\*?/g, '');
-    text = text.replace(/صفحة\s*:?\s*\d+\s*\/\s*\d+/g, '');
-    text = text.replace(/\*?\*?التاريخ والوقت:\*?\*?\s*\d+\s*\/\s*\d+/g, '');
+    text = text.replace(/\d+\s*\/\s*\d+\s*:?\s*صفحة/g, '');
     
-        // Remove duplicate header blocks (keep only the first occurrence)
-        // Pattern matches the full header block
-        const headerPattern = /#+\s*مملكة البحرين[\s\S]*?Capital Prosecution/g;
-        const headers = text.match(headerPattern);
+    // Remove Word document artifacts
+    text = text.replace(/\t+/g, ' '); // Replace tabs with spaces
+    text = text.replace(/\r\n/g, '\n'); // Normalize line breaks
+    text = text.replace(/\r/g, '\n'); // Convert Mac line breaks
     
-        if (headers && headers.length > 1) {
-          // Keep only the first header, remove all subsequent ones
-          let firstHeaderFound = false;
-          text = text.replace(headerPattern, (match) => {
-            if (!firstHeaderFound) {
-              firstHeaderFound = true;
-              return match; // Keep the first one
-            }
-            return ''; // Remove subsequent ones
-          });
+    // Remove excessive spacing before Arabic text
+    text = text.replace(/^\s{2,}/gm, ''); // Remove leading spaces on each line
+    
+    // Clean up bullet points and list markers from Word
+    text = text.replace(/^●\s*/gm, '- '); // Convert bullets to markdown
+    text = text.replace(/^•\s*/gm, '- '); // Alternative bullet
+    text = text.replace(/^○\s*/gm, '- '); // Circle bullet
+    
+    // Remove duplicate header blocks (keep only the first occurrence)
+    const headerPattern = /#+\s*مملكة البحرين[\s\S]*?(?:Capital Prosecution|النيابة العامة)/g;
+    const headers = text.match(headerPattern);
+    
+    if (headers && headers.length > 1) {
+      let firstHeaderFound = false;
+      text = text.replace(headerPattern, (match) => {
+        if (!firstHeaderFound) {
+          firstHeaderFound = true;
+          return match;
         }
+        return '';
+      });
+    }
+    
+    // Clean up Q&A formatting - convert س:/ج: to proper headers
+    text = text.replace(/^س:\s*/gm, '**سؤال:** ');
+    text = text.replace(/^ج:\s*/gm, '**جواب:** ');
+    text = text.replace(/^س\d+:\s*/gm, '**سؤال:** ');
+    text = text.replace(/^ج\d+:\s*/gm, '**جواب:** ');
+    
+    // Fix encoding issues first before removing garbled text
+    const encodingFixes: Record<string, string> = {
+      '╪º': 'ا',
+      '┘ä': 'ل',
+      '┘à': 'م',
+      '╪¡': 'ح',
+      '╪⌐': 'ت',
+      '╪¿': 'ب',
+      '╪▒': 'ر',
+      '╪╢': 'ض',
+      '┘è': 'ي',
+      '╪╣': 'ع',
+      '╪¬': 'ن',
+      '╪╖': 'ط',
+      '╪╡': 'ص',
+      '╪¼': 'ح',
+      '╪│': 'س',
+      '┘é': 'ق',
+      '╪║': 'غ',
+      '╪╝': 'خ',
+      '╪░': 'ذ',
+      '┘ü': 'ف',
+      '╪ú': 'أ',
+      '┘ê': 'و',
+      '┘â': 'ك',
+      '╪ó': 'إ',
+      '╪ª': 'ش',
+      '╪ę': 'ه',
+      '┘ç': 'ى'
+    };
+    
+    // Apply encoding fixes
+    Object.entries(encodingFixes).forEach(([garbled, correct]) => {
+      const regex = new RegExp(garbled, 'g');
+      text = text.replace(regex, correct);
+    });
+    
+    // Remove any remaining garbled text patterns (consecutive special characters)
+    text = text.replace(/[╪┘]{3,}/g, '');
+    
+    // Collapse artificial spaces inserted between Arabic letters (Word copy artifacts)
+    const spacedLettersRegex = /(^|[^\u0600-\u06FF])((?:[\u0600-\u06FF]\s){2,}[\u0600-\u06FF])(?=[^\u0600-\u06FF]|$)/gu;
+    text = text.replace(spacedLettersRegex, (_match, prefix, letters) =>
+      `${prefix}${letters.replace(/\s+/g, '')}`
+    );
+    
+    // Fix common spacing issues in Arabic
+    text = text.replace(/\s+:/g, ':'); // Remove space before colon
+    text = text.replace(/:\s*\n\s*/g, ': '); // Fix colon with newline
+    text = text.replace(/[ \t]{2,}/g, ' '); // Collapse multiple spaces while preserving single spacing
+    
+    // Normalize table separators
+    text = text.replace(/\|\s*-+\s*\|/g, '| --- |');
+    
+    // Clean up multiple empty lines (but preserve paragraph structure)
+    text = text.replace(/\n{4,}/g, '\n\n\n'); // Max 3 newlines
+    text = text.replace(/\n{3,}/g, '\n\n'); // Normalize to max 2 newlines
     
     // Split text into paragraphs
     const paragraphs = text.split(/\n\n+/);
@@ -361,7 +320,10 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData, selectedLanguage }) => {
   const handlePrint = () => {
     const printWindow = window.open('', '_blank');
     if (printWindow) {
-      const htmlContent = simpleMarkdownToHtmlForExport(rewrittenText);
+      const printableSource = selectedLanguage === "en"
+        ? translatedText || rewrittenText
+        : rewrittenText;
+      const htmlContent = simpleMarkdownToHtmlForExport(printableSource);
       printWindow.document.write(htmlContent);
       printWindow.document.close();
       printWindow.focus();
@@ -382,8 +344,10 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData, selectedLanguage }) => {
         `${window.location.origin.replace("localhost", "localhost").split(":")[0]}://${window.location.hostname}:3000`;
 
       // Prepare request body
-      // Exact S3 path for the file
-      const s3Key = `classification/extracted/session-20251202225417-34b3d6db/20251202-230047-5fe049bd-9142-4f73-9a30-da104eeb0771.txt`;
+      // Build S3 path dynamically from sessionId
+      // Path format: classification/extracted/{sessionId}/*.txt
+      // Temporary hardcoded path for testing
+      const s3Key = `classification/extracted/session-20251203155203-18abf388/`;
       
       const requestBody = {
         sessionId: sessionData.sessionId,
@@ -507,15 +471,11 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData, selectedLanguage }) => {
   // Handle successful rewrite
   const handleRewriteSuccess = (rawText: string) => {
     const cleanedText = cleanRewrittenText(rawText);
+    translationCacheRef.current = { source: "", result: "" };
+    setTranslatedText("");
+    setTranslationPhase(selectedLanguage === "en" ? "loading" : "idle");
     setOriginalRewrittenText(cleanedText); // Store original Arabic
-    
-    // Apply language preference
-    if (selectedLanguage === "en") {
-      const englishVersion = translateToEnglish(cleanedText);
-      setRewrittenText(englishVersion);
-    } else {
-      setRewrittenText(cleanedText);
-    }
+    setRewrittenText(cleanedText);
     
     console.log("Rewritten text received, extracting case number...");
     const extractedCaseNumber = extractCaseNumber(cleanedText);
@@ -525,6 +485,8 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData, selectedLanguage }) => {
     setLoading(false);
     setStatusMessage("");
   };
+
+  const displayMarkdown = selectedLanguage === "en" ? (translatedText || rewrittenText) : rewrittenText;
 
 
 
@@ -580,7 +542,7 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData, selectedLanguage }) => {
                 type="button"
                 className="rewrite-primary-btn"
                 onClick={() => {
-                  exportMarkdownToPDF(simpleMarkdownToHtmlForExport(rewrittenText), `report_${caseNumber || 'case'}.pdf`);
+                  exportMarkdownToPDF(simpleMarkdownToHtmlForExport(displayMarkdown), `report_${caseNumber || 'case'}.pdf`);
                 }}
                 style={{ flex: 1 }}
               >
@@ -590,7 +552,7 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData, selectedLanguage }) => {
                 type="button"
                 className="rewrite-primary-btn"
                 onClick={() => {
-                  exportMarkdownToDocx(rewrittenText, `report_${caseNumber || 'case'}.docx`);
+                  exportMarkdownToDocx(displayMarkdown, `report_${caseNumber || 'case'}.docx`);
                 }}
                 style={{ flex: 1 }}
               >
@@ -602,20 +564,38 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData, selectedLanguage }) => {
                 onClick={handlePrint}
                 style={{ flex: 1 }}
               >
-                <span>{t("🖨️ طباعة", "🖨️ Print")}</span>
+                <span>{t("🖨️ Print", "🖨️ طباعة")}</span>
               </button>
             </div>
           )}
-          {/* Preview formatted output - clean and simple */}
-          <div style={{
-            background: '#ffffff',
-            color: '#1a1a1a',
-            transition: 'all 0.3s ease',
-            borderRadius: 14,
-            padding: '24px',
-            minHeight: '200px'
-          }}>
-            <MarkdownPreview markdown={rewrittenText} />
+          {/* Preview formatted output */}
+          <div className={`rewrite-preview-card ${isArabic ? 'rtl' : 'ltr'}`}>
+            <div className="rewrite-preview-header">
+              <div>
+                <p className="preview-label">
+                  {t("Latest Generated Version", "أحدث نسخة معالجة")}
+                </p>
+                <h3 className="preview-title">
+                  {t("Investigation Report", "تقرير التحقيق")}
+                </h3>
+              </div>
+              <div className="preview-meta">
+                <span className="preview-chip">
+                  {isArabic ? "العربية" : "English"}
+                </span>
+                {caseNumber && (
+                  <span className="preview-chip highlight">
+                    {caseNumber}
+                  </span>
+                )}
+                <span className="preview-chip subtle">
+                  {t("Session", "الجلسة")} #{sessionData.sessionId.slice(-6)}
+                </span>
+              </div>
+            </div>
+            <div className="rewrite-preview-scroll">
+              <MarkdownPreview markdown={displayMarkdown} />
+            </div>
           </div>
         </div>
 
@@ -638,6 +618,26 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData, selectedLanguage }) => {
 };
 
 export default Rewrite;
+
+const TRANSLATION_CHUNK_SIZE = 4500;
+
+function splitTextForTranslation(text: string, chunkSize = TRANSLATION_CHUNK_SIZE): string[] {
+  const normalized = text.replace(/\r/g, "");
+  if (normalized.length <= chunkSize) {
+    return [normalized];
+  }
+
+  const chunks: string[] = [];
+  let cursor = 0;
+
+  while (cursor < normalized.length) {
+    const nextCursor = Math.min(cursor + chunkSize, normalized.length);
+    chunks.push(normalized.slice(cursor, nextCursor));
+    cursor = nextCursor;
+  }
+
+  return chunks;
+}
 
 // Enhanced HTML builder for PDF export with proper table and formatting support
 function simpleMarkdownToHtmlForExport(md: string): string {

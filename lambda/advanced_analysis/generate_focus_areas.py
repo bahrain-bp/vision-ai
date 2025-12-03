@@ -121,13 +121,13 @@ STYLE & CONSTRAINTS
             'statusCode': 200,
             'headers': {
                 'Access-Control-Allow-Origin': '*',
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json; charset=utf-8'
             },
             'body': json.dumps({
                 'sessionId': session_id,
                 'focusAreas': focus_areas,
                 's3ObjectKey': s3_key
-            })
+            }, ensure_ascii=False)
         }
         
     except Exception as e:
@@ -136,10 +136,10 @@ STYLE & CONSTRAINTS
             'statusCode': 500,
             'headers': {
                 'Access-Control-Allow-Origin': '*',
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json; charset=utf-8'
             },
             'body': json.dumps({
                 'error': 'Failed to generate focus areas',
                 'details': str(e)
-            })
+            }, ensure_ascii=False)
         }
