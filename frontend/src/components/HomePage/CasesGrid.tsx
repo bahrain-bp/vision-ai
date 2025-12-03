@@ -16,6 +16,7 @@ interface CasesGridProps {
   onDeactivateCase: (caseId: string) => void;
   onStartSession: (caseId: string) => void;
   onCreateCase: () => void;
+  t: (key: string) => string;
 }
 
 const CasesGrid: React.FC<CasesGridProps> = ({
@@ -30,6 +31,7 @@ const CasesGrid: React.FC<CasesGridProps> = ({
   onDeactivateCase,
   onStartSession,
   onCreateCase,
+  t,
 }) => {
   if (isLoading) {
     return (
@@ -45,17 +47,15 @@ const CasesGrid: React.FC<CasesGridProps> = ({
       <div className="empty-state">
         <Folder size={48} className="empty-icon" />
         <h3 className="empty-title">
-          {searchTerm ? "No cases found" : "No cases yet"}
+          {searchTerm ? t("home.noCasesFound") : t("home.noCasesYet")}
         </h3>
         <p className="empty-description">
-          {searchTerm
-            ? "Try adjusting your search terms"
-            : "Create your first case to get started"}
+          {searchTerm ? t("home.adjustSearch") : t("home.createFirstCase")}
         </p>
         {!searchTerm && (
           <button onClick={onCreateCase} className="new-case-btn">
             <Plus size={20} />
-            <span>Create Case</span>
+            <span>{t("home.createCase")}</span>
           </button>
         )}
       </div>
@@ -74,6 +74,7 @@ const CasesGrid: React.FC<CasesGridProps> = ({
             onDeactivate={onDeactivateCase}
             onStartSession={onStartSession}
             isLoading={isLoading}
+            t={t}
           />
         ))}
       </div>
@@ -82,6 +83,7 @@ const CasesGrid: React.FC<CasesGridProps> = ({
         currentPage={currentPage}
         totalPages={totalPages}
         onPageChange={onPageChange}
+        t={t}
       />
     </>
   );

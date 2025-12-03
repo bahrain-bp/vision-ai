@@ -9,6 +9,7 @@ interface CaseCardProps {
   onDeactivate: (caseId: string) => void;
   onStartSession: (caseId: string) => void;
   isLoading: boolean;
+  t: (key: string) => string;
 }
 
 const CaseCard: React.FC<CaseCardProps> = ({
@@ -18,6 +19,7 @@ const CaseCard: React.FC<CaseCardProps> = ({
   onDeactivate,
   onStartSession,
   isLoading,
+  t,
 }) => {
   const formatDate = (dateString: string): string => {
     return new Date(dateString).toLocaleDateString("en-US", {
@@ -32,7 +34,7 @@ const CaseCard: React.FC<CaseCardProps> = ({
       <div className="case-card-header">
         <Folder size={20} className="case-folder-icon" />
         <span className={`case-status ${caseItem.status}`}>
-          {caseItem.status}
+          {t(`home.${caseItem.status}`)}
         </span>
       </div>
 
@@ -61,7 +63,7 @@ const CaseCard: React.FC<CaseCardProps> = ({
             className="deactivate-case-btn"
             disabled={isLoading}
           >
-            Deactivate Case
+            {t("home.deactivateCase")}
           </button>
         ) : (
           <button
@@ -69,7 +71,7 @@ const CaseCard: React.FC<CaseCardProps> = ({
             className="activate-case-btn"
             disabled={isLoading}
           >
-            Activate Case
+            {t("home.activateCase")}
           </button>
         )}
       </div>
@@ -81,7 +83,7 @@ const CaseCard: React.FC<CaseCardProps> = ({
             className="start-session-card-btn"
           >
             <Plus size={16} />
-            <span>Start New Session</span>
+            <span>{t("home.startNewSession")}</span>
           </button>
         )}
       </div>
