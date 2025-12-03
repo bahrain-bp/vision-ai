@@ -10,9 +10,12 @@ import { SessionData } from "../../ProcessingView";
 
 export interface AISuggestionsProps {
   sessionData: SessionData;
+  language?: "en" | "ar";
   isLoading?: boolean;
   lastUpdatedAt?: string | null;
   errorMessage?: string | null;
+  persistedData?: any;
+  onDataChange?: (data: any) => void;
 }
 
 interface Question {
@@ -72,58 +75,17 @@ const isArabicLanguage = (value?: string | null): boolean => {
 
 const AISuggestions: React.FC<AISuggestionsProps> = ({
   sessionData,
+  language = "en",
   isLoading = false,
   lastUpdatedAt = null,
   errorMessage = null,
+  persistedData = null,
+  onDataChange,
 }) => {
   const [statusMessage, setStatusMessage] = useState<string>("");
-  const [questions, setQuestions] = useState<Question[]>([
-    {
-      id: "q1",
-      text: "Walk me through the sequence of events leading to the incident.",
-      context: "Clarify timeline and causal links",
-      priority: "High",
-    },
-    {
-      id: "q2",
-      text: "Who else was present, and what did they observe?",
-      context: "Identify corroborating witnesses",
-      priority: "High",
-    },
-    {
-      id: "q3",
-      text: "What supporting evidence should we review to validate your account?",
-      context: "Connect testimony to available artefacts",
-      priority: "Medium",
-    },
-  ]);
-  const [gaps, setGaps] = useState<Gap[]>([
-    {
-      id: "gap1",
-      title: "Timeline Precision",
-      description:
-        "Multiple statements diverge on when the confrontation began. Pin down exact timestamps.",
-      severity: "high",
-      resolved: false,
-    },
-    {
-      id: "gap2",
-      title: "Witness Roles",
-      description:
-        "Witness identities are mentioned without clarifying involvement or relation to the case.",
-      severity: "medium",
-      resolved: false,
-    },
-    {
-      id: "gap3",
-      title: "Environmental Details",
-      description:
-        "Weather and lighting conditions are missing, making it hard to validate visibility claims.",
-      severity: "low",
-      resolved: false,
-    },
-  ]);
-  const [focusAreas, setFocusAreas] = useState<string[]>([]);
+  const [questions, setQuestions] = useState<Question[]>(persistedData?.questions || []);
+  const [gaps, setGaps] = useState<Gap[]>(persistedData?.gaps || []);
+  const [focusAreas, setFocusAreas] = useState<string[]>(persistedData?.focusAreas || []);
   const [customQuestion, setCustomQuestion] = useState<string>("");
   const [customPriority, setCustomPriority] =
     useState<Question["priority"]>("Medium");
@@ -319,11 +281,27 @@ const AISuggestions: React.FC<AISuggestionsProps> = ({
     successMessage?: string,
     errorMessageText?: string
   ): Promise<void> => {
+    const generatingText =
+      message ||
+      (language === "en"
+        ? "Generating AI questions..."
+        : "جارٍ إنشاء أسئلة بالذكاء الاصطناعي...");
+    const successText =
+      successMessage ||
+      (language === "en"
+        ? "AI questions generated!"
+        : "تم إنشاء الأسئلة بنجاح!");
+    const errorText =
+      errorMessageText ||
+      (language === "en"
+        ? "Failed to generate questions"
+        : "فشل إنشاء الأسئلة");
+
     if (isQuestionGenerating) {
       return;
     }
     setIsQuestionGenerating(true);
-    setStatusMessage(message || "Generating AI questions...");
+    setStatusMessage(generatingText);
 
     try {
       const response = await fetch(
@@ -332,9 +310,9 @@ const AISuggestions: React.FC<AISuggestionsProps> = ({
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            sessionId: "test-session-001",
-            witness: sessionData.witness || "سارة محمود",
-            language: "ar",
+            sessionId: sessionData.sessionId,
+            witness: sessionData.witness || "Unknown",
+            language: language,
           }),
         }
       );
@@ -353,10 +331,11 @@ const AISuggestions: React.FC<AISuggestionsProps> = ({
         })
       );
       setQuestions(normalizedQuestions);
-      setStatusMessage(successMessage || "AI questions generated!");
+      onDataChange?.({ questions: normalizedQuestions, gaps, focusAreas });
+      setStatusMessage(successText);
     } catch (error) {
       console.error("Error generating questions:", error);
-      setStatusMessage(errorMessageText || "Failed to generate questions");
+      setStatusMessage(errorText);
     } finally {
       setIsQuestionGenerating(false);
     }
@@ -367,7 +346,11 @@ const AISuggestions: React.FC<AISuggestionsProps> = ({
       return;
     }
     setIsFocusGenerating(true);
-    setStatusMessage("Generating Key Focus Areas...");
+    setStatusMessage(
+      language === "en"
+        ? "Generating Key Focus Areas..."
+        : "جارٍ إنشاء مجالات التركيز الرئيسية..."
+    );
     try {
       const response = await fetch(
         "https://hvjlr6aa2m.execute-api.us-east-1.amazonaws.com/prod/advanced-analysis/focus-areas",
@@ -375,8 +358,8 @@ const AISuggestions: React.FC<AISuggestionsProps> = ({
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            sessionId: "test-session-001",
-            language: "ar",
+            sessionId: sessionData.sessionId,
+            language: language,
           }),
         }
       );
@@ -391,7 +374,10 @@ const AISuggestions: React.FC<AISuggestionsProps> = ({
         severity: area.priority.toLowerCase() as "high" | "medium" | "low",
         resolved: false,
       }));
-      setGaps(mappedGaps);
+      const resolvedGaps = gaps.filter(gap => gap.resolved);
+      const allGaps = [...mappedGaps, ...resolvedGaps];
+      setGaps(allGaps);
+      onDataChange?.({ questions, gaps: allGaps, focusAreas });
       setStatusMessage("Key Focus Areas generated!");
     } catch (error) {
       console.error("Error:", error);
@@ -458,11 +444,43 @@ const AISuggestions: React.FC<AISuggestionsProps> = ({
   const activeGaps = sortedGaps.filter((gap) => !gap.resolved);
   const resolvedGaps = sortedGaps.filter((gap) => gap.resolved);
 
-  const contentLanguage = sessionData.language || "";
-  const isRTLContent = isArabicLanguage(contentLanguage);
+  const isRTLContent = isArabicLanguage(language);
+
+  const renderQuestionSkeletons = (): JSX.Element => (
+    <div className="ai-question-grid">
+      {[1, 2, 3].map((index) => (
+        <div key={index} className="ai-question-card skeleton">
+          <div className="ai-question-header">
+            <span className="ai-priority-chip skeleton-pill" />
+            <span className="ai-focus-add skeleton-chip" />
+          </div>
+          <div className="ai-skeleton-line wide" />
+          <div className="ai-skeleton-line" />
+        </div>
+      ))}
+    </div>
+  );
+
+  const renderFocusSkeletons = (): JSX.Element => (
+    <div className="ai-gap-grid">
+      {[1, 2].map((index) => (
+        <div key={index} className="ai-gap-card skeleton">
+          <div className="ai-gap-top">
+            <div className="ai-gap-title-row">
+              <span className="ai-skeleton-line short" />
+              <span className="ai-gap-severity skeleton-pill" />
+            </div>
+            <span className="ai-cta subtle skeleton-chip" />
+          </div>
+          <div className="ai-skeleton-line wide" />
+          <div className="ai-skeleton-line" />
+        </div>
+      ))}
+    </div>
+  );
 
   return (
-    <div className="ai-suggestions-view">
+    <div className={`ai-suggestions-view ${language === "ar" ? "rtl" : ""}`}>
       {(statusMessage || lastUpdatedAt || isLoading) && (
         <div className="ai-status-banner" aria-live="polite">
           {statusMessage && <span>{statusMessage}</span>}
@@ -475,13 +493,15 @@ const AISuggestions: React.FC<AISuggestionsProps> = ({
         </div>
       )}
 
-      <div className="ai-suggestions-card">
+      <div className={`ai-suggestions-card ${language === "ar" ? "rtl" : ""}`}>
         <div className="ai-suggestions-header">
           <div>
             
-            <h3 className="ai-main-title">AI Suggestions</h3>
+            <h3 className="ai-main-title">{language === "en" ? "AI Suggestions" : "اقتراحات الذكاء الاصطناعي"}</h3>
             <p className="ai-main-subtitle">
-              Generate AI targeted follow-up questions derived from the rewritten report analysis to help clarify, confirm, or expand on critical details.
+              {language === "en" 
+                ? "Generate AI targeted follow-up questions derived from the rewritten report analysis to help clarify, confirm, or expand on critical details."
+                : "إنشاء أسئلة متابعة مستهدفة بالذكاء الاصطناعي مستمدة من تحليل التقرير المعاد صياغته للمساعدة في توضيح أو تأكيد أو توسيع التفاصيل الحرجة."}
             </p>
           </div>
         </div>
@@ -489,7 +509,7 @@ const AISuggestions: React.FC<AISuggestionsProps> = ({
         <div className="ai-suggestions-grid">
           <section className="ai-suggestions-panel">
             <div className="ai-panel-header">
-              <h4 className="ai-panel-title">Suggested Questions</h4>
+              <h4 className="ai-panel-title">{language === "en" ? "Suggested Questions" : "الأسئلة المقترحة"}</h4>
               <button
                 type="button"
                 className={`ai-cta ai-cta-compact ${isQuestionGenerating ? "loading" : ""}`}
@@ -497,37 +517,50 @@ const AISuggestions: React.FC<AISuggestionsProps> = ({
                 disabled={isLoading || isQuestionGenerating}
               >
                 <Sparkles size={16} />
-                {isQuestionGenerating ? "Generating..." : "Generate"}
+                {isQuestionGenerating ? (language === "en" ? "Generating..." : "جاري الإنشاء...") : (language === "en" ? "Generate" : "إنشاء")}
               </button>
             </div>
             <div className="ai-panel-body">
-              <div className="ai-question-grid">
-                {sortedQuestions.map((question) => (
-                  <div
-                    key={question.id}
-                    className={`ai-question-card priority-${question.priority.toLowerCase()} ${
-                      isRTLContent ? "rtl" : ""
-                    }`}
-                  >
-                    <div className="ai-question-header">
-                      <span
-                        className={`ai-priority-chip priority-${question.priority.toLowerCase()}`}
-                      >
-                        {question.priority}
-                      </span>
-                      <button
-                        type="button"
-                        className="ai-focus-add"
-                        onClick={() => handleAddFocusArea(question.context)}
-                      >
-                        Add focus
-                      </button>
+              {isQuestionGenerating ? (
+                renderQuestionSkeletons()
+              ) : sortedQuestions.length === 0 ? (
+                <div className="ai-empty-state">
+                  <p className="ai-empty-title">{language === "en" ? "No questions yet" : "لا توجد أسئلة بعد"}</p>
+                  <p className="ai-empty-subtitle">
+                    {language === "en" 
+                      ? "Click Generate to create AI-powered questions based on the session data."
+                      : "انقر فوق إنشاء لإنشاء أسئلة مدعومة بالذكاء الاصطناعي بناءً على بيانات الجلسة."}
+                  </p>
+                </div>
+              ) : (
+                <div className="ai-question-grid">
+                  {sortedQuestions.map((question) => (
+                    <div
+                      key={question.id}
+                      className={`ai-question-card priority-${question.priority.toLowerCase()} ${
+                        isRTLContent ? "rtl" : ""
+                      }`}
+                    >
+                      <div className="ai-question-header">
+                        <span
+                          className={`ai-priority-chip priority-${question.priority.toLowerCase()}`}
+                        >
+                          {question.priority}
+                        </span>
+                        <button
+                          type="button"
+                          className="ai-focus-add"
+                          onClick={() => handleAddFocusArea(question.text)}
+                        >
+                          {language === "en" ? "Add focus" : "إضافة سؤال"}
+                        </button>
+                      </div>
+                      <p className="ai-question-text">{question.text}</p>
+                      <p className="ai-question-context">{question.context}</p>
                     </div>
-                    <p className="ai-question-text">{question.text}</p>
-                    <p className="ai-question-context">{question.context}</p>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
               <div className="ai-question-input-row">
                 <input
                   type="text"
@@ -539,7 +572,7 @@ const AISuggestions: React.FC<AISuggestionsProps> = ({
                       handleAddCustomQuestion();
                     }
                   }}
-                  placeholder="Add a custom question"
+                  placeholder={language === "en" ? "Add a custom question" : "إضافة سؤال مخصص"}
                   className="ai-question-input"
                 />
                 <div className="ai-priority-selector">
@@ -559,7 +592,7 @@ const AISuggestions: React.FC<AISuggestionsProps> = ({
                     }
                     onKeyDown={handlePriorityTriggerKeyDown}
                   >
-                    <span>{prioritySelected ? customPriority : "Priority"}</span>
+                    <span>{prioritySelected ? customPriority : (language === "en" ? "Priority" : "الأولوية")}</span>
                     <ChevronDown size={14} />
                   </button>
                 </div>
@@ -569,7 +602,7 @@ const AISuggestions: React.FC<AISuggestionsProps> = ({
                   onClick={handleAddCustomQuestion}
                 >
                   <Plus size={16} />
-                  Add
+                  {language === "en" ? "Add" : "إضافة"}
                 </button>
               </div>
               {focusAreas.length > 0 && (
@@ -629,7 +662,7 @@ const AISuggestions: React.FC<AISuggestionsProps> = ({
 
           <section className="ai-suggestions-panel">
             <div className="ai-panel-header">
-              <h4 className="ai-panel-title">Key Focus Areas</h4>
+              <h4 className="ai-panel-title">{language === "en" ? "Key Focus Areas" : "مجالات التركيز الرئيسية"}</h4>
               <button
                 type="button"
                 className={`ai-cta ai-cta-compact ${isFocusGenerating ? "loading" : ""}`}
@@ -637,74 +670,95 @@ const AISuggestions: React.FC<AISuggestionsProps> = ({
                 disabled={isLoading || isFocusGenerating}
               >
                 <Sparkles size={16} />
-                {isFocusGenerating ? "Generating..." : "Generate"}
+                {isFocusGenerating ? (language === "en" ? "Generating..." : "جاري الإنشاء...") : (language === "en" ? "Generate" : "إنشاء")}
               </button>
             </div>
             <div className="ai-panel-body">
-              {activeGaps.length > 0 && (
-                <div className="ai-gap-grid">
-                  {activeGaps.map((gap) => (
-                    <div
-                      key={gap.id}
-                      className={`ai-gap-card ${gap.resolved ? "ai-gap-resolved" : ""} severity-${gap.severity}`}
-                    >
-                      <div className="ai-gap-top">
-                        <div className="ai-gap-title-row">
-                          <h4>{gap.title}</h4>
-                          <span
-                            className={`ai-gap-severity severity-${gap.severity}`}
-                          >
-                            <AlertCircle size={14} />
-                            {gap.severity.toUpperCase()}
-                          </span>
-                        </div>
-                        <button
-                          type="button"
-                          className="ai-cta subtle"
-                          onClick={() => handleToggleGapResolved(gap.id)}
-                        >
-                          Mark resolved
-                        </button>
-                      </div>
-                      <p className="ai-gap-description">{gap.description}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {resolvedGaps.length > 0 && (
-                <div className="ai-gap-resolved-section">
-                  <div className="ai-gap-resolved-header">
-                    <div>
-                      <p className="ai-gap-resolved-label">Resolved</p>
-                      <p className="ai-gap-resolved-subtext">
-                        Completed focus areas appear here for quick reference.
+              {isFocusGenerating ? (
+                renderFocusSkeletons()
+              ) : (
+                <>
+                  {activeGaps.length === 0 && resolvedGaps.length === 0 && (
+                    <div className="ai-empty-state">
+                      <p className="ai-empty-title">{language === "en" ? "No focus areas yet" : "لا توجد مجالات تركيز بعد"}</p>
+                      <p className="ai-empty-subtitle">
+                        {language === "en" 
+                          ? "Click Generate to identify key investigation focus areas based on the session data."
+                          : "انقر فوق إنشاء لتحديد مجالات التركيز الرئيسية للتحقيق بناءً على بيانات الجلسة."}
                       </p>
                     </div>
-                  </div>
-                  <div className="ai-gap-grid">
-                    {resolvedGaps.map((gap) => (
-                      <div
-                        key={gap.id}
-                        className="ai-gap-card ai-gap-resolved"
-                      >
-                        <div className="ai-gap-top">
-                          <div className="ai-gap-title-row">
-                            <h4>{gap.title}</h4>
+                  )}
+                  {activeGaps.length > 0 && (
+                    <div className="ai-gap-grid">
+                      {activeGaps.map((gap) => (
+                        <div
+                          key={gap.id}
+                          className={`ai-gap-card ${gap.resolved ? "ai-gap-resolved" : ""} severity-${gap.severity}`}
+                        >
+                          <div className="ai-gap-top">
+                            <div className="ai-gap-title-row">
+                              <h4>{gap.title}</h4>
+                              <span
+                                className={`ai-gap-severity severity-${gap.severity}`}
+                              >
+                                <AlertCircle size={14} />
+                                {gap.severity.toUpperCase()}
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              className="ai-cta subtle"
+                              onClick={() => handleToggleGapResolved(gap.id)}
+                            >
+                              {language === "en" ? "Mark resolved" : "وضع علامة كمحلول"}
+                            </button>
                           </div>
-                          <button
-                            type="button"
-                            className="ai-cta subtle"
-                            onClick={() => handleToggleGapResolved(gap.id)}
-                          >
-                            Mark unresolved
-                          </button>
+                          <p className="ai-gap-description">{gap.description}</p>
                         </div>
-                        <p className="ai-gap-description">{gap.description}</p>
+                      ))}
+                    </div>
+                  )}
+
+                  {resolvedGaps.length > 0 && (
+                    <div
+                      className="ai-gap-resolved-section"
+                      dir={isRTLContent ? "rtl" : "ltr"}
+                    >
+                      <div className="ai-gap-resolved-header">
+                        <div>
+                          <p className="ai-gap-resolved-label">{language === "en" ? "Resolved" : "محلول"}</p>
+                          <p className="ai-gap-resolved-subtext">
+                            {language === "en" 
+                              ? "Completed focus areas appear here for quick reference."
+                              : "تظهر مجالات التركيز المكتملة هنا للرجوع السريع."}
+                          </p>
+                        </div>
                       </div>
-                    ))}
-                  </div>
-                </div>
+                      <div className="ai-gap-grid">
+                        {resolvedGaps.map((gap) => (
+                          <div
+                            key={gap.id}
+                            className="ai-gap-card ai-gap-resolved"
+                          >
+                            <div className="ai-gap-top">
+                              <div className="ai-gap-title-row">
+                                <h4>{gap.title}</h4>
+                              </div>
+                              <button
+                                type="button"
+                                className="ai-cta subtle"
+                                onClick={() => handleToggleGapResolved(gap.id)}
+                              >
+                                {language === "en" ? "Mark unresolved" : "وضع علامة كغير محلول"}
+                              </button>
+                            </div>
+                            <p className="ai-gap-description">{gap.description}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </section>

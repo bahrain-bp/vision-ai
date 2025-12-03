@@ -29,97 +29,117 @@ def handler(event, context):
         session_id = body.get('sessionId') or f"session-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
         witness = body.get('witness', 'Anonymous Witness')
         language = body.get('language', 'en')
-        context_notes = body.get('contextNotes', '')
         
         print(f"Generating questions for session: {session_id}")
         
-        # Try to fetch police report from S3 if contextNotes not provided
-        if not context_notes:
-            try:
-                report_key = f"advanced-analysis/police-reports/{session_id}/report.txt"
-                print(f"Attempting to fetch police report from S3: {report_key}")
-                response = s3.get_object(Bucket=questions_bucket, Key=report_key)
-                context_notes = response['Body'].read().decode('utf-8')
-                print(f"Successfully loaded police report from S3 ({len(context_notes)} characters)")
-            except Exception as s3_error:
-                print(f"No police report found in S3: {s3_error}")
-                context_notes = 'General investigation session'
+        # Fetch latest rewritten file from S3
+        rewrite_prefix = "rewritten/"
+        response = s3.list_objects_v2(Bucket=questions_bucket, Prefix=rewrite_prefix)
+        
+        if 'Contents' not in response or len(response['Contents']) == 0:
+            raise Exception("No rewritten files found")
+        
+        # Get latest file by LastModified (any session)
+        latest_file = sorted(response['Contents'], key=lambda x: x['LastModified'], reverse=True)[0]
+        latest_key = latest_file['Key']
+        print(f"Using latest rewritten file: {latest_key}")
+        
+        obj_response = s3.get_object(Bucket=questions_bucket, Key=latest_key)
+        context_notes = obj_response['Body'].read().decode('utf-8')
+        print(f"Loaded rewritten report ({len(context_notes)} characters)")
         
         # Build prompt for Bedrock (enhanced)
-        prompt = f"""You are an expert investigator assistant for the Bahrain Public Prosecution. Based on the inputs below, generate 7–10 strategic FOLLOW-UP interview questions (post-interview) that help clarify, confirm, or expand critical details before finalizing the case report.
+        prompt = f"""You are an expert investigator assistant for the Bahrain Public Prosecution. Based on the inputs below, generate 7–10 strategic interview questions that the investigator may use when speaking directly to the **suspect**. These questions may be used during interview preparation, in the interview itself, or as follow-up clarifications. Questions must focus on the suspect's actions, statements, movements, and involvement as described in the report. Police officers may be mentioned for context only, but questions must never target police conduct.
 
 LEGAL CONTEXT
 - Apply Bahraini criminal procedure law and evidentiary standards.
-- Questions must align with Bahrain's legal framework for witness testimony, evidence collection, and case documentation.
-- Consider requirements under Bahraini law for establishing facts, corroboration, and admissibility of evidence.
+- Questions must align with Bahrain's requirements for lawful suspect questioning, fact establishment, corroboration, reliability assessment, and admissibility of evidence.
+- Maintain neutrality and avoid accusatory or leading phrasing.
 
 Session: {session_id}
-Witness: {witness}
+Suspect: {witness}
 Language: {language}
 Context (rewritten report + notes): {context_notes}
 
 REQUIREMENTS
-1) Output MUST be ONLY a valid JSON array (no markdown, no leading/trailing text).
-2) Each item MUST have exactly these fields: "id", "text", "context", "priority".
-3) "priority" MUST be one of "High", "Medium", "Low".
-4) Write all content in the specified Language exactly: {language}.
-5) Questions MUST be neutral, non-leading, and legally appropriate under Bahraini law (no speculation or accusations).
-6) Avoid duplicates; cover diverse angles (who/what/when/where/why/how, corroboration, scope, sequence, specifics).
-7) Keep each "text" ≤ 140 characters; each "context" ≤ 140 characters.
-8) Prefer questions that:
-   - Establish timeline and sequence of events
-   - Identify other witnesses, exhibits, or corroborating evidence
-   - Clarify ambiguities or fill information gaps from the Context
-   - Pin down specific, verifiable details (times, locations, objects, roles)
-9) Do NOT restate contradictions as accusations; phrase as clarifying prompts.
-10) Order the array by priority: High first, then Medium, then Low.
+1) Output MUST be ONLY a valid JSON array (no markdown, no extra commentary).
+2) Each item MUST include: "id", "text", "context", "priority".
+3) "priority" MUST be one of: High, Medium, Low.
+4) All content MUST be written in {language}.
+5) All questions MUST:
+   - Be **direct questions addressed to the suspect** ("you").
+   - Reference specific details from the report (names, locations, times, objects, actions).
+   - Clarify the suspect's behavior, decisions, movements, statements, or interactions.
+   - Stay neutral and legally appropriate (no assumptions of guilt or intent).
+   - Be structured clearly and precisely for investigative use.
+6) Questions MAY:
+   - Be used pre-interview, during the interview, or after the interview.
+   - Mention police officers ONLY as background reference points (e.g., location, presence).
+7) Questions MUST NOT:
+   - Be directed toward police officers.
+   - Critique or examine police decisions or investigative steps.
+   - Contain speculative or guilt-assuming phrasing.
+8) Each "text" ≤140 characters; each "context" ≤140 characters.
+9) Cover diverse investigative dimensions: timeline, sequence, physical actions, witness interactions, object handling, motivations, surroundings, events.
+10) Avoid duplicates; ensure each question targets a distinct aspect of the suspect's involvement.
+11) Order items by priority: High → Medium → Low.
+12) IDs must be zero-padded: q01, q02, ..., up to q10.
 
 RETURN ONLY THIS JSON SHAPE:
 [
   {{
     "id": "q01",
-    "text": "Your question here (≤140 chars, {language})",
-    "context": "Why this question matters (≤140 chars, {language})",
+    "text": "Direct suspect-focused question (≤140 chars, {language})",
+    "context": "Why this suspect detail matters (≤140 chars, {language})",
     "priority": "High"
   }}
 ]
 
-Generate 7–10 items total, using zero-padded ids: q01, q02, ..."""
+Generate 7–10 items total."""
 
         questions = []
+        max_retries = 3
         
-        # Try Bedrock first
+        # Try Bedrock with retries
         if inference_profile_arn:
-            try:
-                # Different API format for different models
-                if 'nova' in inference_profile_arn.lower():
-                    # Amazon Nova format
-                    response = bedrock_runtime.invoke_model(
-                        modelId=inference_profile_arn,
-                        body=json.dumps({
-                            "messages": [{"role": "user", "content": [{"text": prompt}]}],
-                            "inferenceConfig": {"maxTokens": 2000, "temperature": 0.7}
-                        })
-                    )
-                    result = json.loads(response['body'].read())
-                    content = result['output']['message']['content'][0]['text']
-
-                else: print("The inference profile does not match a Nova model")
-                
-                # Extract JSON from response
+            for attempt in range(max_retries):
                 try:
-                    start = content.find('[')
-                    end = content.rfind(']') + 1
-                    if start >= 0 and end > start:
-                        questions = json.loads(content[start:end])
-                        print(f"Generated {len(questions)} questions via Bedrock")
-                except (json.JSONDecodeError, IndexError) as parse_error:
-                    print(f"Failed to parse Bedrock response: {parse_error}")
+                    if 'nova' in inference_profile_arn.lower():
+                        response = bedrock_runtime.invoke_model(
+                            modelId=inference_profile_arn,
+                            body=json.dumps({
+                                "messages": [{"role": "user", "content": [{"text": prompt}]}],
+                                "inferenceConfig": {"maxTokens": 2000, "temperature": 0.7}
+                            })
+                        )
+                        result = json.loads(response['body'].read())
+                        content = result['output']['message']['content'][0]['text']
+                    else:
+                        print("The inference profile does not match a Nova model")
+                        break
+                    
+                    # Extract JSON from response
+                    try:
+                        start = content.find('[')
+                        end = content.rfind(']') + 1
+                        if start >= 0 and end > start:
+                            questions = json.loads(content[start:end])
+                            print(f"Generated {len(questions)} questions on attempt {attempt + 1}")
+                            break
+                    except (json.JSONDecodeError, IndexError) as parse_error:
+                        print(f"Failed to parse on attempt {attempt + 1}: {parse_error}")
+                        if attempt < max_retries - 1:
+                            print("Retrying...")
+                            continue
+                        else:
+                            print(f"Failed after {max_retries} attempts")
+                            questions = []
+                    
+                except Exception as bedrock_error:
+                    print(f"Bedrock error on attempt {attempt + 1}: {str(bedrock_error)}")
+                    if attempt < max_retries - 1:
+                        continue
                     questions = []
-                
-            except Exception as bedrock_error:
-                print(f"Bedrock error: {str(bedrock_error)}")
-                questions = []
         
        
         
@@ -136,8 +156,8 @@ Generate 7–10 items total, using zero-padded ids: q01, q02, ..."""
             }
         }
         
-        # Store in S3 (optional for testing)
-        s3_key = f"advanced-analysis/questions/{session_id}/{timestamp.replace(':', '-')}.json"
+        # Store in S3
+        s3_key = f"advanced-analysis/questions/session-{session_id}/{timestamp.replace(':', '-')}.json"
         try:
             s3.put_object(
                 Bucket=questions_bucket,

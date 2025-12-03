@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import { Loader } from "lucide-react";
 import "../../ProcessingView.css";
 
-// import processing tab components
 import Classification from "./processing-tabs/Classification";
 import Rewrite from "./processing-tabs/Rewrite";
 import CameraFootage from "./processing-tabs/CameraFootage";
@@ -30,46 +29,40 @@ interface Tab {
   render: () => JSX.Element;
 }
 
-const ProcessingView: React.FC<ProcessingViewProps> = ({
-  sessionData,
-  language,
-}) => {
+const ProcessingView: React.FC<ProcessingViewProps> = ({ sessionData, language }) => {
   const [activeTab, setActiveTab] = useState<string>("Classification");
   const [isProcessing, setIsProcessing] = useState<boolean>(true);
+  const [aiSuggestionsData, setAiSuggestionsData] = useState<any>(null);
+  const [outcomeData, setOutcomeData] = useState<any>(null);
 
   const tabs: Tab[] = [
     {
-      id: "Classification",
-      label: language === "en" ? "Classification" : "تصنيف القضية",
-      render: () => <Classification />,
-    },
-    {
+       id: "Classification",
+       label: language === "en" ? "Classification" : "التصنيف",
+       render: () => <Classification />,
+       },
+    { 
       id: "Rewrite",
-      label: language === "en" ? "Rewrite" : "إعادة صياغة التقرير",
+      label: language === "en" ? "Rewrite" : "إعادة الصياغة",
       render: () => <Rewrite sessionData={sessionData} />,
+     },
+    { id: "CameraFootage",
+      label: language === "en" ? "Camera Footage" : "لقطات الكاميرا",
+      render: () => <CameraFootage sessionData={sessionData} language={language} />,
+     },
+    { id: "AISuggestions",
+     label: language === "en" ? "AI Suggestions" : "اقتراحات الذكاء الاصطناعي",
+     render: () => <AISuggestions sessionData={sessionData} language={language} persistedData={aiSuggestionsData} onDataChange={setAiSuggestionsData} />,
     },
-    {
-      id: "CameraFootage",
-      label: language === "en" ? "Camera Footage" : "تحليل الفيديوهات ",
-      render: () => (
-        <CameraFootage sessionData={sessionData} language={language} />
-      ),
-    },
-    {
-      id: "AISuggestions",
-      label: language === "en" ? "AI Suggestions" : "اقتراحات الذكاء الاصطناعي",
-      render: () => <AISuggestions sessionData={sessionData} />,
-    },
-    {
+    { 
       id: "Contradictions",
       label: language === "en" ? "Contradictions" : "التناقضات",
       render: () => <Contradictions language={language} />,
     },
-    {
-      id: "Outcome",
-      label: language === "en" ? "Outcome" : "الإدانة",
-      render: () => <Outcome />,
-    },
+    { id: "Outcome",
+    label: language === "en" ? "Outcome" : "النتيجة",
+    render: () => <Outcome sessionData={sessionData} language={language} persistedData={outcomeData} onDataChange={setOutcomeData} />,
+  },
   ];
 
   const handleContinue = (): void => {
@@ -82,9 +75,7 @@ const ProcessingView: React.FC<ProcessingViewProps> = ({
         <div className="processing-content">
           <Loader className="processing-spinner" />
           <h2 className="processing-title">
-            {language === "en"
-              ? "Processing Session Data"
-              : "جاري معالجة بيانات الجلسة"}
+            {language === "en" ? "Processing Session Data" : "جاري معالجة بيانات الجلسة"}
           </h2>
           <p className="processing-description">
             {language === "en"
@@ -112,25 +103,17 @@ const ProcessingView: React.FC<ProcessingViewProps> = ({
         {tabs.map((tab) => (
           <button
             key={tab.id}
-            className={`tab-btn ${activeTab === tab.id ? "active" : ""} ${
-              isProcessing ? "disabled" : ""
-            }`}
+            className={`tab-btn ${activeTab === tab.id ? "active" : ""} ${isProcessing ? "disabled" : ""}`}
             onClick={() => !isProcessing && setActiveTab(tab.id)}
             disabled={isProcessing}
           >
             {tab.label}
-            {!isProcessing && activeTab === tab.id && (
-              <div className="tab-indicator" />
-            )}
+            {!isProcessing && activeTab === tab.id && <div className="tab-indicator" />}
           </button>
         ))}
       </div>
 
-      <div
-        className={`tab-content ${
-          isAISuggestionsActive ? "ai-tab-content" : ""
-        }`}
-      >
+      <div className={`tab-content ${isAISuggestionsActive ? "ai-tab-content" : ""}`}>
         {renderTabContent()}
       </div>
     </div>
