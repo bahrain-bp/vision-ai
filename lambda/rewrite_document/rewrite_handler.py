@@ -30,8 +30,8 @@ s3_client = boto3.client("s3")
 BUCKET_NAME = os.environ.get("BUCKET_NAME", "vision-investigation-system-052904446370")
 MODEL_ID = "amazon.nova-lite-v1:0"
 DEFAULT_MOCK_S3_KEY = "rewritten/report.txt"
-# Limit input size to avoid API Gateway/Lambda timeouts
-MAX_INPUT_CHARS = 8000  # safe limit for truncation
+# Balanced limit: processes in 15-20 seconds while maintaining quality
+MAX_INPUT_CHARS = 5000  # Sweet spot between speed and quality
 
 # CORS headers
 CORS_HEADERS = {
@@ -126,24 +126,34 @@ def get_input_text(event: Dict) -> Tuple[str, Optional[str]]:
 
 def build_rewrite_prompts(original_text: str) -> Tuple[str, str]:
     """Generate system + user prompts for Nova Lite."""
-    system = """أنت مساعد متخصص في الكتابة القانونية لتقارير التحقيق العربية المستخدمة من قبل النيابة العامة والشرطة.
+    system = """أنت مساعد متخصص في إعادة صياغة تقارير التحقيق القانونية للنيابة العامة والشرطة في مملكة البحرين.
 
-أعد صياغة التقرير ليكون أكثر وضوحاً وتنظيماً أفضل وتنسيقاً احترافياً.
+مهمتك: إعادة كتابة التقرير بشكل احترافي ومنظم مع الحفاظ على كافة المعلومات.
 
-تعليمات:
-- لا تغيّر الحقائق أو الأسماء أو التواريخ
-- لا تضف معلومات غير موجودة
-- لا تحذف تفاصيل مهمة
-- اكتب بالعربية فقط بلا إنجليزية
-- اجعل الأسلوب رسمياً قانونياً
-- صحح الأخطاء الإملائية
+التعليمات الإلزامية:
+1. احتفظ بجميع الأسماء والتواريخ والأرقام والحقائق كما هي تماماً
+2. لا تضف أي معلومات جديدة غير موجودة في النص الأصلي
+3. لا تحذف أي تفاصيل مهمة أو شهادات
+4. استخدم اللغة العربية الفصحى فقط
+5. اتبع الأسلوب الرسمي القانوني
+6. صحح الأخطاء الإملائية والنحوية
+7. نظم المحتوى بشكل منطقي ومتسلسل
+8. استخدم العناوين الواضحة والجداول حيث يلزم
+9. أكمل التقرير بالكامل من البداية للنهاية دون توقف
+
+التنسيق المطلوب:
+- استخدم Markdown للعناوين (# ## ###)
+- استخدم الجداول للبيانات المنظمة
+- اكتب بوضوح واحترافية
 """
 
-    user = f"""أعد كتابة تقرير التحقيق التالي دون حذف أو إضافة معلومات:
+    user = f"""أعد صياغة تقرير التحقيق التالي بشكل احترافي ومنظم:
 
 {original_text}
 
-أعطني النص المعاد صياغته فقط:
+مهم جداً: لا تكتب أرقام الصفحات مثل "27 / 1 صفحة" أو "صفحة: 5" نهائياً.
+
+اكتب التقرير المعاد صياغته بالكامل:
 """
     return system, user
 
@@ -160,8 +170,8 @@ def call_bedrock_for_rewrite(original_text: str) -> str:
         "messages": [
             {"role": "user", "content": [{"text": user_prompt}]}
         ],
-        # Reduce maxTokens to keep responses bounded and avoid long processing
-        "inferenceConfig": {"maxTokens": 1024, "temperature": 0.1, "topP": 0.8}
+        # Balanced for speed AND completeness: 2500 tokens = ~1800 words, processes in 15-20 sec
+        "inferenceConfig": {"maxTokens": 2500, "temperature": 0.15, "topP": 0.85}
     }
 
     try:

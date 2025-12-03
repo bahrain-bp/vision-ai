@@ -20,17 +20,38 @@ function simpleMarkdownToHtml(md: string): string {
   html = html.replace(/((?:^.*\|.*\n)+)/gm, (block) => {
     const lines = block.trim().split(/\n/).filter(l => l.includes('|'));
     if (lines.length < 2) return block;
-    // Remove separator lines (---...)
+    
+    // Remove separator lines (---...) and clean lines
     const cleanLines = lines.filter(l => !/^[-|\s]+$/.test(l));
     if (cleanLines.length < 2) return block;
-    const rows = cleanLines.map(line => line.split('|').map(cell => cell.trim()).filter(Boolean));
+    
+    // Parse rows and normalize - split by | and filter empty cells from start/end
+    const rows = cleanLines.map(line => {
+      // Normalize: trim, split by |, filter empty strings from edges
+      let cells = line.split('|').map(cell => cell.trim());
+      // Remove leading/trailing empty cells (from | at start/end of line)
+      while (cells.length > 0 && cells[0] === '') cells.shift();
+      while (cells.length > 0 && cells[cells.length - 1] === '') cells.pop();
+      return cells;
+    });
+    
     if (rows.length < 2) return block;
-    // If header row, use <th>
+    
+    // Find max column count to normalize all rows
+    const maxCols = Math.max(...rows.map(r => r.length));
+    
+    // Pad rows to have same number of columns
+    const normalizedRows = rows.map(row => {
+      while (row.length < maxCols) row.push('');
+      return row;
+    });
+    
+    // Build table
     let table = '<table class="markdown-table"><thead><tr>';
-    table += rows[0].map(cell => `<th>${cell}</th>`).join('');
+    table += normalizedRows[0].map(cell => `<th>${cell}</th>`).join('');
     table += '</tr></thead><tbody>';
-    for (let i = 1; i < rows.length; i++) {
-      table += '<tr>' + rows[i].map(cell => `<td>${cell}</td>`).join('') + '</tr>';
+    for (let i = 1; i < normalizedRows.length; i++) {
+      table += '<tr>' + normalizedRows[i].map(cell => `<td>${cell}</td>`).join('') + '</tr>';
     }
     table += '</tbody></table>';
     return table;
@@ -129,17 +150,19 @@ const MarkdownPreview: React.FC<MarkdownPreviewProps> = ({ markdown }) => {
         borderRadius: 14,
         border: '1.5px solid #e0e7ef',
         boxShadow: '0 1.5px 8px rgba(60,40,120,0.06)',
-        padding: '24px 20px',
+        padding: '32px 28px',
         marginBottom: 24,
         marginTop: 8,
-        fontFamily: 'Segoe UI, Noto Sans Arabic, Tahoma, Arial, sans-serif',
-        fontSize: 17,
-        color: '#23272f',
-        lineHeight: 2.05,
+        fontFamily: '"IBM Plex Sans Arabic", "Cairo", "Segoe UI", "Noto Sans Arabic", Tahoma, sans-serif',
+        fontSize: '1.1rem',
+        fontWeight: 500,
+        color: '#1a1a1a',
+        lineHeight: 2.2,
         direction: 'rtl',
         textAlign: 'right',
         overflowX: 'auto',
         whiteSpace: 'pre-wrap',
+        letterSpacing: '0.01em',
       }}
       dangerouslySetInnerHTML={{ __html: html }}
     />
@@ -151,20 +174,70 @@ if (typeof window !== 'undefined' && !document.head.querySelector('style.markdow
   const style = document.createElement('style');
   style.className = 'markdown-table';
   style.innerHTML = `
+.markdown-preview h1 {
+  font-size: 1.85rem;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 24px 0 16px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #e2e8f0;
+}
+.markdown-preview h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 20px 0 12px;
+}
+.markdown-preview h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #334155;
+  margin: 16px 0 10px;
+}
+.markdown-preview p {
+  margin: 12px 0;
+  line-height: 2.2;
+}
+.markdown-preview strong {
+  font-weight: 700;
+  color: #0f172a;
+}
+.markdown-preview hr {
+  border: none;
+  border-top: 2px solid #e2e8f0;
+  margin: 24px 0;
+}
 .markdown-table {
   border-collapse: collapse;
   width: 100%;
-  margin: 18px 0;
+  margin: 24px 0;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  border-radius: 8px;
+  overflow: hidden;
 }
 .markdown-table th, .markdown-table td {
-  border: 1px solid #d1d5db;
-  padding: 8px 12px;
+  border: 1px solid #e2e8f0;
+  padding: 14px 16px;
   text-align: center;
-  font-size: 16px;
+  font-size: 1.05rem;
 }
 .markdown-table th {
-  background: #f3f4f6;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
   font-weight: 700;
+  color: #0f172a;
+  border-bottom: 2px solid #cbd5e1;
+  font-size: 1.08rem;
+}
+.markdown-table tbody tr:nth-child(even) {
+  background-color: #f9fafb;
+}
+.markdown-table tbody tr:hover {
+  background-color: #f0f4f8;
+  transition: background-color 0.2s ease;
+}
+.markdown-table td {
+  color: #1e293b;
+  font-weight: 500;
 }
 `;
   document.head.appendChild(style);

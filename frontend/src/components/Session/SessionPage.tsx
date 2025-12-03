@@ -1,13 +1,25 @@
 import React, { useState, useEffect } from "react";
-import { ArrowLeft, Clock, Pause, Play, RotateCcw } from "lucide-react";
+import {
+  ArrowLeft,
+  Clock,
+  Pause,
+  Play,
+  RotateCcw,
+  ArrowRight,
+} from "lucide-react";
 import RealTimeView from "../RealTime/RealTimeView";
 import ProcessingView from "../Processing/ProcessingView";
 import SessionSummaryModal from "../RealTime/SessionSummaryModal";
 import { User, RecordingStatus } from "../../types/";
 import { useTranscription } from "../../hooks/useTranscription";
 import { useCaseContext } from "../../hooks/useCaseContext";
+
 import { useLanguage } from "../../context/LanguageContext";
 import { getTimeString } from "../common/Timer/Timer";
+
+import { getTimeString } from "../common/Timer/Timer";
+import { CameraFootageProvider } from "../../context/CameraFootageContext";
+
 
 interface ParticipantData {
   fullName: string;
@@ -67,13 +79,17 @@ const SessionPage: React.FC<SessionPageProps> = ({
     setCurrentSession,
     setCurrentPersonName,
   } = useCaseContext();
+
   const [activeMainTab, setActiveMainTab] = useState<MainTab>("real-time");
   const [sessionState, setSessionState] = useState<RecordingStatus>("off");
   const [showSummaryModal, setShowSummaryModal] = useState<boolean>(false);
-  const [triggerSummarization, setTriggerSummarization] =
-    useState<boolean>(false);
   const { stopRecording, toggleRecordingPause, toggleReset } =
     useTranscription();
+
+  const [language, setLanguage] = useState<"en" | "ar">("en");
+
+  const [triggerSummarization, setTriggerSummarization] =
+    useState<boolean>(false);
 
   const [isPaused, setIsPaused] = useState(false);
   const [timerMs, setTimerMs] = useState(0);
@@ -122,7 +138,7 @@ const SessionPage: React.FC<SessionPageProps> = ({
     ? {
         sessionId: currentSession.sessionId,
         investigator: currentSession.investigator || getInvestigatorName(),
-        language: "Arabic",
+        language: language === "en" ? "English" : "Arabic",
         duration: timerString,
         participant: setupData.witnessData.fullName || "Not set",
         status: currentSession.status,
@@ -130,7 +146,7 @@ const SessionPage: React.FC<SessionPageProps> = ({
     : {
         sessionId: "#2025-INV-0042",
         investigator: getInvestigatorName(),
-        language: "Arabic",
+        language: language === "en" ? "English" : "Arabic",
         duration: timerString,
         participant: "Not set",
         status: "Active",
@@ -161,6 +177,7 @@ const SessionPage: React.FC<SessionPageProps> = ({
 
     // Trigger switch to summarization tab
     setTriggerSummarization(true);
+    setShowSummaryModal(true);
   };
 
   const handleCloseSummary = () => {
@@ -220,12 +237,10 @@ const SessionPage: React.FC<SessionPageProps> = ({
       alert("Please enter witness full name.");
       return;
     }
-
     if (!setupData.identityData.referencePhoto) {
       alert("Please upload a reference photo.");
       return;
     }
-
     updateIdentityData("isVerified", true);
     alert("Identity verification completed successfully!");
   };
@@ -237,7 +252,6 @@ const SessionPage: React.FC<SessionPageProps> = ({
       if (sessionCreationAttempted.current) {
         return;
       }
-
       if (currentCase && !currentSession) {
         try {
           sessionCreationAttempted.current = true;
@@ -249,18 +263,25 @@ const SessionPage: React.FC<SessionPageProps> = ({
         }
       }
     };
-
     initializeSession();
   }, [currentCase, currentSession, createSession, user]);
 
   return (
     <div className="session-page-container">
-      <nav className="session-nav">
+      <nav className="session-nav" dir={language === "ar" ? "rtl" : "ltr"}>
         <div className="nav-content">
           <div className="nav-items">
             <button onClick={handleBackToHome} className="back-button">
-              <ArrowLeft className="icon" />
-              <span>{t("session.backToHome")}</span>
+              {language === "ar" ? (
+                <ArrowRight className="icon" />
+              ) : (
+                <ArrowLeft className="icon" />
+              )}
+              <span>
+                {language === "ar"
+                  ? "العودة إلى الصفحة الرئيسية"
+                  : "Back to Home"}
+              </span>
             </button>
 
             <div className="nav-center">
@@ -278,7 +299,8 @@ const SessionPage: React.FC<SessionPageProps> = ({
                 )}
               </div>
               <p className="investigator-info">
-                Investigator: {currentSessionData.investigator}
+                {language === "ar" ? "المحقق" : "Investigator"}:{" "}
+                {currentSessionData.investigator}
               </p>
               {currentCase && (
                 <p className="case-info">
@@ -289,6 +311,23 @@ const SessionPage: React.FC<SessionPageProps> = ({
             </div>
 
             <div className="nav-controls">
+              <div className="language-controls">
+                <span className="language-label">
+                  {language === "ar" ? "اللغة:" : "Language:"}
+                </span>
+                <button
+                  className={`lang-btn ${language === "en" ? "active" : ""}`}
+                  onClick={() => setLanguage("en")}
+                >
+                  EN
+                </button>
+                <button
+                  className={`lang-btn ${language === "ar" ? "active" : ""}`}
+                  onClick={() => setLanguage("ar")}
+                >
+                  AR
+                </button>
+              </div>
               <div className="time-display">
                 <Clock className="icon" />
                 <span>{currentSessionData.duration}</span>
@@ -393,7 +432,12 @@ const SessionPage: React.FC<SessionPageProps> = ({
             triggerSummarization={triggerSummarization}
           />
         ) : (
-          <ProcessingView sessionData={currentSessionData} />
+          <CameraFootageProvider>
+            <ProcessingView
+              sessionData={currentSessionData}
+              language={language}
+            />
+          </CameraFootageProvider>
         )}
       </div>
 

@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import {
   RecordingStatus,
-  sessionType,
+  SessionType,
   LanguagePreferences,
 } from "../../types/";
 import { STREAMING_LANGUAGES } from "./StreamLanguages";
@@ -22,7 +22,7 @@ interface TranscriptionSessionSetupProps {
   setLanguagePreferences: (prefs: LanguagePreferences) => void;
   detectionLanguages: string[];
   setDetectionLanguages: (lang: []) => void;
-  sessionType: sessionType;
+  sessionType: SessionType;
   setSessionType: (type: "standard" | "multi") => void;
   setStartRecording: (value: boolean) => void;
   setSessionState: (state: RecordingStatus) => void;
