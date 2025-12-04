@@ -554,6 +554,7 @@ def extract_data_from_document(document_key, document_type='cpr'):
         # Validate document type matches uploaded document
         document_validation = validate_document_type(extracted_lines, full_text, document_type)
         if not document_validation['valid']:
+            logger.error(f"Document type validation failed: {document_validation['error']}")
             return {
                 'success': False,
                 'error': document_validation['error'],

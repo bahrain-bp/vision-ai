@@ -36,7 +36,6 @@ def handler(event, context):
             'createdAt': datetime.utcnow().isoformat() + 'Z',
             'createdBy': created_by,
             'status': 'active',
-            'totalSessions': 0,
             'lastUpdated': datetime.utcnow().isoformat() + 'Z'
         }
         

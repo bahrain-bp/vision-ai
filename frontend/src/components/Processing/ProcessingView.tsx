@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Loader } from "lucide-react";
 import "../../ProcessingView.css";
 
@@ -17,7 +17,7 @@ export interface SessionData {
   duration?: string;
   witness?: string;
   status?: string;
-  // we can other fields as needed later 
+  extractedTextKey?: string;
 }
 
 interface ProcessingViewProps {
@@ -34,29 +34,49 @@ interface Tab {
 
 const ProcessingView: React.FC<ProcessingViewProps> = ({ sessionData, selectedLanguage }) => {
   const [activeTab, setActiveTab] = useState<string>("Classification");
-  const [isProcessing, setIsProcessing] = useState<boolean>(true); // processing state 
+  const [isProcessing, setIsProcessing] = useState<boolean>(true);
+  const [extractedTextKey, setExtractedTextKey] = useState<string | undefined>(
+    sessionData.extractedTextKey
+  );
 
+  useEffect(() => {
+    setExtractedTextKey(sessionData.extractedTextKey);
+  }, [sessionData.sessionId, sessionData.extractedTextKey]);
+
+  const handleExtractedKey = (key: string) => {
+    setExtractedTextKey(key);
+  };
+
+  const sessionWithKey: SessionData = {
+    ...sessionData,
+    extractedTextKey,
+  };
 
   const tabs: Tab[] = [
     {
-      id: "Classification",
-      label: "Classification",
-      render: () => <Classification />,
-    },
-    {
+       id: "Classification",
+       label: selectedLanguage === "en" ? "Classification" : "التصنيف",
+       render: () => (
+         <Classification
+           sessionData={sessionWithKey}
+           language={selectedLanguage}
+           onExtractedKey={handleExtractedKey}
+         />
+       ),
+       },
+    { 
       id: "Rewrite",
-      label: "Rewrite",
-      render: () => <Rewrite sessionData={sessionData} selectedLanguage={selectedLanguage} />,
+      label: selectedLanguage === "en" ? "Rewrite" : "إعادة صياغة التقرير",
+      render: () => <Rewrite sessionData={sessionWithKey} selectedLanguage={selectedLanguage} />,
+     },
+    { id: "AISuggestions",
+     label: selectedLanguage === "en" ? "AI Suggestions" : "اقتراحات الذكاء الاصطناعي",
+     render: () => <AISuggestions sessionData={sessionWithKey} />,
     },
     {
       id: "CameraFootage",
       label: "Camera Footage",
       render: () => <CameraFootage sessionData={sessionData} language={selectedLanguage} />,
-    },
-    {
-      id: "AISuggestions",
-      label: "AI Suggestions",
-      render: () => <AISuggestions sessionData={sessionData} />,
     },
     {
       id: "Contradictions",

@@ -7,7 +7,7 @@ import { translationService } from "../../../services/LiveTranslation/Translatio
 
 interface SessionData {
   sessionId: string;
-  extractedText?: string;  // Add extracted text field
+  extractedTextKey?: string;
 }
 
 interface RewriteProps {
@@ -338,20 +338,22 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData, selectedLanguage }) => {
     setError(null);
     setStatusMessage(t("Starting rewrite job...", "جارٍ بدء عملية إعادة الكتابة..."));
 
+    if (!sessionData.extractedTextKey) {
+      setError(t("No extracted text found. Save the extracted text in Classification first.", "لم يتم العثور على نص مستخرج. احفظ النص المستخرج في التصنيف أولاً."));
+      setLoading(false);
+      setStatusMessage("");
+      return;
+    }
+
     try {
       // Get API endpoint
       const apiGatewayEndpoint = process.env.REACT_APP_API_ENDPOINT ||
         `${window.location.origin.replace("localhost", "localhost").split(":")[0]}://${window.location.hostname}:3000`;
 
-      // Prepare request body
-      // Build S3 path dynamically from sessionId
-      // Path format: classification/extracted/{sessionId}/*.txt
-      // Temporary hardcoded path for testing
-      const s3Key = `classification/extracted/session-20251203155203-18abf388/`;
-      
+      // Use the extracted text key saved from Classification
       const requestBody = {
         sessionId: sessionData.sessionId,
-        s3Key: s3Key,
+        s3Key: sessionData.extractedTextKey,
         language: selectedLanguage
       };
 

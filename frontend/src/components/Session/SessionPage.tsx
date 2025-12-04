@@ -6,8 +6,7 @@ import SessionSummaryModal from "../RealTime/SessionSummaryModal";
 import { User,RecordingStatus } from "../../types/";
 import { useTranscription } from "../../hooks/useTranscription";
 
- 
-interface WitnessData {
+interface ParticipantData {
   fullName: string;
   idNumber: string;
 }
@@ -24,7 +23,7 @@ interface TranslationSettings {
 }
  
 interface SetupData {
-  witnessData: WitnessData;
+  witnessData: ParticipantData;
   identityData: IdentityData;
   translationSettings: TranslationSettings;
 }
@@ -37,7 +36,7 @@ interface SessionData {
   witness: string;
   participant: string;
   status: string;
-  witnessData?: WitnessData;
+  witnessData?: ParticipantData;
   identityData?: IdentityData;
   translationSettings?: TranslationSettings;
 }
@@ -114,7 +113,7 @@ const SessionPage: React.FC<SessionPageProps> = ({
     }
   };
  
-  const updateWitnessData = (field: keyof WitnessData, value: string) => {
+  const updateWitnessData = (field: keyof ParticipantData, value: string) => {
     setSetupData((prev) => ({
       ...prev,
       witnessData: {

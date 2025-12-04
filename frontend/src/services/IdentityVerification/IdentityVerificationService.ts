@@ -34,7 +34,7 @@ const getFileMimeType = (file: File): string => {
 };
 
 const handleApiError = (error: unknown, context: string): never => {
-  if (error && typeof error === 'object' && 'response' in error) {
+  if (error && typeof error === "object" && "response" in error) {
     const axiosError = error as any;
     const status = axiosError.response?.status;
     const errorMessage = axiosError.response?.data?.error || axiosError.message;
@@ -189,7 +189,12 @@ export const uploadFileToS3 = async (
       },
     });
   } catch (error) {
-    if (error && typeof error === 'object' && 'code' in error && (error as any).code === "ECONNABORTED") {
+    if (
+      error &&
+      typeof error === "object" &&
+      "code" in error &&
+      (error as any).code === "ECONNABORTED"
+    ) {
       throw new IdentityVerificationError(
         "Upload timeout. Please try again.",
         "UPLOAD_TIMEOUT",
@@ -293,6 +298,7 @@ export const completeIdentityVerification = async (
   }
 
   // Step 4: Trigger verification
+
   const verificationResult = await verifyIdentity({
     caseId,
     sessionId,
