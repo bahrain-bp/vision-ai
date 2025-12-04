@@ -15,6 +15,7 @@ from vision_ai.transcription_stack import TranscriptionStack
 from vision_ai.frontend_stack import FrontendStack
 from vision_ai.detect_contradiction_stack import ContradictionStack
 from vision_ai.camera_footage_stack import CameraFootageAnalysisStack
+from vision_ai.audio_analysis_stack import AudioAnalysisStack
 
 
 load_dotenv()
@@ -211,6 +212,21 @@ detect_contradiction_stack = ContradictionStack(
 )
 detect_contradiction_stack.add_dependency(shared_stack)
 
+
+# ==========================================
+# 12. AUDIO ANALYSIS STACK
+# ==========================================
+audio_analysis_stack = AudioAnalysisStack(
+    app,
+    f"{app_name}-audio-analysis-stack",
+    env=env,
+    investigation_bucket=shared_stack.investigation_bucket,
+    shared_api_id=shared_stack.shared_api.rest_api_id,
+    shared_api_root_resource_id=shared_stack.shared_api.rest_api_root_resource_id,
+    description="Audio Analysis: Transcribe and translate audio to Arabic",
+)
+audio_analysis_stack.add_dependency(shared_stack)
+
 # ==========================================
 # 12. API DEPLOYMENT STACK
 # Deploys API after all routes are added
@@ -235,6 +251,7 @@ deployment_stack.add_dependency(detect_contradiction_stack)
 deployment_stack.add_dependency(transcription_stack)
 deployment_stack.add_dependency(summarization_stack)
 deployment_stack.add_dependency(camera_footage_stack)
+deployment_stack.add_dependency(audio_analysis_stack)
 
 # ==========================================
 # 13. FRONTEND STACK
