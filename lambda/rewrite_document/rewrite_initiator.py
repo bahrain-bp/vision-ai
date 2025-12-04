@@ -79,7 +79,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict:
         session_id = body.get("sessionId", "unknown")
         language = body.get("language", "ar")  # Default to Arabic
         
-        logger.info(f"≡ƒô¥ Starting rewrite job {job_id} for session {session_id} in {language}")
+        logger.info(f"📝 Starting rewrite job {job_id} for session {session_id} in {language}")
         
         # Create initial status in S3
         status_key = f"rewrite-jobs/{job_id}/status.json"
@@ -113,7 +113,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict:
             Payload=json.dumps(worker_payload)
         )
         
-        logger.info(f"Γ£à Worker Lambda invoked for job {job_id}")
+        logger.info(f"✅ Worker Lambda invoked for job {job_id}")
         
         # Return job ID immediately
         return create_response(200, {
@@ -123,8 +123,9 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict:
         })
         
     except Exception as e:
-        logger.error(f"Γ¥î Error in initiator Lambda: {e}", exc_info=True)
+        logger.error(f"❌ Error in initiator Lambda: {e}", exc_info=True)
         return create_response(500, {
             "error": "Internal server error",
             "message": str(e)
         })
+    

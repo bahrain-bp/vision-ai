@@ -155,3 +155,4 @@ class RewriteStack(Stack):
             value=rewrite_status_lambda.function_arn,
             description="Rewrite Status Checker Lambda function ARN"
         )
+        

@@ -105,7 +105,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict:
                 "error": "Job ID is required"
             })
         
-        logger.info(f"≡ƒôè Checking status for job {job_id}")
+        logger.info(f"📊 Checking status for job {job_id}")
         
         # Get job status from S3
         status_data = get_job_status(job_id)
@@ -138,7 +138,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict:
                     "updatedAt": status_data.get("updatedAt")
                 }
                 
-                logger.info(f"Γ£à Job {job_id} completed - returning result")
+                logger.info(f"✅ Job {job_id} completed - returning result")
                 return create_response(200, response_data)
             else:
                 # Status says completed but no result found
@@ -160,7 +160,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict:
                 "updatedAt": status_data.get("updatedAt")
             }
             
-            logger.info(f"Γ¥î Job {job_id} failed")
+            logger.info(f"❌ Job {job_id} failed")
             return create_response(200, response_data)
         
         # Job still processing
@@ -172,11 +172,11 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict:
                 "message": "Job is still being processed"
             }
             
-            logger.info(f"≡ƒöä Job {job_id} still processing")
+            logger.info(f"🔄 Job {job_id} still processing")
             return create_response(200, response_data)
         
     except Exception as e:
-        logger.error(f"Γ¥î Error checking job status: {e}", exc_info=True)
+        logger.error(f"❌ Error checking job status: {e}", exc_info=True)
         return create_response(500, {
             "status": "ERROR",
             "error": "Internal server error",

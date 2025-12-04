@@ -100,12 +100,12 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData, selectedLanguage }) => {
 
   // Function to extract case number from Arabic text
   const extractCaseNumber = (text: string): string => {
-    // Collect all candidate patterns (accept / or \\)
+    // Collect all candidate patterns (accept / or \)
     const candidateRegexes: RegExp[] = [
-      /رقم\s*البلاغ\s*:?:?\s*([\d]{4,6}\s*[\/\\\\]\s*[\d]{4})/gi,
-      /القضية\s*رقم\s*:?:?\s*([\d]{4,6}\s*[\/\\\\]\s*[\d]{4})/gi,
-      /رقم\s*القضية\s*:?:?\s*([\d]{4,6}\s*[\/\\\\]\s*[\d]{4})/gi,
-      /\b([\d]{4,6}\s*[\/\\]\s*[\d]{4})\b/gi,
+      /رقم\s*البلاغ\s*:?:?\s*([\d]{4,6}\s*[/\\]\s*[\d]{4})/gi,
+      /القضية\s*رقم\s*:?:?\s*([\d]{4,6}\s*[/\\]\s*[\d]{4})/gi,
+      /رقم\s*القضية\s*:?:?\s*([\d]{4,6}\s*[/\\]\s*[\d]{4})/gi,
+      /\b([\d]{4,6}\s*[/\\]\s*[\d]{4})\b/gi,
     ];
 
     const candidates: string[] = [];
@@ -149,7 +149,7 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData, selectedLanguage }) => {
       }
     }
 
-    const norm = best.replace(/[\/\\]/, ' \\ ').replace(/\s+/g, ' ');
+    const norm = best.replace(/[/\\]/, ' \\ ').replace(/\s+/g, ' ');
     console.log("Selected case number:", norm);
     return norm;
   };
@@ -690,7 +690,7 @@ function simpleMarkdownToHtmlForExport(md: string): string {
   
   // Bullets to lists
   html = html.replace(/(?:^|\n)((?:-\s+[^\n]+\n?)+)/g, (_m, group) => {
-    const items = group.trim().split(/\n/).map((line: string) => line.replace(/^\-\s+/, '').trim());
+    const items = group.trim().split(/\n/).map((line: string) => line.replace(/^-\s+/, '').trim());
     const lis = items.map((it: string) => `<li>${it}</li>`).join('');
     return `\n<ul>${lis}</ul>`;
   });
