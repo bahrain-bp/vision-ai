@@ -3,6 +3,7 @@ from aws_cdk import (
     aws_s3 as s3,
     aws_apigateway as apigateway,
     RemovalPolicy,
+    aws_iam as iam, 
     CfnOutput,
 )
 from constructs import Construct
@@ -39,7 +40,6 @@ class SharedInfrastructureStack(Stack):
                 max_age=3000
             )]
         )
-        
         # ==========================================
         # API GATEWAY - SHARED ACROSS ALL FEATURES
         # ==========================================
