@@ -102,9 +102,9 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData, selectedLanguage }) => {
   const extractCaseNumber = (text: string): string => {
     // Collect all candidate patterns (accept / or \\)
     const candidateRegexes: RegExp[] = [
-      /╪▒┘é┘à\s*╪º┘ä╪¿┘ä╪º╪║\s*:?:?\s*([\d]{4,6}\s*[\/\\]\s*[\d]{4})/gi,
-      /╪º┘ä┘é╪╢┘è╪⌐\s*╪▒┘é┘à\s*:?:?\s*([\d]{4,6}\s*[\/\\]\s*[\d]{4})/gi,
-      /╪▒┘é┘à\s*╪º┘ä┘é╪╢┘è╪⌐\s*:?:?\s*([\d]{4,6}\s*[\/\\]\s*[\d]{4})/gi,
+      /رقم\s*البلاغ\s*:?:?\s*([\d]{4,6}\s*[\/\\\\]\s*[\d]{4})/gi,
+      /القضية\s*رقم\s*:?:?\s*([\d]{4,6}\s*[\/\\\\]\s*[\d]{4})/gi,
+      /رقم\s*القضية\s*:?:?\s*([\d]{4,6}\s*[\/\\\\]\s*[\d]{4})/gi,
       /\b([\d]{4,6}\s*[\/\\]\s*[\d]{4})\b/gi,
     ];
 
@@ -133,7 +133,7 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData, selectedLanguage }) => {
       if (after === '2024') score += 2; // common year
       // proximity to '╪º┘ä┘å┘è╪º╪¿╪⌐ ╪º┘ä╪╣╪º┘à╪⌐'
       const window = text.substring(Math.max(0, indexInText - 80), Math.min(text.length, indexInText + 80));
-      if (/╪º┘ä┘å┘è╪º╪¿╪⌐\s+╪º┘ä╪╣╪º┘à╪⌐/.test(window)) score += 2;
+      if (/النيابة\s+العامة/.test(window)) score += 2;
       return score;
     };
 
@@ -156,16 +156,16 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData, selectedLanguage }) => {
 
   // Function to clean and deduplicate the rewritten text
   const cleanRewrittenText = (text: string): string => {
-    // Remove unwanted headers like "╪º┘ä╪¼╪▓╪í 1 ┘à┘å 2" or "╪º┘ä╪¼╪▓╪í ╪º┘ä╪½╪º┘å┘è"
-    text = text.replace(/╪º┘ä╪¼╪▓╪í\s*\d+\s*┘à┘å\s*\d+/g, '');
-    text = text.replace(/╪º┘ä╪¼╪▓╪í\s+(╪º┘ä╪ú┘ê┘ä|╪º┘ä╪½╪º┘å┘è|╪º┘ä╪½╪º┘ä╪½|╪º┘ä╪▒╪º╪¿╪╣|╪º┘ä╪«╪º┘à╪│)/g, '');
+    // Remove unwanted headers like "الجزء 1 من 2" or "الجزء الثاني"
+    text = text.replace(/الجزء\s*\d+\s*من\s*\d+/g, '');
+    text = text.replace(/الجزء\s+(الأول|الثاني|الثالث|الرابع|الخامس)/g, '');
     
     // Remove page numbers in all variations including bold markers
-    text = text.replace(/\*?\*?╪▒┘é┘à ╪º┘ä╪╡┘ü╪¡╪⌐:\s*\d+\*?\*?/g, '');
-    text = text.replace(/\*?\*?\d+\s*\/\s*\d+\s*╪╡┘ü╪¡╪⌐\s*:?\*?\*?/g, '');
-    text = text.replace(/╪╡┘ü╪¡╪⌐\s*:?\s*\d+\s*\/?\s*\d*/g, '');
-    text = text.replace(/\*?\*?╪º┘ä╪¬╪º╪▒┘è╪« ┘ê╪º┘ä┘ê┘é╪¬:\*?\*?\s*\d+\s*\/\s*\d+/g, '');
-    text = text.replace(/\d+\s*\/\s*\d+\s*:?\s*╪╡┘ü╪¡╪⌐/g, '');
+    text = text.replace(/\*?\*?رقم الصفحة:\s*\d+\*?\*?/g, '');
+    text = text.replace(/\*?\*?\d+\s*\/\s*\d+\s*صفحة\s*:?\*?\*?/g, '');
+    text = text.replace(/صفحة\s*:?\s*\d+\s*\/?\s*\d*/g, '');
+    text = text.replace(/\*?\*?التاريخ والوقت:\*?\*?\s*\d+\s*\/\s*\d+/g, '');
+    text = text.replace(/\d+\s*\/\s*\d+\s*:?\s*صفحة/g, '');
     
     // Remove Word document artifacts
     text = text.replace(/\t+/g, ' '); // Replace tabs with spaces
@@ -181,7 +181,7 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData, selectedLanguage }) => {
     text = text.replace(/^Γùï\s*/gm, '- '); // Circle bullet
     
     // Remove duplicate header blocks (keep only the first occurrence)
-    const headerPattern = /#+\s*┘à┘à┘ä┘â╪⌐ ╪º┘ä╪¿╪¡╪▒┘è┘å[\s\S]*?(?:Capital Prosecution|╪º┘ä┘å┘è╪º╪¿╪⌐ ╪º┘ä╪╣╪º┘à╪⌐)/g;
+    const headerPattern = /#+\s*مملكة البحرين[\s\S]*?(?:Capital Prosecution|النيابة العامة)/g;
     const headers = text.match(headerPattern);
     
     if (headers && headers.length > 1) {
@@ -195,11 +195,11 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData, selectedLanguage }) => {
       });
     }
     
-    // Clean up Q&A formatting - convert ╪│:/╪¼: to proper headers
-    text = text.replace(/^╪│:\s*/gm, '**╪│╪ñ╪º┘ä:** ');
-    text = text.replace(/^╪¼:\s*/gm, '**╪¼┘ê╪º╪¿:** ');
-    text = text.replace(/^╪│\d+:\s*/gm, '**╪│╪ñ╪º┘ä:** ');
-    text = text.replace(/^╪¼\d+:\s*/gm, '**╪¼┘ê╪º╪¿:** ');
+    // Clean up Q&A formatting - convert س:/ج: to proper headers
+    text = text.replace(/^س:\s*/gm, '**سؤال:** ');
+    text = text.replace(/^ج:\s*/gm, '**جواب:** ');
+    text = text.replace(/^س\d+:\s*/gm, '**سؤال:** ');
+    text = text.replace(/^ج\d+:\s*/gm, '**جواب:** ');
     
     // Fix encoding issues first before removing garbled text
     const encodingFixes: Record<string, string> = {
@@ -267,8 +267,8 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData, selectedLanguage }) => {
     for (const para of paragraphs) {
       if (!para.trim()) continue;
       
-      // Check if this paragraph contains a Q&A (╪¼┘ê╪º╪¿ or ╪¼1:)
-      const qaMatch = para.match(/(?:╪¼┘ê╪º╪¿|╪¼\d*)\s*:?\s*(.{200,})/s);
+      // Check if this paragraph contains a Q&A (جواب or ج1:)
+      const qaMatch = para.match(/(?:جواب|ج\d*)\s*:?\s*(.{200,})/s);
       
       if (qaMatch) {
         // Extract answer content for similarity comparison
@@ -336,10 +336,10 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData, selectedLanguage }) => {
   const handleRewrite = async () => {
     setLoading(true);
     setError(null);
-    setStatusMessage(t("Starting rewrite job...", "╪¼╪º╪▒┘ì ╪¿╪»╪í ╪╣┘à┘ä┘è╪⌐ ╪Ñ╪╣╪º╪»╪⌐ ╪º┘ä┘â╪¬╪º╪¿╪⌐..."));
+    setStatusMessage(t("Starting rewrite job...", "جارٍ بدء عملية إعادة الكتابة..."));
 
     if (!sessionData.extractedTextKey) {
-      setError(t("No extracted text found. Save the extracted text in Classification first.", "┘ä┘à ┘è╪¬┘à ╪º┘ä╪╣╪½┘ê╪▒ ╪╣┘ä┘ë ┘å╪╡ ┘à╪│╪¬╪«╪▒╪¼. ╪º╪¡┘ü╪╕ ╪º┘ä┘å╪╡ ╪º┘ä┘à╪│╪¬╪«╪▒╪¼ ┘ü┘è ╪º┘ä╪¬╪╡┘å┘è┘ü ╪ú┘ê┘ä╪º┘ï."));
+      setError(t("No extracted text found. Save the extracted text in Classification first.", "لم يتم العثور على نص مستخرج. احفظ النص المستخرج في التصنيف أولاً."));
       setLoading(false);
       setStatusMessage("");
       return;
@@ -382,7 +382,7 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData, selectedLanguage }) => {
       // Check if we got a jobId (async mode)
       if (data.jobId) {
         console.log("Job started with ID:", data.jobId);
-        setStatusMessage(t("Job started. Checking status...", "╪¼╪º╪▒┘ì ╪¿╪»╪í ╪º┘ä╪╣┘à┘ä┘è╪⌐. ┘à╪▒╪º╪¼╪╣╪⌐ ╪º┘ä╪¡╪º┘ä╪⌐..."));
+        setStatusMessage(t("Job started. Checking status...", "جارٍ بدء العملية. مراجعة الحالة..."));
         
         // Step 2: Poll for status
         pollJobStatus(data.jobId, apiGatewayEndpoint);
@@ -395,7 +395,7 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData, selectedLanguage }) => {
       }
     } catch (err) {
       const errorMessage =
-        err instanceof Error ? err.message : t("Failed to start rewrite job", "┘ü╪┤┘ä ┘ü┘è ╪¿╪»╪í ╪╣┘à┘ä┘è╪⌐ ╪Ñ╪╣╪º╪»╪⌐ ╪º┘ä┘â╪¬╪º╪¿╪⌐");
+        err instanceof Error ? err.message : t("Failed to start rewrite job", "فشل في بدء عملية إعادة الكتابة");
       setError(errorMessage);
       console.error("Rewrite error:", err);
       setLoading(false);
@@ -426,29 +426,29 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData, selectedLanguage }) => {
 
         if (statusData.status === "COMPLETED") {
           clearInterval(pollInterval);
-          setStatusMessage(t("Rewrite completed!", "╪¬┘à╪¬ ╪Ñ╪╣╪º╪»╪⌐ ╪º┘ä┘â╪¬╪º╪¿╪⌐ ╪¿┘å╪¼╪º╪¡!"));
+          setStatusMessage(t("Rewrite completed!", "تمت إعادة الكتابة بنجاح!"));
           
           if (statusData.rewrittenText) {
             handleRewriteSuccess(statusData.rewrittenText);
           } else {
-            setError(t("Rewrite completed but no text returned", "╪¬┘à╪¬ ╪Ñ╪╣╪º╪»╪⌐ ╪º┘ä┘â╪¬╪º╪¿╪⌐ ┘ê┘ä┘â┘å ┘ä┘à ┘è╪¬┘à ╪Ñ╪▒╪¼╪º╪╣ ╪º┘ä┘å╪╡"));
+            setError(t("Rewrite completed but no text returned", "تمت إعادة الكتابة ولكن لم يتم إرجاع النص"));
             setLoading(false);
           }
         } else if (statusData.status === "FAILED") {
           clearInterval(pollInterval);
-          const failMsg = statusData.error || t("Rewrite job failed", "┘ü╪┤┘ä╪¬ ╪╣┘à┘ä┘è╪⌐ ╪Ñ╪╣╪º╪»╪⌐ ╪º┘ä┘â╪¬╪º╪¿╪⌐");
-          setError(isArabic ? `┘ü╪┤┘ä╪¬ ╪Ñ╪╣╪º╪»╪⌐ ╪º┘ä┘â╪¬╪º╪¿╪⌐: ${failMsg}` : failMsg);
+          const failMsg = statusData.error || t("Rewrite job failed", "فشلت عملية إعادة الكتابة");
+          setError(isArabic ? `فشلت إعادة الكتابة: ${failMsg}` : failMsg);
           setLoading(false);
           setStatusMessage("");
         } else if (statusData.status === "PROCESSING") {
-          setStatusMessage(t("Processing your report... Please wait.", "╪¼╪º╪▒┘ì ┘à╪╣╪º┘ä╪¼╪⌐ ╪º┘ä╪¬┘é╪▒┘è╪▒... ╪º┘ä╪▒╪¼╪º╪í ╪º┘ä╪º┘å╪¬╪╕╪º╪▒."));
+          setStatusMessage(t("Processing your report... Please wait.", "جارٍ معالجة التقرير... الرجاء الانتظار."));
         } else {
-          setStatusMessage(isArabic ? `╪º┘ä╪¡╪º┘ä╪⌐: ${statusData.status}` : `Status: ${statusData.status}`);
+          setStatusMessage(isArabic ? `الحالة: ${statusData.status}` : `Status: ${statusData.status}`);
         }
       } catch (err) {
         clearInterval(pollInterval);
         const errorMessage =
-          err instanceof Error ? err.message : t("Failed to check job status", "┘ü╪┤┘ä ┘ü┘è ┘ü╪¡╪╡ ╪¡╪º┘ä╪⌐ ╪º┘ä╪╣┘à┘ä┘è╪⌐");
+          err instanceof Error ? err.message : t("Failed to check job status", "فشل في فحص حالة العملية");
         setError(errorMessage);
         console.error("Status check error:", err);
         setLoading(false);
@@ -462,7 +462,7 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData, selectedLanguage }) => {
       if (loading) {
         setError(t(
           "Job timeout: Processing took too long. Please try again.",
-          "╪º┘å╪¬┘ç╪¬ ┘à┘ç┘ä╪⌐ ╪º┘ä╪╣┘à┘ä┘è╪⌐: ╪º╪│╪¬╪║╪▒┘é╪¬ ┘ê┘é╪¬┘ï╪º ╪╖┘ê┘è┘ä╪º┘ï. ╪º┘ä╪▒╪¼╪º╪í ╪º┘ä┘à╪¡╪º┘ê┘ä╪⌐ ┘à╪▒╪⌐ ╪ú╪«╪▒┘ë."
+          "انتهت مهلة العملية: استغرقت وقتًا طويلاً. الرجاء المحاولة مرة أخرى."
         ));
         setLoading(false);
         setStatusMessage("");
@@ -501,10 +501,10 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData, selectedLanguage }) => {
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <h2 className="rewrite-heading">
-              {t("Rewrite", "╪Ñ╪╣╪º╪»╪⌐ ╪º┘ä┘â╪¬╪º╪¿╪⌐")}
+              {t("Rewrite", "إعادة الكتابة")}
             </h2>
             <p className="rewrite-subheading">
-              {t("Rewrite and improve investigation reports", "╪Ñ╪╣╪º╪»╪⌐ ┘â╪¬╪º╪¿╪⌐ ┘ê╪¬╪¡╪│┘è┘å ╪¬┘é╪º╪▒┘è╪▒ ╪º┘ä╪¬╪¡┘é┘è┘é")}
+              {t("Rewrite and improve investigation reports", "إعادة كتابة وتحسين تقارير التحقيق")}
             </p>
           </div>
         </div>
@@ -526,13 +526,13 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData, selectedLanguage }) => {
 
         <div className="rewrite-body">
           <label className="rewrite-section-label">
-            {t("Rewritten Report", "╪º┘ä╪¬┘é╪▒┘è╪▒ ╪º┘ä┘à┘Å╪╣╪º╪» ┘â╪¬╪º╪¿╪¬┘ç")}
+            {t("Rewritten Report", "التقرير المُعاد كتابته")}
           </label>
           {/* Case Number Display - Only show when case number is extracted */}
           {caseNumber && (
             <div className="case-number-banner">
               <div className="case-number-label">
-                {t("Case Number", "╪º┘ä┘é╪╢┘è╪⌐ ╪▒┘é┘à")}
+                {t("Case Number", "القضية رقم")}
               </div>
               <div className="case-number-value">{caseNumber}</div>
             </div>
@@ -548,7 +548,7 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData, selectedLanguage }) => {
                 }}
                 style={{ flex: 1 }}
               >
-                <span>{t("≡ƒôä Export PDF", "≡ƒôä ╪¬╪╡╪»┘è╪▒ PDF")}</span>
+                <span>{t("📄 Export PDF", "📄 تصدير PDF")}</span>
               </button>
               <button
                 type="button"
@@ -558,7 +558,7 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData, selectedLanguage }) => {
                 }}
                 style={{ flex: 1 }}
               >
-                <span>{t("≡ƒô¥ Export Word", "≡ƒô¥ ╪¬╪╡╪»┘è╪▒ Word")}</span>
+                <span>{t("📝 Export Word", "📝 تصدير Word")}</span>
               </button>
               <button
                 type="button"
@@ -566,7 +566,7 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData, selectedLanguage }) => {
                 onClick={handlePrint}
                 style={{ flex: 1 }}
               >
-                <span>{t("≡ƒû¿∩╕Å Print", "≡ƒû¿∩╕Å ╪╖╪¿╪º╪╣╪⌐")}</span>
+                <span>{t("🖨️ Print", "🖨️ طباعة")}</span>
               </button>
             </div>
           )}
@@ -575,15 +575,15 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData, selectedLanguage }) => {
             <div className="rewrite-preview-header">
               <div>
                 <p className="preview-label">
-                  {t("Latest Generated Version", "╪ú╪¡╪»╪½ ┘å╪│╪«╪⌐ ┘à╪╣╪º┘ä╪¼╪⌐")}
+                  {t("Latest Generated Version", "أحدث نسخة معالجة")}
                 </p>
                 <h3 className="preview-title">
-                  {t("Investigation Report", "╪¬┘é╪▒┘è╪▒ ╪º┘ä╪¬╪¡┘é┘è┘é")}
+                  {t("Investigation Report", "تقرير التحقيق")}
                 </h3>
               </div>
               <div className="preview-meta">
                 <span className="preview-chip">
-                  {isArabic ? "╪º┘ä╪╣╪▒╪¿┘è╪⌐" : "English"}
+                  {isArabic ? "العربية" : "English"}
                 </span>
                 {caseNumber && (
                   <span className="preview-chip highlight">
@@ -591,7 +591,7 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData, selectedLanguage }) => {
                   </span>
                 )}
                 <span className="preview-chip subtle">
-                  {t("Session", "╪º┘ä╪¼┘ä╪│╪⌐")} #{sessionData.sessionId.slice(-6)}
+                  {t("Session", "الجلسة")} #{sessionData.sessionId.slice(-6)}
                 </span>
               </div>
             </div>
@@ -610,9 +610,9 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData, selectedLanguage }) => {
           <Lock size={18} className="rewrite-btn-icon" />
           <span>
             {loading 
-              ? t("Rewriting...", "╪¼╪º╪▒┘ì ╪Ñ╪╣╪º╪»╪⌐ ╪º┘ä┘â╪¬╪º╪¿╪⌐...") 
-              : t("Rewrite Report", "╪Ñ╪╣╪º╪»╪⌐ ┘â╪¬╪º╪¿╪⌐ ╪º┘ä╪¬┘é╪▒┘è╪▒")}
-          </span>
+              ? t("Rewriting...", "جارٍ إعادة الكتابة...") 
+              : t("Rewrite Report", "إعادة كتابة التقرير")}
+            </span>
         </button>
       </div>
     </div>
@@ -855,7 +855,7 @@ function simpleMarkdownToHtmlForExport(md: string): string {
 <body>
   <div class="header">
     <div class="header-text">
-      <div style="margin-bottom: 8px;">┘à┘à┘ä┘â╪⌐ ╪º┘ä╪¿╪¡╪▒┘è┘å</div>
+      <div style="margin-bottom: 8px;">مملكة البحرين</div>
       <div style="font-size: 20px; font-weight: normal; color: #4b5563;">Kingdom of Bahrain</div>
     </div>
     <img class="header-logo" src="https://upload.wikimedia.org/wikipedia/commons/thumb/2/2c/Flag_of_Bahrain.svg/320px-Flag_of_Bahrain.svg.png" alt="Bahrain Flag">
