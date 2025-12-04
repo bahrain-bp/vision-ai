@@ -110,8 +110,22 @@ class RewriteStack(Stack):
         )
         
         # Add /rewrite/status/{jobId} route for checking job status
-        status_resource = rewrite_resource.add_resource("status")
-        job_id_resource = status_resource.add_resource("{jobId}")
+        status_resource = rewrite_resource.add_resource(
+            "status",
+            default_cors_preflight_options=apigateway.CorsOptions(
+                allow_origins=apigateway.Cors.ALL_ORIGINS,
+                allow_methods=["GET", "OPTIONS"],
+                allow_headers=["Content-Type", "Authorization"]
+            )
+        )
+        job_id_resource = status_resource.add_resource(
+            "{jobId}",
+            default_cors_preflight_options=apigateway.CorsOptions(
+                allow_origins=apigateway.Cors.ALL_ORIGINS,
+                allow_methods=["GET", "OPTIONS"],
+                allow_headers=["Content-Type", "Authorization"]
+            )
+        )
         
         # GET /rewrite/status/{jobId} - Checks the status of a rewrite job
         job_id_resource.add_method(
