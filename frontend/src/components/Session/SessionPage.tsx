@@ -13,8 +13,12 @@ import SessionSummaryModal from "../RealTime/SessionSummaryModal";
 import { User, RecordingStatus } from "../../types/";
 import { useTranscription } from "../../hooks/useTranscription";
 import { useCaseContext } from "../../hooks/useCaseContext";
+
+import { useLanguage } from "../../context/LanguageContext";
 import { getTimeString } from "../common/Timer/Timer";
+
 import { CameraFootageProvider } from "../../context/CameraFootageContext";
+
 
 interface ParticipantData {
   fullName: string;
@@ -65,6 +69,7 @@ const SessionPage: React.FC<SessionPageProps> = ({
   sessionData,
   onEndSession,
 }) => {
+  const { t } = useLanguage();
   const {
     currentCase,
     currentSession,
@@ -281,16 +286,14 @@ const SessionPage: React.FC<SessionPageProps> = ({
             <div className="nav-center">
               <h1 className="app-logo-text">VISION-AI</h1>
               <div className="session-info-header">
-                <span className="session-label">
-                  {language === "ar" ? "الجلسة" : "Session"}
-                </span>
+                <span className="session-label">{t("session.session")}</span>
                 <span className="session-id">
                   {currentSessionData.sessionId}
                 </span>
                 {sessionState === "on" && (
                   <span className="live-indicator">
                     <span className="live-dot"></span>
-                    <span>LIVE</span>
+                    <span>{t("session.live")}</span>
                   </span>
                 )}
               </div>
@@ -300,8 +303,8 @@ const SessionPage: React.FC<SessionPageProps> = ({
               </p>
               {currentCase && (
                 <p className="case-info">
-                  {language === "ar" ? "القضية" : "Case"}:{" "}
-                  {currentCase.caseTitle} ({currentCase.caseId})
+                  {t("session.case")}: {currentCase.caseTitle} (
+                  {currentCase.caseId})
                 </p>
               )}
             </div>
@@ -401,7 +404,7 @@ const SessionPage: React.FC<SessionPageProps> = ({
               activeMainTab === "real-time" ? "active" : ""
             }`}
           >
-            Real-time
+            {t("session.realTime")}
           </button>
           <button
             onClick={() => setActiveMainTab("processing")}
@@ -409,7 +412,7 @@ const SessionPage: React.FC<SessionPageProps> = ({
               activeMainTab === "processing" ? "active" : ""
             }`}
           >
-            Processing
+            {t("session.processing")}
           </button>
         </div>
       </div>

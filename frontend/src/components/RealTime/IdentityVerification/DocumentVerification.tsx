@@ -1,18 +1,17 @@
-import React, { useRef, useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import { useCaseContext } from "../../../hooks/useCaseContext";
 import ConfirmationPopup from "./ConfirmationPopup";
-import {
-  CheckCircle,
-  RefreshCw,
-  ArrowRight,
-  Loader2,
-  AlertCircle,
-  XCircle,
-  ImageIcon,
-} from "lucide-react";
+import { useLanguage } from "../../../context/LanguageContext";
+import AttemptsCounter from "./AttemptsCounter";
+import NotificationBanners from "./NotificationBanners";
+import PersonPhotoUpload from "./PersonPhotoUpload";
+import DocumentUploadSection from "./DocumentUploadSection";
+import ImageComparisonGrid from "./ImageComparisonGrid";
+import VerificationResultDetails from "./VerificationResultDetails";
+import ManualOverrideForm from "./ManualOverrideForm";
+import VerificationActions from "./VerificationActions";
 import {
   DocumentVerificationProps,
-  DocumentType,
   VerificationState,
 } from "../../../types/identityVerification";
 import IdentityVerificationService from "../../../services/IdentityVerification/IdentityVerificationService";
@@ -24,7 +23,6 @@ const validateManualOverrideInput = (
   cpr: string,
   nationality: string
 ): { valid: boolean; error?: string } => {
-  // Validate name - must be at least 2 words, no numbers
   const nameTrimmed = name.trim();
   const nameWords = nameTrimmed.split(/\s+/);
 
@@ -43,12 +41,10 @@ const validateManualOverrideInput = (
     return { valid: false, error: "Name must be at least 3 characters long" };
   }
 
-  // Validate CPR - must be exactly 9 digits
   if (!/^\d{9}$/.test(cpr.trim())) {
     return { valid: false, error: "CPR must be exactly 9 digits" };
   }
 
-  // Validate nationality - no numbers, at least 3 characters
   const nationalityTrimmed = nationality.trim();
 
   if (/\d/.test(nationalityTrimmed)) {
@@ -64,6 +60,7 @@ const validateManualOverrideInput = (
 
   return { valid: true };
 };
+
 const DocumentVerification: React.FC<DocumentVerificationProps> = ({
   identityData,
   onIdentityDataChange,
@@ -71,13 +68,14 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
   caseId,
   sessionId,
   personType,
+  documentType,
+  setDocumentType,
 }) => {
+  const { t } = useLanguage();
   const { setCurrentPersonName, setCurrentPersonType } = useCaseContext();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const documentInputRef = useRef<HTMLInputElement>(null);
   const [fileInputKey, setFileInputKey] = useState<number>(0);
   const [documentInputKey, setDocumentInputKey] = useState<number>(0);
-  const [documentType, setDocumentType] = useState<DocumentType>("cpr");
+
   const [verificationAttempts, setVerificationAttempts] = useState<number>(0);
   const [manualOverrideReason, setManualOverrideReason] = useState<string>("");
   const [manualParticipantName, setManualParticipantName] =
@@ -100,7 +98,6 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
   const [previousPersonPhotoKey, setPreviousPersonPhotoKey] = useState<
     string | null
   >(null);
-
   const [verificationState, setVerificationState] = useState<VerificationState>(
     {
       isUploading: false,
@@ -110,24 +107,21 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
       verificationResult: null,
     }
   );
-
   const [showEndSessionPopup, setShowEndSessionPopup] =
     useState<boolean>(false);
 
   const documentDisplayName = useMemo(() => {
-    return documentType === "cpr" ? "CPR" : "Passport";
-  }, [documentType]);
+    return documentType === "cpr" ? t("identity.cpr") : t("identity.passport");
+  }, [documentType, t]);
 
   const currentDocument = useMemo(() => {
     return identityData[documentType];
   }, [identityData, documentType]);
 
-  // Validate that uploaded files are not the same as the other upload to avoid backend failure
   const validateFileSelection = useCallback(
     (file: File, field: keyof typeof identityData): boolean => {
       if (!file) return false;
 
-      // Determine the other field to compare with
       let otherField: keyof typeof identityData | null = null;
       if (field === "referencePhoto") {
         otherField = identityData.cpr
@@ -162,7 +156,6 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
   const handleDocumentUpload = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
       setVerificationState((prev) => ({ ...prev, error: null }));
-
       const file = event.target.files?.[0];
 
       if (!file) {
@@ -240,7 +233,6 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
 
       onIdentityDataChange("referencePhoto", file);
       setVerificationState((prev) => ({ ...prev, error: null }));
-
       setFileInputKey((prev) => prev + 1);
     },
     [onIdentityDataChange, validateFileSelection]
@@ -281,7 +273,6 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
 
     try {
       console.log("Starting identity verification workflow...");
-
       const currentAttempt = verificationAttempts + 1;
 
       const result =
@@ -360,7 +351,6 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
       console.error("Verification error:", error);
       const errorMessage =
         error instanceof Error ? error.message : "Verification failed";
-
       const currentAttempt = verificationAttempts + 1;
       setVerificationAttempts(currentAttempt);
 
@@ -391,10 +381,11 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
     onIdentityDataChange,
     verificationAttempts,
     setCurrentPersonName,
+    setCurrentPersonType,
+    documentType,
   ]);
 
   const handleManualOverride = useCallback(async () => {
-    // Validate manual override form inputs using the validation helper
     const validation = validateManualOverrideInput(
       manualParticipantName,
       manualParticipantCPR,
@@ -417,8 +408,6 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
       return;
     }
 
-    // For manual override, don't validate the document content
-    // Just check that files exist
     if (!identityData.referencePhoto || !currentDocument) {
       setVerificationState((prev) => ({
         ...prev,
@@ -448,14 +437,12 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
       let documentKey = previousDocumentKey;
       let personPhotoKey = previousPersonPhotoKey;
 
-      // For manual override, upload files without content validation
       if (!documentKey || !personPhotoKey) {
         console.log(
           "No previous upload keys found, uploading files for manual override..."
         );
 
         try {
-          // Use direct upload without validation for manual override
           documentKey = await IdentityVerificationService.uploadDocument(
             caseId,
             sessionId,
@@ -467,7 +454,6 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
             "Document upload failed for manual override:",
             uploadError
           );
-          // For manual override, continue with placeholder keys
           documentKey = `manual-override-document-${Date.now()}`;
         }
 
@@ -491,7 +477,6 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
         }
       }
 
-      // Call verifyIdentity with manualOverride=true
       const result = await IdentityVerificationService.verifyIdentity({
         caseId,
         sessionId,
@@ -523,7 +508,6 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
       }));
 
       setShowManualOverride(false);
-
       onStartInvestigation();
     } catch (error) {
       console.error("Manual override error:", error);
@@ -552,8 +536,9 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
     onIdentityDataChange,
     onStartInvestigation,
     setCurrentPersonName,
+    setCurrentPersonType,
   ]);
-  // Handler to retry verification after failure
+
   const handleRetryVerification = useCallback(async () => {
     if (verificationAttempts >= MAX_VERIFICATION_ATTEMPTS) {
       setVerificationState((prev) => ({
@@ -595,12 +580,12 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
     previousDocumentKey,
     previousPersonPhotoKey,
   ]);
+
   const handleEndSessionClick = useCallback(() => {
     setShowEndSessionPopup(true);
   }, []);
 
   const handleEndSessionConfirm = useCallback(() => {
-    // Reset all state
     setVerificationAttempts(0);
     setShowManualOverride(false);
     setManualOverrideReason("");
@@ -627,18 +612,16 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
     });
 
     console.log("Session ended by user - navigating to homepage");
-
-    // Navigate to homepage
     window.location.href = "/";
   }, [onIdentityDataChange]);
 
   const handleEndSessionCancel = useCallback(() => {
     setShowEndSessionPopup(false);
   }, []);
+
   const toggleDocumentType = useCallback(() => {
     const newDocumentType = documentType === "cpr" ? "passport" : "cpr";
 
-    // Only clear the OLD document type if it exists
     if (documentType === "cpr" && identityData.cpr) {
       onIdentityDataChange("cpr", null);
     } else if (documentType === "passport" && identityData.passport) {
@@ -651,6 +634,7 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
     identityData.cpr,
     identityData.passport,
     onIdentityDataChange,
+    setDocumentType,
   ]);
 
   const isVerificationDisabled = useMemo(() => {
@@ -684,311 +668,66 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
   return (
     <div className="identity-verification-container">
       <div className="session-card">
-        <h2 className="card-title">Identity Verification</h2>
+        <AttemptsCounter
+          verificationAttempts={verificationAttempts}
+          maxAttempts={MAX_VERIFICATION_ATTEMPTS}
+          attemptsRemaining={attemptsRemaining}
+          t={t}
+        />
 
-        {/* Attempts Counter */}
-        {verificationAttempts > 0 && (
-          <div className="verification-attempts">
-            <span className="attempts-label">Verification Attempts:</span>
-            <span
-              className={`attempts-count ${
-                verificationAttempts >= MAX_VERIFICATION_ATTEMPTS
-                  ? "text-red-600 font-bold"
-                  : ""
-              }`}
-            >
-              {verificationAttempts} / {MAX_VERIFICATION_ATTEMPTS}
-            </span>
-            {attemptsRemaining > 0 && (
-              <span className="attempts-remaining text-sm text-gray-600 ml-2">
-                ({attemptsRemaining} remaining)
-              </span>
-            )}
-            {verificationAttempts >= MAX_VERIFICATION_ATTEMPTS && (
-              <span className="text-sm text-red-600 ml-2 font-semibold">
-                - Maximum attempts reached
-              </span>
-            )}
-          </div>
-        )}
-
-        {/* Error Banner */}
-        {verificationState.error && (
-          <div className="error-banner">
-            <AlertCircle size={20} />
-            <span>{verificationState.error}</span>
-          </div>
-        )}
-
-        {/* Success Banner */}
-        {verificationState.verificationResult?.match && (
-          <div className="success-banner">
-            <CheckCircle size={20} />
-            <span>
-              Identity Verified Successfully!
-              {verificationState.verificationResult.manualOverride &&
-                " (Manual Override)"}
-            </span>
-          </div>
-        )}
+        <NotificationBanners
+          error={verificationState.error}
+          verificationResult={verificationState.verificationResult}
+          t={t}
+        />
 
         <div className="space-y-8">
-          {/* Person Photo Section */}
-          <div className="verification-section">
-            <label className="form-label">Person Photo *</label>
-            <p className="form-description">
-              Upload a clear photo of the person for identity verification
-              during the investigation
-            </p>
+          <PersonPhotoUpload
+            onFileUpload={handleFileUpload}
+            referencePhoto={identityData.referencePhoto}
+            isVerifying={verificationState.isVerifying}
+            isVerified={identityData.isVerified}
+            fileInputKey={fileInputKey}
+            t={t}
+          />
 
-            <div
-              className="file-upload-area"
-              onClick={() => fileInputRef.current?.click()}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  fileInputRef.current?.click();
-                }
-              }}
-            >
-              <input
-                type="file"
-                key={fileInputKey}
-                ref={fileInputRef}
-                onChange={handleFileUpload}
-                accept=".jpg,.jpeg,.png"
-                className="hidden"
-                disabled={
-                  verificationState.isVerifying || identityData.isVerified
-                }
-                aria-label="Upload person photo"
-              />
+          <DocumentUploadSection
+            documentType={documentType}
+            documentDisplayName={documentDisplayName}
+            currentDocument={currentDocument}
+            onDocumentUpload={handleDocumentUpload}
+            onToggleDocumentType={toggleDocumentType}
+            isVerifying={verificationState.isVerifying}
+            isVerified={identityData.isVerified}
+            documentInputKey={documentInputKey}
+            t={t}
+          />
 
-              <div className="upload-icon">📁</div>
-              <p className="upload-text">Upload a clear photo of the person</p>
-
-              <button
-                className="upload-button"
-                disabled={
-                  verificationState.isVerifying || identityData.isVerified
-                }
-                type="button"
-              >
-                Upload Person Photo
-              </button>
-              <p className="file-types">JPG, PNG (Max 10MB)</p>
-
-              {identityData.referencePhoto && (
-                <div className="upload-success">
-                  <CheckCircle size={16} />
-                  <span>
-                    {identityData.referencePhoto.name} uploaded successfully
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Document Section */}
-          <div className="verification-section">
-            <div className="document-header">
-              <label className="form-label">
-                {documentDisplayName} Document *
-              </label>
-              <button
-                onClick={toggleDocumentType}
-                className="toggle-document-btn"
-                type="button"
-                disabled={verificationState.isVerifying}
-              >
-                {documentType === "passport" && (
-                  <div className="passport-disclaimer text-sm text-yellow-700 bg-yellow-100 p-2 rounded mb-4">
-                    Note: Passport verification is currently optimized for
-                    Bahraini passports only. For other nationalities, we
-                    recommend using CPR card for best results.
-                  </div>
-                )}
-                <RefreshCw size={16} />
-                Verify with {documentType === "cpr" ? "Passport" : "CPR"}{" "}
-                instead
-              </button>
-            </div>
-
-            <p className="form-description">
-              Upload {documentDisplayName.toLowerCase()} document for identity
-              verification
-            </p>
-
-            <div
-              className="file-upload-area"
-              onClick={() => documentInputRef.current?.click()}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  documentInputRef.current?.click();
-                }
-              }}
-            >
-              <input
-                type="file"
-                key={documentInputKey}
-                ref={documentInputRef}
-                onChange={handleDocumentUpload}
-                accept=".jpg,.jpeg,.png,.pdf"
-                className="hidden"
-                disabled={
-                  verificationState.isVerifying || identityData.isVerified
-                }
-                aria-label={`Upload ${documentDisplayName.toLowerCase()} document`}
-              />
-
-              <div className="upload-icon">📄</div>
-              <p className="upload-text">
-                Upload {documentDisplayName.toLowerCase()} document
-              </p>
-
-              <button
-                className="upload-button"
-                disabled={
-                  verificationState.isVerifying || identityData.isVerified
-                }
-                type="button"
-              >
-                Upload {documentDisplayName}
-              </button>
-              <p className="file-types">JPG, PNG, PDF (Max 10MB)</p>
-
-              {currentDocument && (
-                <div className="upload-success">
-                  <CheckCircle size={16} />
-                  <span>{currentDocument.name} uploaded successfully</span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Verification Results or Manual Override Section */}
           {(verificationState.verificationResult ||
             (showManualOverride &&
               verificationAttempts >= MAX_VERIFICATION_ATTEMPTS)) && (
             <div className="verification-result-container">
               {verificationState.verificationResult && (
                 <>
-                  <h3 className="result-title">Verification Results</h3>
+                  <h3 className="result-title">
+                    {t("identity.VerificationResults")}
+                  </h3>
 
-                  <div className="image-comparison-grid">
-                    <div className="comparison-image-card">
-                      <div className="image-label">Uploaded Photo</div>
-                      {uploadedPhotoPreview ? (
-                        <img
-                          src={uploadedPhotoPreview}
-                          alt="Uploaded person for verification"
-                          className="comparison-image"
-                        />
-                      ) : (
-                        <div className="image-placeholder">
-                          <ImageIcon size={48} />
-                          <span>No preview available</span>
-                        </div>
-                      )}
-                    </div>
+                  <ImageComparisonGrid
+                    uploadedPhotoPreview={uploadedPhotoPreview}
+                    comparisonPhotoPreview={comparisonPhotoPreview}
+                    photoSource={
+                      verificationState.verificationResult.photoSource
+                    }
+                    loadingReferencePhoto={loadingReferencePhoto}
+                    onImageError={() => setComparisonPhotoPreview(null)}
+                    t={t}
+                  />
 
-                    <div className="comparison-image-card">
-                      <div className="image-label">
-                        Comparison Source (
-                        {verificationState.verificationResult.photoSource})
-                      </div>
-                      {verificationState.verificationResult.photoSource ===
-                      "global-assets" ? (
-                        loadingReferencePhoto ? (
-                          <div className="image-placeholder">
-                            <Loader2 size={48} className="animate-spin" />
-                            <span>Loading reference photo...</span>
-                          </div>
-                        ) : comparisonPhotoPreview ? (
-                          <img
-                            src={comparisonPhotoPreview}
-                            alt="Reference from database"
-                            className="comparison-image"
-                            onError={() => setComparisonPhotoPreview(null)}
-                          />
-                        ) : (
-                          <div className="image-placeholder">
-                            <ImageIcon size={48} />
-                            <span>Reference photo from database</span>
-                          </div>
-                        )
-                      ) : comparisonPhotoPreview ? (
-                        <img
-                          src={comparisonPhotoPreview}
-                          alt="Comparison source from document"
-                          className="comparison-image"
-                        />
-                      ) : (
-                        <div className="image-placeholder">
-                          <ImageIcon size={48} />
-                          <span>Loading document photo...</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="result-details">
-                    <div className="result-row">
-                      <span className="result-label">Name:</span>
-                      <span className="result-value">
-                        {verificationState.verificationResult.personName}
-                      </span>
-                    </div>
-                    <div className="result-row">
-                      <span className="result-label">CPR Number:</span>
-                      <span className="result-value">
-                        {verificationState.verificationResult.cprNumber}
-                      </span>
-                    </div>
-                    <div className="result-row">
-                      <span className="result-label">Nationality:</span>
-                      <span className="result-value">
-                        {verificationState.verificationResult.nationality}
-                      </span>
-                    </div>
-                    <div className="result-row">
-                      <span className="result-label">Similarity Score:</span>
-                      <span className="result-value">
-                        {verificationState.verificationResult.similarity}%
-                      </span>
-                    </div>
-                    <div className="result-row">
-                      <span className="result-label">Confidence:</span>
-                      <span className="result-value">
-                        {verificationState.verificationResult.confidence}
-                      </span>
-                    </div>
-                    <div className="result-row">
-                      <span className="result-label">Status:</span>
-                      <span
-                        className={`result-value ${
-                          verificationState.verificationResult.match
-                            ? "text-green-600"
-                            : "text-red-600"
-                        }`}
-                      >
-                        {verificationState.verificationResult.match
-                          ? "✓ VERIFIED"
-                          : "✗ NOT VERIFIED"}
-                      </span>
-                    </div>
-                    {verificationState.verificationResult.manualOverride && (
-                      <div className="result-row">
-                        <span className="result-label">Override Reason:</span>
-                        <span className="result-value text-orange-600">
-                          {verificationState.verificationResult.overrideReason}
-                        </span>
-                      </div>
-                    )}
-                  </div>
+                  <VerificationResultDetails
+                    verificationResult={verificationState.verificationResult}
+                    t={t}
+                  />
                 </>
               )}
 
@@ -999,210 +738,73 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
                   verificationAttempts >= MAX_VERIFICATION_ATTEMPTS)) && (
                 <div className="verification-actions">
                   {canRetry && !showManualOverride && (
-                    <button
-                      onClick={handleRetryVerification}
-                      className="btn-secondary"
-                      type="button"
-                    >
-                      <RefreshCw size={18} />
-                      Retry Verification ({attemptsRemaining}{" "}
-                      {attemptsRemaining === 1 ? "attempt" : "attempts"} left)
-                    </button>
+                    <VerificationActions
+                      isVerified={identityData.isVerified}
+                      isVerifying={verificationState.isVerifying}
+                      verificationAttempts={verificationAttempts}
+                      maxAttempts={MAX_VERIFICATION_ATTEMPTS}
+                      attemptsRemaining={attemptsRemaining}
+                      isVerificationDisabled={isVerificationDisabled}
+                      canRetry={canRetry}
+                      onCompleteVerification={handleCompleteVerification}
+                      onRetryVerification={handleRetryVerification}
+                      onStartInvestigation={onStartInvestigation}
+                      t={t}
+                    />
                   )}
 
                   {showManualOverride && (
-                    <div className="manual-override-section">
-                      <div className="override-warning-box">
-                        <AlertCircle size={20} className="warning-icon" />
-                        <div className="warning-content">
-                          <p className="warning-title">
-                            Maximum verification attempts (
-                            {MAX_VERIFICATION_ATTEMPTS}) reached.
-                          </p>
-                          <p className="warning-description">
-                            {verificationState.verificationResult
-                              ? "The automated verification has failed. Choose one of the following options to proceed:"
-                              : "An error occurred during verification. Choose one of the following options to proceed:"}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="override-options-container">
-                        <div className="override-option-card option-accept">
-                          <h4 className="option-title">
-                            <CheckCircle size={18} />
-                            Option 1: Accept Verification with Manual Entry
-                          </h4>
-                          <p className="option-description">
-                            If you believe the identity is correct despite the
-                            failed automated verification, manually enter the
-                            participant's details and provide a detailed reason
-                            for approval.
-                          </p>
-
-                          <div className="form-field">
-                            <label className="field-label">
-                              Participant Full Name *
-                            </label>
-                            <input
-                              type="text"
-                              value={manualParticipantName}
-                              onChange={(e) =>
-                                setManualParticipantName(e.target.value)
-                              }
-                              placeholder="Enter full name as shown on document"
-                              className="field-input"
-                              disabled={verificationState.isVerifying}
-                            />
-                          </div>
-
-                          <div className="form-field">
-                            <label className="field-label">CPR Number *</label>
-                            <input
-                              type="text"
-                              value={manualParticipantCPR}
-                              onChange={(e) => {
-                                const value = e.target.value
-                                  .replace(/\D/g, "")
-                                  .slice(0, 9);
-                                setManualParticipantCPR(value);
-                              }}
-                              placeholder="Enter 9-digit CPR number"
-                              maxLength={9}
-                              className="field-input"
-                              disabled={verificationState.isVerifying}
-                            />
-                            <p className="field-hint">9 digits only</p>
-                          </div>
-
-                          <div className="form-field">
-                            <label className="field-label">Nationality *</label>
-                            <input
-                              type="text"
-                              value={manualParticipantNationality}
-                              onChange={(e) =>
-                                setManualParticipantNationality(e.target.value)
-                              }
-                              placeholder="Enter nationality (e.g., Bahraini, Indian, etc.)"
-                              className="field-input"
-                              disabled={verificationState.isVerifying}
-                            />
-                          </div>
-
-                          <div className="form-field">
-                            <label className="field-label">
-                              Reason for Manual Override *
-                            </label>
-                            <textarea
-                              value={manualOverrideReason}
-                              onChange={(e) =>
-                                setManualOverrideReason(e.target.value)
-                              }
-                              placeholder="Enter detailed reason for manual approval"
-                              className="field-textarea"
-                              rows={4}
-                              disabled={verificationState.isVerifying}
-                            />
-                          </div>
-
-                          <button
-                            onClick={handleManualOverride}
-                            className="btn-accept-override"
-                            type="button"
-                            disabled={
-                              !manualOverrideReason.trim() ||
-                              !manualParticipantName.trim() ||
-                              !manualParticipantCPR.trim() ||
-                              !manualParticipantNationality.trim() ||
-                              verificationState.isVerifying
-                            }
-                          >
-                            {verificationState.isVerifying ? (
-                              <>
-                                <Loader2 size={18} className="spinner-icon" />{" "}
-                                Processing Manual Approval...
-                              </>
-                            ) : (
-                              <>
-                                <CheckCircle size={18} /> Accept and Proceed to
-                                Investigation
-                              </>
-                            )}
-                          </button>
-                        </div>
-
-                        <div className="override-option-card option-end">
-                          <h4 className="option-title">
-                            <XCircle size={18} />
-                            Option 2: End This Session
-                          </h4>
-                          <p className="option-description">
-                            If you cannot verify the identity or believe the
-                            verification has failed legitimately, you can end
-                            this session. All data will be reset.
-                          </p>
-
-                          <button
-                            onClick={handleEndSessionClick}
-                            className="btn-end-session"
-                            type="button"
-                            disabled={verificationState.isVerifying}
-                          >
-                            <XCircle size={18} /> End Session and Start Over
-                          </button>
-                        </div>
-                      </div>
-                    </div>
+                    <ManualOverrideForm
+                      manualParticipantName={manualParticipantName}
+                      setManualParticipantName={setManualParticipantName}
+                      manualParticipantCPR={manualParticipantCPR}
+                      setManualParticipantCPR={setManualParticipantCPR}
+                      manualParticipantNationality={
+                        manualParticipantNationality
+                      }
+                      setManualParticipantNationality={
+                        setManualParticipantNationality
+                      }
+                      manualOverrideReason={manualOverrideReason}
+                      setManualOverrideReason={setManualOverrideReason}
+                      isVerifying={verificationState.isVerifying}
+                      onManualOverride={handleManualOverride}
+                      onEndSessionClick={handleEndSessionClick}
+                      hasVerificationResult={
+                        !!verificationState.verificationResult
+                      }
+                      t={t}
+                    />
                   )}
                 </div>
               )}
             </div>
           )}
 
-          {!identityData.isVerified && (
-            <button
-              onClick={handleCompleteVerification}
-              className="btn-success"
-              disabled={isVerificationDisabled}
-              type="button"
-            >
-              {verificationState.isVerifying ? (
-                <>
-                  <Loader2 size={18} className="animate-spin" /> Verifying
-                  Identity...
-                </>
-              ) : verificationAttempts >= MAX_VERIFICATION_ATTEMPTS ? (
-                <>
-                  <AlertCircle size={18} /> Maximum Attempts Reached
-                </>
-              ) : (
-                <>
-                  Complete Identity Verification <ArrowRight size={18} />
-                </>
-              )}
-            </button>
-          )}
-
-          {identityData.isVerified && (
-            <button
-              onClick={onStartInvestigation}
-              className="btn-primary"
-              type="button"
-            >
-              Proceed to Investigation <ArrowRight size={18} />
-            </button>
-          )}
+          <VerificationActions
+            isVerified={identityData.isVerified}
+            isVerifying={verificationState.isVerifying}
+            verificationAttempts={verificationAttempts}
+            maxAttempts={MAX_VERIFICATION_ATTEMPTS}
+            attemptsRemaining={attemptsRemaining}
+            isVerificationDisabled={isVerificationDisabled}
+            canRetry={canRetry}
+            onCompleteVerification={handleCompleteVerification}
+            onRetryVerification={handleRetryVerification}
+            onStartInvestigation={onStartInvestigation}
+            t={t}
+          />
         </div>
       </div>
-      {/* End Session Confirmation Popup */}
+
       <ConfirmationPopup
         isOpen={showEndSessionPopup}
         onClose={handleEndSessionCancel}
         onConfirm={handleEndSessionConfirm}
-        title="End Session"
-        message="Are you sure you want to end this session? All verification data will be lost and you'll be redirected to the homepage. This action cannot be undone."
-        confirmText="End Session"
-        cancelText="Cancel"
+        title={t("popup.title")}
+        message={t("popup.message")}
+        confirmText={t("popup.confirm")}
+        cancelText={t("popup.cancel")}
         type="danger"
       />
     </div>

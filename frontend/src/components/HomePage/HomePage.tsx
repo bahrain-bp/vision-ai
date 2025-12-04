@@ -6,6 +6,8 @@ import { useCaseContext } from "../../hooks/useCaseContext";
 import CreateCaseModal from "./CreateCaseModal";
 import ActionBar from "./ActionBar";
 import CasesGrid from "./CasesGrid";
+import { useLanguage } from "../../context/LanguageContext";
+import LanguageToggle from "../common/LanguageToggle";
 
 interface HomePageProps {
   user: UserType | null;
@@ -30,6 +32,8 @@ const HomePage: React.FC<HomePageProps> = ({
     clearError,
     updateCaseStatus,
   } = useCaseContext();
+
+  const { t } = useLanguage();
 
   const [showCreateCaseModal, setShowCreateCaseModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -162,14 +166,19 @@ const HomePage: React.FC<HomePageProps> = ({
           <div className="header-top">
             <div className="header-center">
               <div className="header-text">
-                <h1>Vision AI Investigation System</h1>
-                <p>Welcome back, {user?.username || "User"}!</p>
+                <h1>{t("home.title")}</h1>
+                <p>
+                  {t("home.welcome")}, {user?.username || "User"}!
+                </p>
               </div>
             </div>
-            <button onClick={handleSignOut} className="signout-btn">
-              <LogOut size={18} />
-              <span>Sign Out</span>
-            </button>
+            <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+              <LanguageToggle />
+              <button onClick={handleSignOut} className="signout-btn">
+                <LogOut size={18} />
+                <span>{t("home.signOut")}</span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -199,14 +208,17 @@ const HomePage: React.FC<HomePageProps> = ({
           onSortOrderChange={setSortOrder}
           onCreateCase={() => setShowCreateCaseModal(true)}
           isLoading={isLoading}
+          t={t}
         />
 
         {/* Cases List */}
         <div className="cases-container">
           <div className="cases-header">
             <Folder size={24} className="cases-icon" />
-            <h2 className="cases-title">Investigation Cases</h2>
-            <span className="cases-count">{filteredCases.length} cases</span>
+            <h2 className="cases-title">{t("home.investigationCases")}</h2>
+            <span className="cases-count">
+              {filteredCases.length} {t("home.cases")}
+            </span>
           </div>
 
           <CasesGrid
@@ -221,6 +233,7 @@ const HomePage: React.FC<HomePageProps> = ({
             onDeactivateCase={handleDeactivateCase}
             onStartSession={handleStartSessionInCase}
             onCreateCase={() => setShowCreateCaseModal(true)}
+            t={t}
           />
         </div>
 
@@ -230,6 +243,7 @@ const HomePage: React.FC<HomePageProps> = ({
             onClose={() => setShowCreateCaseModal(false)}
             onCreateCase={handleCreateCase}
             isLoading={isLoading}
+            t={t}
           />
         )}
       </div>

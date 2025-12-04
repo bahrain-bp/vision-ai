@@ -10,6 +10,7 @@ interface ActionBarProps {
   onSortOrderChange: (value: "newest" | "oldest") => void;
   onCreateCase: () => void;
   isLoading: boolean;
+  t: (key: string) => string;
 }
 
 const ActionBar: React.FC<ActionBarProps> = ({
@@ -21,6 +22,7 @@ const ActionBar: React.FC<ActionBarProps> = ({
   onSortOrderChange,
   onCreateCase,
   isLoading,
+  t,
 }) => {
   return (
     <div className="actions-bar">
@@ -28,7 +30,7 @@ const ActionBar: React.FC<ActionBarProps> = ({
         <Search size={20} className="search-icon" />
         <input
           type="text"
-          placeholder="Search cases..."
+          placeholder={t("home.searchCases")}
           value={searchTerm}
           onChange={(e) => onSearchChange(e.target.value)}
           className="search-input"
@@ -45,9 +47,9 @@ const ActionBar: React.FC<ActionBarProps> = ({
           }
           className="filter-select"
         >
-          <option value="all">All Status</option>
-          <option value="active">Active</option>
-          <option value="inactive">Inactive</option>
+          <option value="all">{t("home.allStatus")}</option>
+          <option value="active">{t("home.active")}</option>
+          <option value="inactive">{t("home.inactive")}</option>
         </select>
 
         <select
@@ -57,8 +59,8 @@ const ActionBar: React.FC<ActionBarProps> = ({
           }
           className="filter-select"
         >
-          <option value="newest">Newest First</option>
-          <option value="oldest">Oldest First</option>
+          <option value="newest">{t("home.newestFirst")}</option>
+          <option value="oldest">{t("home.oldestFirst")}</option>
         </select>
       </div>
 
@@ -68,7 +70,7 @@ const ActionBar: React.FC<ActionBarProps> = ({
         className="new-case-btn"
       >
         <Plus size={20} />
-        <span>New Case</span>
+        <span>{t("home.newCase")}</span>
       </button>
     </div>
   );
