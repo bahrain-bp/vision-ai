@@ -97,22 +97,7 @@ case_management_stack = CaseManagementStack(
 case_management_stack.add_dependency(shared_stack)
 case_management_stack.add_dependency(identity_stack)
 
-# ==========================================
-# 5. IDENTITY VERIFICATION STACK
-# Uses shared API by ID
-# ==========================================
-identity_stack = IdentityVerificationStack(
-    app,
-    f"{app_name}-identity-verification-stack",
-    env=env,
-    investigation_bucket=shared_stack.investigation_bucket,
-    shared_api_id=shared_stack.shared_api.rest_api_id,
-    shared_api_root_resource_id=shared_stack.shared_api.rest_api_root_resource_id,
-    description="Identity verification: CPR extraction, name extraction, and face comparison with CloudWatch logging",
-)
 
-# Ensure identity stack depends on case management stack
-identity_stack.add_dependency(case_management_stack)
 
 # ==========================================
 # 6. ADVANCED ANALYSIS STACK

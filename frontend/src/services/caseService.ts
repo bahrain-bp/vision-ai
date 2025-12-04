@@ -1,5 +1,5 @@
-import axios, { AxiosError } from "axios";
-
+import axios from "axios";
+import { AxiosError } from "../types/caseManagement";
 const API_BASE_URL = process.env.REACT_APP_API_ENDPOINT;
 
 export interface Case {
