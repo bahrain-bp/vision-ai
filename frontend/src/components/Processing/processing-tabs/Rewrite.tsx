@@ -1,8 +1,9 @@
-import React, { useState } from "react";
+﻿import React, { useState } from "react";
 import MarkdownPreview from "./MarkdownPreview";
 import { exportMarkdownToPDF, exportMarkdownToDocx } from "./ExportUtils";
 import { Sparkles, Lock, AlertCircle } from "lucide-react";
 import "./Rewrite.css";
+import { translationService } from "../../../services/LiveTranslation/TranslationService";
 
 interface SessionData {
   sessionId: string;
@@ -11,23 +12,99 @@ interface SessionData {
 
 interface RewriteProps {
   sessionData: SessionData;
+  selectedLanguage: "en" | "ar";
 }
 
-const Rewrite: React.FC<RewriteProps> = ({ sessionData }) => {
+type TranslationPhase = "idle" | "loading" | "ready" | "error";
+
+const Rewrite: React.FC<RewriteProps> = ({ sessionData, selectedLanguage }) => {
   const [rewrittenText, setRewrittenText] = useState("");
+  const [originalRewrittenText, setOriginalRewrittenText] = useState(""); // Store original Arabic
+  const [translatedText, setTranslatedText] = useState("");
+  const [, setTranslationPhase] = useState<TranslationPhase>("idle");
   const [caseNumber, setCaseNumber] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState<string>("");
+  const translationCacheRef = React.useRef<{ source: string; result: string }>({
+    source: "",
+    result: ""
+  });
 
+  // Helper function for bilingual text (like Classification)
+  const isArabic = selectedLanguage === "ar";
+  const t = (en: string, ar: string) => (isArabic ? ar : en);
 
+  const translateRewrittenReport = React.useCallback(async (text: string) => {
+    if (!text.trim()) {
+      setTranslatedText("");
+      setTranslationPhase("idle");
+      return;
+    }
+
+    const sourceText = text;
+
+    if (
+      translationCacheRef.current.source === sourceText &&
+      translationCacheRef.current.result
+    ) {
+      setTranslatedText(translationCacheRef.current.result);
+      setTranslationPhase("ready");
+      return;
+    }
+
+    setTranslationPhase("loading");
+
+    try {
+      const chunks = splitTextForTranslation(sourceText);
+      const translatedChunks: string[] = [];
+
+      for (const chunk of chunks) {
+        const translatedChunk = await translationService.translateText(
+          chunk,
+          "auto",
+          "en"
+        );
+        translatedChunks.push(translatedChunk);
+      }
+
+      const combined = translatedChunks.join("");
+      translationCacheRef.current = {
+        source: sourceText,
+        result: combined,
+      };
+
+      setTranslatedText(combined);
+      setTranslationPhase("ready");
+    } catch (translateErr) {
+      console.error("Report translation failed:", translateErr);
+      translationCacheRef.current = { source: "", result: "" };
+      setTranslatedText("");
+      setTranslationPhase("error");
+    }
+  }, []);
+
+  React.useEffect(() => {
+    if (selectedLanguage === "en" && originalRewrittenText) {
+      translateRewrittenReport(originalRewrittenText);
+    }
+  }, [selectedLanguage, originalRewrittenText, translateRewrittenReport]);
+
+  React.useEffect(() => {
+    if (!originalRewrittenText) {
+      setRewrittenText("");
+    } else {
+      setRewrittenText(originalRewrittenText);
+    }
+  }, [originalRewrittenText]);
 
   // Function to extract case number from Arabic text
   const extractCaseNumber = (text: string): string => {
     // Collect all candidate patterns (accept / or \\)
     const candidateRegexes: RegExp[] = [
-      /رقم\s*البلاغ\s*:?:?\s*([\d]{4,6}\s*[\/\\]\s*[\d]{4})/gi,
-      /القضية\s*رقم\s*:?:?\s*([\d]{4,6}\s*[\/\\]\s*[\d]{4})/gi,
-      /رقم\s*القضية\s*:?:?\s*([\d]{4,6}\s*[\/\\]\s*[\d]{4})/gi,
+      /╪▒┘é┘à\s*╪º┘ä╪¿┘ä╪º╪║\s*:?:?\s*([\d]{4,6}\s*[\/\\]\s*[\d]{4})/gi,
+      /╪º┘ä┘é╪╢┘è╪⌐\s*╪▒┘é┘à\s*:?:?\s*([\d]{4,6}\s*[\/\\]\s*[\d]{4})/gi,
+      /╪▒┘é┘à\s*╪º┘ä┘é╪╢┘è╪⌐\s*:?:?\s*([\d]{4,6}\s*[\/\\]\s*[\d]{4})/gi,
       /\b([\d]{4,6}\s*[\/\\]\s*[\d]{4})\b/gi,
     ];
 
@@ -45,7 +122,7 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData }) => {
       return "";
     }
 
-    // Score candidates: prefer backslash, prefer 5-6 digits before separator, prefer year 2024, prefer those near 'النيابة العامة' context
+    // Score candidates: prefer backslash, prefer 5-6 digits before separator, prefer year 2024, prefer those near '╪º┘ä┘å┘è╪º╪¿╪⌐ ╪º┘ä╪╣╪º┘à╪⌐' context
     const scoreCandidate = (c: string, indexInText: number): number => {
       let score = 0;
       if (c.includes("\\")) score += 3; // backslash format preferred
@@ -54,9 +131,9 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData }) => {
       const after = parts[1] || '';
       if (/^\d{5,6}$/.test(before)) score += 3; // 5-6 digits preferred
       if (after === '2024') score += 2; // common year
-      // proximity to 'النيابة العامة'
+      // proximity to '╪º┘ä┘å┘è╪º╪¿╪⌐ ╪º┘ä╪╣╪º┘à╪⌐'
       const window = text.substring(Math.max(0, indexInText - 80), Math.min(text.length, indexInText + 80));
-      if (/النيابة\s+العامة/.test(window)) score += 2;
+      if (/╪º┘ä┘å┘è╪º╪¿╪⌐\s+╪º┘ä╪╣╪º┘à╪⌐/.test(window)) score += 2;
       return score;
     };
 
@@ -79,31 +156,108 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData }) => {
 
   // Function to clean and deduplicate the rewritten text
   const cleanRewrittenText = (text: string): string => {
+    // Remove unwanted headers like "╪º┘ä╪¼╪▓╪í 1 ┘à┘å 2" or "╪º┘ä╪¼╪▓╪í ╪º┘ä╪½╪º┘å┘è"
+    text = text.replace(/╪º┘ä╪¼╪▓╪í\s*\d+\s*┘à┘å\s*\d+/g, '');
+    text = text.replace(/╪º┘ä╪¼╪▓╪í\s+(╪º┘ä╪ú┘ê┘ä|╪º┘ä╪½╪º┘å┘è|╪º┘ä╪½╪º┘ä╪½|╪º┘ä╪▒╪º╪¿╪╣|╪º┘ä╪«╪º┘à╪│)/g, '');
+    
     // Remove page numbers in all variations including bold markers
-    text = text.replace(/\*?\*?رقم الصفحة:\s*\d+\*?\*?/g, '');
-    text = text.replace(/\*?\*?\d+\s*\/\s*\d+\s*صفحة\s*:?\*?\*?/g, '');
-    text = text.replace(/صفحة\s*:?\s*\d+\s*\/?\s*\d*/g, '');
-    text = text.replace(/\*?\*?التاريخ والوقت:\*?\*?\s*\d+\s*\/\s*\d+/g, '');
-    text = text.replace(/\*?\*?\d+\s*\/\s*\d+\s*صفحة\s*:?\*?\*?/g, '');
-    text = text.replace(/صفحة\s*:?\s*\d+\s*\/\s*\d+/g, '');
-    text = text.replace(/\*?\*?التاريخ والوقت:\*?\*?\s*\d+\s*\/\s*\d+/g, '');
+    text = text.replace(/\*?\*?╪▒┘é┘à ╪º┘ä╪╡┘ü╪¡╪⌐:\s*\d+\*?\*?/g, '');
+    text = text.replace(/\*?\*?\d+\s*\/\s*\d+\s*╪╡┘ü╪¡╪⌐\s*:?\*?\*?/g, '');
+    text = text.replace(/╪╡┘ü╪¡╪⌐\s*:?\s*\d+\s*\/?\s*\d*/g, '');
+    text = text.replace(/\*?\*?╪º┘ä╪¬╪º╪▒┘è╪« ┘ê╪º┘ä┘ê┘é╪¬:\*?\*?\s*\d+\s*\/\s*\d+/g, '');
+    text = text.replace(/\d+\s*\/\s*\d+\s*:?\s*╪╡┘ü╪¡╪⌐/g, '');
     
-        // Remove duplicate header blocks (keep only the first occurrence)
-        // Pattern matches the full header block
-        const headerPattern = /#+\s*مملكة البحرين[\s\S]*?Capital Prosecution/g;
-        const headers = text.match(headerPattern);
+    // Remove Word document artifacts
+    text = text.replace(/\t+/g, ' '); // Replace tabs with spaces
+    text = text.replace(/\r\n/g, '\n'); // Normalize line breaks
+    text = text.replace(/\r/g, '\n'); // Convert Mac line breaks
     
-        if (headers && headers.length > 1) {
-          // Keep only the first header, remove all subsequent ones
-          let firstHeaderFound = false;
-          text = text.replace(headerPattern, (match) => {
-            if (!firstHeaderFound) {
-              firstHeaderFound = true;
-              return match; // Keep the first one
-            }
-            return ''; // Remove subsequent ones
-          });
+    // Remove excessive spacing before Arabic text
+    text = text.replace(/^\s{2,}/gm, ''); // Remove leading spaces on each line
+    
+    // Clean up bullet points and list markers from Word
+    text = text.replace(/^ΓùÅ\s*/gm, '- '); // Convert bullets to markdown
+    text = text.replace(/^ΓÇó\s*/gm, '- '); // Alternative bullet
+    text = text.replace(/^Γùï\s*/gm, '- '); // Circle bullet
+    
+    // Remove duplicate header blocks (keep only the first occurrence)
+    const headerPattern = /#+\s*┘à┘à┘ä┘â╪⌐ ╪º┘ä╪¿╪¡╪▒┘è┘å[\s\S]*?(?:Capital Prosecution|╪º┘ä┘å┘è╪º╪¿╪⌐ ╪º┘ä╪╣╪º┘à╪⌐)/g;
+    const headers = text.match(headerPattern);
+    
+    if (headers && headers.length > 1) {
+      let firstHeaderFound = false;
+      text = text.replace(headerPattern, (match) => {
+        if (!firstHeaderFound) {
+          firstHeaderFound = true;
+          return match;
         }
+        return '';
+      });
+    }
+    
+    // Clean up Q&A formatting - convert ╪│:/╪¼: to proper headers
+    text = text.replace(/^╪│:\s*/gm, '**╪│╪ñ╪º┘ä:** ');
+    text = text.replace(/^╪¼:\s*/gm, '**╪¼┘ê╪º╪¿:** ');
+    text = text.replace(/^╪│\d+:\s*/gm, '**╪│╪ñ╪º┘ä:** ');
+    text = text.replace(/^╪¼\d+:\s*/gm, '**╪¼┘ê╪º╪¿:** ');
+    
+    // Fix encoding issues first before removing garbled text
+    const encodingFixes: Record<string, string> = {
+      'Γò¬┬║': '╪º',
+      'Γöÿ├ñ': '┘ä',
+      'Γöÿ├á': '┘à',
+      'Γò¬┬í': '╪¡',
+      'Γò¬ΓîÉ': '╪¬',
+      'Γò¬┬┐': '╪¿',
+      'Γò¬ΓûÆ': '╪▒',
+      'Γò¬Γòó': '╪╢',
+      'Γöÿ├¿': '┘è',
+      'Γò¬Γòú': '╪╣',
+      'Γò¬┬¼': '┘å',
+      'Γò¬Γòû': '╪╖',
+      'Γò¬Γòí': '╪╡',
+      'Γò¬┬╝': '╪¡',
+      'Γò¬Γöé': '╪│',
+      'Γöÿ├⌐': '┘é',
+      'Γò¬Γòæ': '╪║',
+      'Γò¬Γò¥': '╪«',
+      'Γò¬Γûæ': '╪░',
+      'Γöÿ├╝': '┘ü',
+      'Γò¬├║': '╪ú',
+      'Γöÿ├¬': '┘ê',
+      'Γöÿ├ó': '┘â',
+      'Γò¬├│': '╪Ñ',
+      'Γò¬┬¬': '╪┤',
+      'Γò¬─Ö': '┘ç',
+      'Γöÿ├º': '┘ë'
+    };
+    
+    // Apply encoding fixes
+    Object.entries(encodingFixes).forEach(([garbled, correct]) => {
+      const regex = new RegExp(garbled, 'g');
+      text = text.replace(regex, correct);
+    });
+    
+    // Remove any remaining garbled text patterns (consecutive special characters)
+    text = text.replace(/[Γò¬Γöÿ]{3,}/g, '');
+    
+    // Collapse artificial spaces inserted between Arabic letters (Word copy artifacts)
+    const spacedLettersRegex = /(^|[^\u0600-\u06FF])((?:[\u0600-\u06FF]\s){2,}[\u0600-\u06FF])(?=[^\u0600-\u06FF]|$)/gu;
+    text = text.replace(spacedLettersRegex, (_match, prefix, letters) =>
+      `${prefix}${letters.replace(/\s+/g, '')}`
+    );
+    
+    // Fix common spacing issues in Arabic
+    text = text.replace(/\s+:/g, ':'); // Remove space before colon
+    text = text.replace(/:\s*\n\s*/g, ': '); // Fix colon with newline
+    text = text.replace(/[ \t]{2,}/g, ' '); // Collapse multiple spaces while preserving single spacing
+    
+    // Normalize table separators
+    text = text.replace(/\|\s*-+\s*\|/g, '| --- |');
+    
+    // Clean up multiple empty lines (but preserve paragraph structure)
+    text = text.replace(/\n{4,}/g, '\n\n\n'); // Max 3 newlines
+    text = text.replace(/\n{3,}/g, '\n\n'); // Normalize to max 2 newlines
     
     // Split text into paragraphs
     const paragraphs = text.split(/\n\n+/);
@@ -113,8 +267,8 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData }) => {
     for (const para of paragraphs) {
       if (!para.trim()) continue;
       
-      // Check if this paragraph contains a Q&A (جواب or ج1:)
-      const qaMatch = para.match(/(?:جواب|ج\d*)\s*:?\s*(.{200,})/s);
+      // Check if this paragraph contains a Q&A (╪¼┘ê╪º╪¿ or ╪¼1:)
+      const qaMatch = para.match(/(?:╪¼┘ê╪º╪¿|╪¼\d*)\s*:?\s*(.{200,})/s);
       
       if (qaMatch) {
         // Extract answer content for similarity comparison
@@ -166,7 +320,10 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData }) => {
   const handlePrint = () => {
     const printWindow = window.open('', '_blank');
     if (printWindow) {
-      const htmlContent = simpleMarkdownToHtmlForExport(rewrittenText);
+      const printableSource = selectedLanguage === "en"
+        ? translatedText || rewrittenText
+        : rewrittenText;
+      const htmlContent = simpleMarkdownToHtmlForExport(printableSource);
       printWindow.document.write(htmlContent);
       printWindow.document.close();
       printWindow.focus();
@@ -179,39 +336,39 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData }) => {
   const handleRewrite = async () => {
     setLoading(true);
     setError(null);
+    setStatusMessage(t("Starting rewrite job...", "╪¼╪º╪▒┘ì ╪¿╪»╪í ╪╣┘à┘ä┘è╪⌐ ╪Ñ╪╣╪º╪»╪⌐ ╪º┘ä┘â╪¬╪º╪¿╪⌐..."));
 
     if (!sessionData.extractedTextKey) {
-      setError("No extracted text found. Save the extracted text in Classification first.");
+      setError(t("No extracted text found. Save the extracted text in Classification first.", "┘ä┘à ┘è╪¬┘à ╪º┘ä╪╣╪½┘ê╪▒ ╪╣┘ä┘ë ┘å╪╡ ┘à╪│╪¬╪«╪▒╪¼. ╪º╪¡┘ü╪╕ ╪º┘ä┘å╪╡ ╪º┘ä┘à╪│╪¬╪«╪▒╪¼ ┘ü┘è ╪º┘ä╪¬╪╡┘å┘è┘ü ╪ú┘ê┘ä╪º┘ï."));
       setLoading(false);
+      setStatusMessage("");
       return;
     }
 
-    // Set a timeout for the request (30 seconds)
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000);
-
     try {
-      // Get API endpoint from environment or construct from window location
-      const apiEndpoint =
-        process.env.REACT_APP_API_ENDPOINT ||
+      // Get API endpoint
+      const apiGatewayEndpoint = process.env.REACT_APP_API_ENDPOINT ||
         `${window.location.origin.replace("localhost", "localhost").split(":")[0]}://${window.location.hostname}:3000`;
 
       // Use the extracted text key saved from Classification
       const requestBody = {
         sessionId: sessionData.sessionId,
         s3Key: sessionData.extractedTextKey,
+        language: selectedLanguage
       };
 
-      const response = await fetch(`${apiEndpoint}/rewrite`, {
+      // Step 1: Start the rewrite job
+      const requestUrl = `${apiGatewayEndpoint}/rewrite`;
+      console.log("Starting rewrite job:", requestUrl);
+      console.log("Request body:", requestBody);
+      
+      const response = await fetch(requestUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(requestBody),
-        signal: controller.signal,
       });
-
-      clearTimeout(timeoutId);
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -221,46 +378,117 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData }) => {
       }
 
       const data = await response.json();
-
-      if (data.status === "success") {
-        if (data.rewrittenText && data.rewrittenText.trim().length > 0) {
-          // Clean and deduplicate the text first
-          const cleanedText = cleanRewrittenText(data.rewrittenText);
-          setRewrittenText(cleanedText);
-          // Extract case number from the rewritten text
-          console.log("Rewritten text received, extracting case number...");
-          const extractedCaseNumber = extractCaseNumber(cleanedText);
-          console.log("Extracted case number:", extractedCaseNumber);
-          setCaseNumber(extractedCaseNumber);
-          // Log S3 output path (not displayed in UI)
-          if (data.outputS3Key) {
-            console.log("S3 Output Path:", data.outputS3Key);
-          }
-        } else {
-          // success but empty payload
-          const msg = data.message || "No rewritten text returned from the server.";
-          setError(msg);
-        }
+      
+      // Check if we got a jobId (async mode)
+      if (data.jobId) {
+        console.log("Job started with ID:", data.jobId);
+        setStatusMessage(t("Job started. Checking status...", "╪¼╪º╪▒┘ì ╪¿╪»╪í ╪º┘ä╪╣┘à┘ä┘è╪⌐. ┘à╪▒╪º╪¼╪╣╪⌐ ╪º┘ä╪¡╪º┘ä╪⌐..."));
+        
+        // Step 2: Poll for status
+        pollJobStatus(data.jobId, apiGatewayEndpoint);
+      } 
+      // Fallback: if server returns old sync format (for compatibility)
+      else if (data.status === "success" && data.rewrittenText) {
+        handleRewriteSuccess(data.rewrittenText);
       } else {
-        throw new Error(data.message || "Unknown error from API");
+        throw new Error(data.message || "Unexpected response format");
       }
     } catch (err) {
-      clearTimeout(timeoutId);
-      
-      // Handle timeout specifically
-      if (err instanceof Error && err.name === 'AbortError') {
-        setError("Request timed out. The document may be too large. Try with a smaller document or try again.");
-        console.error("Rewrite timeout");
-      } else {
-        const errorMessage =
-          err instanceof Error ? err.message : "Failed to rewrite report";
-        setError(errorMessage);
-        console.error("Rewrite error:", err);
-      }
-    } finally {
+      const errorMessage =
+        err instanceof Error ? err.message : t("Failed to start rewrite job", "┘ü╪┤┘ä ┘ü┘è ╪¿╪»╪í ╪╣┘à┘ä┘è╪⌐ ╪Ñ╪╣╪º╪»╪⌐ ╪º┘ä┘â╪¬╪º╪¿╪⌐");
+      setError(errorMessage);
+      console.error("Rewrite error:", err);
       setLoading(false);
+      setStatusMessage("");
     }
   };
+
+  // Poll job status every 10 seconds
+  const pollJobStatus = async (jobId: string, apiEndpoint: string) => {
+    const pollInterval = setInterval(async () => {
+      try {
+        const statusUrl = `${apiEndpoint}/rewrite/status/${jobId}`;
+        console.log("Polling status:", statusUrl);
+        
+        const response = await fetch(statusUrl, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error(`Status check failed: ${response.statusText}`);
+        }
+
+        const statusData = await response.json();
+        console.log("Status response:", statusData);
+
+        if (statusData.status === "COMPLETED") {
+          clearInterval(pollInterval);
+          setStatusMessage(t("Rewrite completed!", "╪¬┘à╪¬ ╪Ñ╪╣╪º╪»╪⌐ ╪º┘ä┘â╪¬╪º╪¿╪⌐ ╪¿┘å╪¼╪º╪¡!"));
+          
+          if (statusData.rewrittenText) {
+            handleRewriteSuccess(statusData.rewrittenText);
+          } else {
+            setError(t("Rewrite completed but no text returned", "╪¬┘à╪¬ ╪Ñ╪╣╪º╪»╪⌐ ╪º┘ä┘â╪¬╪º╪¿╪⌐ ┘ê┘ä┘â┘å ┘ä┘à ┘è╪¬┘à ╪Ñ╪▒╪¼╪º╪╣ ╪º┘ä┘å╪╡"));
+            setLoading(false);
+          }
+        } else if (statusData.status === "FAILED") {
+          clearInterval(pollInterval);
+          const failMsg = statusData.error || t("Rewrite job failed", "┘ü╪┤┘ä╪¬ ╪╣┘à┘ä┘è╪⌐ ╪Ñ╪╣╪º╪»╪⌐ ╪º┘ä┘â╪¬╪º╪¿╪⌐");
+          setError(isArabic ? `┘ü╪┤┘ä╪¬ ╪Ñ╪╣╪º╪»╪⌐ ╪º┘ä┘â╪¬╪º╪¿╪⌐: ${failMsg}` : failMsg);
+          setLoading(false);
+          setStatusMessage("");
+        } else if (statusData.status === "PROCESSING") {
+          setStatusMessage(t("Processing your report... Please wait.", "╪¼╪º╪▒┘ì ┘à╪╣╪º┘ä╪¼╪⌐ ╪º┘ä╪¬┘é╪▒┘è╪▒... ╪º┘ä╪▒╪¼╪º╪í ╪º┘ä╪º┘å╪¬╪╕╪º╪▒."));
+        } else {
+          setStatusMessage(isArabic ? `╪º┘ä╪¡╪º┘ä╪⌐: ${statusData.status}` : `Status: ${statusData.status}`);
+        }
+      } catch (err) {
+        clearInterval(pollInterval);
+        const errorMessage =
+          err instanceof Error ? err.message : t("Failed to check job status", "┘ü╪┤┘ä ┘ü┘è ┘ü╪¡╪╡ ╪¡╪º┘ä╪⌐ ╪º┘ä╪╣┘à┘ä┘è╪⌐");
+        setError(errorMessage);
+        console.error("Status check error:", err);
+        setLoading(false);
+        setStatusMessage("");
+      }
+    }, 10000); // Poll every 10 seconds
+
+    // Set a maximum timeout of 5 minutes
+    setTimeout(() => {
+      clearInterval(pollInterval);
+      if (loading) {
+        setError(t(
+          "Job timeout: Processing took too long. Please try again.",
+          "╪º┘å╪¬┘ç╪¬ ┘à┘ç┘ä╪⌐ ╪º┘ä╪╣┘à┘ä┘è╪⌐: ╪º╪│╪¬╪║╪▒┘é╪¬ ┘ê┘é╪¬┘ï╪º ╪╖┘ê┘è┘ä╪º┘ï. ╪º┘ä╪▒╪¼╪º╪í ╪º┘ä┘à╪¡╪º┘ê┘ä╪⌐ ┘à╪▒╪⌐ ╪ú╪«╪▒┘ë."
+        ));
+        setLoading(false);
+        setStatusMessage("");
+      }
+    }, 300000); // 5 minutes
+  };
+
+  // Handle successful rewrite
+  const handleRewriteSuccess = (rawText: string) => {
+    const cleanedText = cleanRewrittenText(rawText);
+    translationCacheRef.current = { source: "", result: "" };
+    setTranslatedText("");
+    setTranslationPhase(selectedLanguage === "en" ? "loading" : "idle");
+    setOriginalRewrittenText(cleanedText); // Store original Arabic
+    setRewrittenText(cleanedText);
+    
+    console.log("Rewritten text received, extracting case number...");
+    const extractedCaseNumber = extractCaseNumber(cleanedText);
+    console.log("Extracted case number:", extractedCaseNumber);
+    setCaseNumber(extractedCaseNumber);
+    
+    setLoading(false);
+    setStatusMessage("");
+  };
+
+  const displayMarkdown = selectedLanguage === "en" ? (translatedText || rewrittenText) : rewrittenText;
 
 
 
@@ -272,9 +500,11 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData }) => {
             <Sparkles size={28} />
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <h2 className="rewrite-heading">Rewrite</h2>
+            <h2 className="rewrite-heading">
+              {t("Rewrite", "╪Ñ╪╣╪º╪»╪⌐ ╪º┘ä┘â╪¬╪º╪¿╪⌐")}
+            </h2>
             <p className="rewrite-subheading">
-              Rewrite and improve investigation reports
+              {t("Rewrite and improve investigation reports", "╪Ñ╪╣╪º╪»╪⌐ ┘â╪¬╪º╪¿╪⌐ ┘ê╪¬╪¡╪│┘è┘å ╪¬┘é╪º╪▒┘è╪▒ ╪º┘ä╪¬╪¡┘é┘è┘é")}
             </p>
           </div>
         </div>
@@ -286,12 +516,24 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData }) => {
           </div>
         )}
 
+        {/* Status Message for async processing */}
+        {statusMessage && !error && (
+          <div className="rewrite-status-message">
+            <div className="spinner"></div>
+            <span>{statusMessage}</span>
+          </div>
+        )}
+
         <div className="rewrite-body">
-          <label className="rewrite-section-label">Rewritten Report</label>
+          <label className="rewrite-section-label">
+            {t("Rewritten Report", "╪º┘ä╪¬┘é╪▒┘è╪▒ ╪º┘ä┘à┘Å╪╣╪º╪» ┘â╪¬╪º╪¿╪¬┘ç")}
+          </label>
           {/* Case Number Display - Only show when case number is extracted */}
           {caseNumber && (
             <div className="case-number-banner">
-              <div className="case-number-label">القضية رقم</div>
+              <div className="case-number-label">
+                {t("Case Number", "╪º┘ä┘é╪╢┘è╪⌐ ╪▒┘é┘à")}
+              </div>
               <div className="case-number-value">{caseNumber}</div>
             </div>
           )}
@@ -302,21 +544,21 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData }) => {
                 type="button"
                 className="rewrite-primary-btn"
                 onClick={() => {
-                  exportMarkdownToPDF(simpleMarkdownToHtmlForExport(rewrittenText), `report_${caseNumber || 'case'}.pdf`);
+                  exportMarkdownToPDF(simpleMarkdownToHtmlForExport(displayMarkdown), `report_${caseNumber || 'case'}.pdf`);
                 }}
                 style={{ flex: 1 }}
               >
-                <span>📄 Export PDF</span>
+                <span>{t("≡ƒôä Export PDF", "≡ƒôä ╪¬╪╡╪»┘è╪▒ PDF")}</span>
               </button>
               <button
                 type="button"
                 className="rewrite-primary-btn"
                 onClick={() => {
-                  exportMarkdownToDocx(rewrittenText, `report_${caseNumber || 'case'}.docx`);
+                  exportMarkdownToDocx(displayMarkdown, `report_${caseNumber || 'case'}.docx`);
                 }}
                 style={{ flex: 1 }}
               >
-                <span>📝 Export Word</span>
+                <span>{t("≡ƒô¥ Export Word", "≡ƒô¥ ╪¬╪╡╪»┘è╪▒ Word")}</span>
               </button>
               <button
                 type="button"
@@ -324,19 +566,38 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData }) => {
                 onClick={handlePrint}
                 style={{ flex: 1 }}
               >
-                <span>🖨️ Print</span>
+                <span>{t("≡ƒû¿∩╕Å Print", "≡ƒû¿∩╕Å ╪╖╪¿╪º╪╣╪⌐")}</span>
               </button>
             </div>
           )}
-          {/* Preview formatted Markdown output */}
-          <div style={{
-            background: '#ffffff',
-            color: '#1a1a1a',
-            transition: 'all 0.3s ease',
-            borderRadius: 14,
-            padding: 0
-          }}>
-            <MarkdownPreview markdown={rewrittenText} />
+          {/* Preview formatted output */}
+          <div className={`rewrite-preview-card ${isArabic ? 'rtl' : 'ltr'}`}>
+            <div className="rewrite-preview-header">
+              <div>
+                <p className="preview-label">
+                  {t("Latest Generated Version", "╪ú╪¡╪»╪½ ┘å╪│╪«╪⌐ ┘à╪╣╪º┘ä╪¼╪⌐")}
+                </p>
+                <h3 className="preview-title">
+                  {t("Investigation Report", "╪¬┘é╪▒┘è╪▒ ╪º┘ä╪¬╪¡┘é┘è┘é")}
+                </h3>
+              </div>
+              <div className="preview-meta">
+                <span className="preview-chip">
+                  {isArabic ? "╪º┘ä╪╣╪▒╪¿┘è╪⌐" : "English"}
+                </span>
+                {caseNumber && (
+                  <span className="preview-chip highlight">
+                    {caseNumber}
+                  </span>
+                )}
+                <span className="preview-chip subtle">
+                  {t("Session", "╪º┘ä╪¼┘ä╪│╪⌐")} #{sessionData.sessionId.slice(-6)}
+                </span>
+              </div>
+            </div>
+            <div className="rewrite-preview-scroll">
+              <MarkdownPreview markdown={displayMarkdown} />
+            </div>
           </div>
         </div>
 
@@ -347,7 +608,11 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData }) => {
           disabled={loading}
         >
           <Lock size={18} className="rewrite-btn-icon" />
-          <span>{loading ? "Rewriting..." : "Rewrite Report"}</span>
+          <span>
+            {loading 
+              ? t("Rewriting...", "╪¼╪º╪▒┘ì ╪Ñ╪╣╪º╪»╪⌐ ╪º┘ä┘â╪¬╪º╪¿╪⌐...") 
+              : t("Rewrite Report", "╪Ñ╪╣╪º╪»╪⌐ ┘â╪¬╪º╪¿╪⌐ ╪º┘ä╪¬┘é╪▒┘è╪▒")}
+          </span>
         </button>
       </div>
     </div>
@@ -355,6 +620,26 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData }) => {
 };
 
 export default Rewrite;
+
+const TRANSLATION_CHUNK_SIZE = 4500;
+
+function splitTextForTranslation(text: string, chunkSize = TRANSLATION_CHUNK_SIZE): string[] {
+  const normalized = text.replace(/\r/g, "");
+  if (normalized.length <= chunkSize) {
+    return [normalized];
+  }
+
+  const chunks: string[] = [];
+  let cursor = 0;
+
+  while (cursor < normalized.length) {
+    const nextCursor = Math.min(cursor + chunkSize, normalized.length);
+    chunks.push(normalized.slice(cursor, nextCursor));
+    cursor = nextCursor;
+  }
+
+  return chunks;
+}
 
 // Enhanced HTML builder for PDF export with proper table and formatting support
 function simpleMarkdownToHtmlForExport(md: string): string {
@@ -508,7 +793,7 @@ function simpleMarkdownToHtmlForExport(md: string): string {
       line-height: 1.8;
     }
     ul li::before {
-      content: '◆';
+      content: 'Γùå';
       position: absolute;
       right: 0;
       color: #dc2626;
@@ -569,7 +854,10 @@ function simpleMarkdownToHtmlForExport(md: string): string {
 </head>
 <body>
   <div class="header">
-    <div class="header-text">مملكة البحرين</div>
+    <div class="header-text">
+      <div style="margin-bottom: 8px;">┘à┘à┘ä┘â╪⌐ ╪º┘ä╪¿╪¡╪▒┘è┘å</div>
+      <div style="font-size: 20px; font-weight: normal; color: #4b5563;">Kingdom of Bahrain</div>
+    </div>
     <img class="header-logo" src="https://upload.wikimedia.org/wikipedia/commons/thumb/2/2c/Flag_of_Bahrain.svg/320px-Flag_of_Bahrain.svg.png" alt="Bahrain Flag">
   </div>
   <div class="content">
