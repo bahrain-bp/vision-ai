@@ -268,6 +268,7 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
       ...prev,
       isVerifying: true,
       error: null,
+      verificationResult: null,
       uploadProgress: { document: 0, photo: 0 },
     }));
 
