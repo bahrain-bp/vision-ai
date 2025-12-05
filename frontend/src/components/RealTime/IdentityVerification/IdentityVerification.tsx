@@ -7,6 +7,7 @@ import {
   PersonType,
 } from "../../../types/identityVerification";
 import { useCaseContext } from "../../../hooks/useCaseContext";
+import { useTranscription } from "../../../hooks/useTranscription";
 
 const IdentityVerification: React.FC<IdentityVerificationProps> = ({
   onStartInvestigation,
@@ -20,6 +21,8 @@ const IdentityVerification: React.FC<IdentityVerificationProps> = ({
     passport: null,
     isVerified: false,
   });
+  const { setParticipantType } = useTranscription();
+
 
   const updateIdentityData = useCallback(
     (field: keyof IdentityData, value: File | boolean | null) => {
@@ -61,7 +64,13 @@ const IdentityVerification: React.FC<IdentityVerificationProps> = ({
                 <span className="session-label">Person Type</span>
                 <select
                   value={personType}
-                  onChange={(e) => setPersonType(e.target.value as PersonType)}
+                  onChange={(e) => {
+                    const newType = e.target.value;
+                    setPersonType(e.target.value as PersonType)
+                      const capitalized =
+                        newType.charAt(0).toUpperCase() + newType.slice(1);
+                      setParticipantType(capitalized);
+                  }}
                   className="person-type-select"
                   disabled={identityData.isVerified}
                 >

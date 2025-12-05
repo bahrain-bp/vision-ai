@@ -8,6 +8,7 @@ import {
   Globe,
   User,
   Languages,
+  AlertTriangle,
 } from "lucide-react";
 import {
   RecordingStatus,
@@ -205,6 +206,7 @@ const TranscriptionSessionSetup: React.FC<TranscriptionSessionSetupProps> = ({
                     showCheckbox={true}
                     onSelect={handleLanguageSelect}
                     onRemove={handleLanguageRemove}
+                    selectionLimit={5}
                     avoidHighlightFirstOption={true}
                     style={{
                       chips: {
@@ -312,7 +314,7 @@ const TranscriptionSessionSetup: React.FC<TranscriptionSessionSetupProps> = ({
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
             <label className="flex items-center gap-2 text-sm font-semibold text-gray-800 mb-4">
               <Users className="w-4 h-4 text-blue-600" />
-              Number of Participants
+              Speaker Detection Mode
             </label>
 
             <div className="space-y-3">
@@ -367,13 +369,23 @@ const TranscriptionSessionSetup: React.FC<TranscriptionSessionSetupProps> = ({
                   className="mt-1 w-4 h-4 text-blue-600"
                 />
                 <div className="flex-1">
-                  <div className="font-semibold text-gray-900 mb-1.5">
-                    Multiple Participants
+                  <div className="flex items-center gap-2">
+                    {" "}
+                    {/* Add this wrapper with items-center */}
+                    <span className="font-semibold text-gray-900">
+                      Multiple Participants
+                    </span>
+                    <span className="px-2 py-0.5 bg-yellow-100 text-yellow-700 text-xs font-medium rounded-full flex items-center gap-1">
+                      <AlertTriangle className="w-3 h-3" />{" "}
+                      {/* You'll need to import this */}
+                      In Development
+                    </span>
                   </div>
-                  <p className="text-sm text-gray-600 leading-relaxed">
-                    For group interviews or when multiple people are present
-                    (witnesses, lawyers, translators, etc.). AWS will
-                    auto-detect up to 10 speakers.
+                  <p className="text-sm text-gray-600 mt-1.5 leading-relaxed">
+                    For group interviews or when multiple people are present.
+                    <span className="font-medium text-yellow-700">
+                      May produce inaccurate results.
+                    </span>
                   </p>
                 </div>
               </label>
@@ -383,8 +395,8 @@ const TranscriptionSessionSetup: React.FC<TranscriptionSessionSetupProps> = ({
               <Info className="w-4 h-4 flex-shrink-0" />
               <span>
                 {sessionType === "standard"
-                  ? 'Speakers will be labeled as "Investigator" and "Witness"'
-                  : 'Speakers will be labeled as "Investigator", "Speaker 0", "Speaker 1", etc.'}
+                  ? 'Speakers will be labeled as "Investigator" and "Witness" for example.'
+                  : 'Speakers will be labeled as "Investigator", "Speaker 0", "Speaker 1", etc. for example.'}
               </span>
             </div>
           </div>

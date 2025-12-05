@@ -31,9 +31,9 @@ class TranscribeService {
 
   private mediaManager = StreamManager;
 
-  private  readonly microphoneAttempts: number = 15;
+  private readonly microphoneAttempts: number = 15;
 
-  private  readonly displayAttempts: number = 15;
+  private readonly displayAttempts: number = 15;
 
   private transcribeClient: TranscribeStreamingClient | null = null;
 
@@ -43,6 +43,8 @@ class TranscribeService {
 
   private transcriptCallback: ((result: TranscriptionResult) => void) | null =
     null;
+
+  private participantType: string = "Witness";
 
   private static instance: TranscribeService;
 
@@ -88,7 +90,7 @@ class TranscribeService {
     const display = await this.mediaManager.getDisplayStream();
     const audio = await this.mediaManager.getMicStream();
 
-    if (display.displayStream === null || display.success === false)
+    if (display.displayStream === null || display.success === false){
       return {
         success: false,
         timestamp: new Date().toISOString(),
@@ -101,6 +103,23 @@ class TranscribeService {
           rawError: display.error,
         },
       };
+    }
+
+    if (!this.mediaManager.getDisplayStreamStatus().hasAudioTracks) {
+      return {
+        success: false,
+        timestamp: new Date().toISOString(),
+        source: "display",
+        error: {
+          success: false,
+          type: "device",
+          message:
+            "Please enable 'Share system audio' when selecting your screen.",
+          rawError: audio.error,
+        },
+      };
+    }
+
     if (audio.audioStream === null || audio.success === false)
       return {
         success: false,
@@ -112,21 +131,6 @@ class TranscribeService {
           rawError: audio.error,
         },
       };
-
-    if (!this.mediaManager.getDisplayStreamStatus().hasAudioTracks) {
-      return {
-        success: false,
-        timestamp: new Date().toISOString(),
-        source: "microphone",
-        error: {
-          success: false,
-          type: "device",
-          message:
-            "Please enable 'Share system audio' when selecting your screen.",
-          rawError: audio.error,
-        },
-      };
-    }
 
     this.audioStatus = "on";
     this.displayStatus = "on";
@@ -163,6 +167,7 @@ class TranscribeService {
     const micResult = await this.attemptConnection(this.micSettings);
 
     if (!micResult.success) {
+      this.mediaManager.stopStreams();
       return {
         success: false,
         timestamp: new Date().toISOString(),
@@ -213,11 +218,7 @@ class TranscribeService {
     };
 
     while (attempts > 0 && !connected) {
-      console.log(
-        `${settings.source} attempt ${settings.maxAttempts - attempts + 1}/${
-          settings.maxAttempts
-        }`
-      );
+   
 
       result = await this.startTranscriptionStream(
         settings.transcribeClient,
@@ -326,7 +327,6 @@ class TranscribeService {
         ShowSpeakerLabel: source === "display" && speakerMode === "multi",
         AudioStream: this.getAudioStream(microphoneStream, sampleRate),
       });
-
     try {
       const data: StartStreamTranscriptionCommandOutput =
         await transcribeClient.send(command);
@@ -389,10 +389,10 @@ class TranscribeService {
           } else {
             // Display audio
             if (speakerMode === "standard") {
-              speaker = "Witness";
+              speaker = this.participantType ?? "Witness";
             } else {
               const awsSpeakerLabel = transcriptWords[0]?.speaker || "0";
-              speaker = `Speaker ${awsSpeakerLabel}`;
+              speaker = `${this.participantType ?? 'Speaker'} ${awsSpeakerLabel}`;
             }
           }
 
@@ -465,12 +465,15 @@ class TranscribeService {
       throw error;
     }
   }
+  setPersonType(personType: string) {
+    this.participantType = personType;
+  }
 
   stopRecording(): void {
     this.mediaManager.stopStreams();
     this.recordingStatus = "off";
   }
-  toggleRecordingPause(isPaused: boolean):void {
+  toggleRecordingPause(isPaused: boolean): void {
     this.recordingStatus = isPaused ? "paused" : "on";
   }
 
