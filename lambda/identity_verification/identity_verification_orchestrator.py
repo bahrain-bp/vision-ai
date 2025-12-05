@@ -908,112 +908,70 @@ def extract_name_unified(lines, full_text, document_type):
 def extract_nationality_from_text(lines, full_text):
     """Extract nationality from document text - ENHANCED VERSION"""
     try:
-        logger.info("=== NATIONALITY EXTRACTION START ===")
-        logger.info(f"Full text to search: {full_text}")
-        
-        # Method 1: Direct pattern matching for "NATIONALITY" followed by the value
-        # This handles cases where NATIONALITY and value are on same line or adjacent lines
-        nationality_pattern = r'NATIONALITY[:\s]*([A-Z]{4,})'
-        match = re.search(nationality_pattern, full_text.upper())
-        
-        if match:
-            extracted = match.group(1).strip()
-            logger.info(f"Found nationality via NATIONALITY pattern: {extracted}")
-            cleaned = clean_nationality(extracted)
-            if cleaned and cleaned != 'Unknown':
-                logger.info(f"✓ Extracted nationality: {cleaned}")
-                return cleaned
-        
-        # Method 2: Look for Arabic nationality keyword الجنسية
-        arabic_pattern = r'الجنسية[:\s]*([^\s]+)'
-        match = re.search(arabic_pattern, full_text)
-        
-        if match:
-            extracted = match.group(1).strip()
-            logger.info(f"Found nationality via Arabic pattern: {extracted}")
-            cleaned = clean_nationality(extracted)
-            if cleaned and cleaned != 'Unknown':
-                return cleaned
-        
-        # Method 3: Search for nationality keywords and extract from nearby lines
+        # Method 1: Look for nationality keywords in both English and Arabic
         nationality_keywords = [
-            'Nationality', 'NATIONALITY', 'الجنسية', 'nationality',
+            'Nationality', 'الجنسية', 'nationality', 'NATIONALITY',
             'Nat.', 'NAT.', 'nat.'
         ]
         
+        # First pass: Look for keyword followed by value on same line or next line
         for i, line in enumerate(lines):
             for keyword in nationality_keywords:
                 if keyword in line:
-                    logger.info(f"Found nationality keyword '{keyword}' in line {i}: {line}")
+                    logger.info(f"Found nationality keyword '{keyword}' in line: {line}")
                     
                     # Check if nationality is on the same line after the keyword
                     if ':' in line:
                         parts = line.split(':', 1)
                         if len(parts) > 1:
                             nationality = parts[1].strip()
-                            if nationality and len(nationality) > 2:
+                            if nationality and len(nationality) > 2 and not nationality.isdigit():
                                 cleaned = clean_nationality(nationality)
                                 if cleaned and cleaned != 'Unknown':
-                                    logger.info(f"✓ Extracted nationality from same line: {cleaned}")
+                                    logger.info(f"Extracted nationality from same line: {cleaned}")
                                     return cleaned
-                    
-                    # Check if there's text after the keyword on the same line (no colon)
-                    line_after_keyword = line.replace(keyword, '', 1).strip()
-                    if line_after_keyword and len(line_after_keyword) > 2:
-                        # Remove any colons or special chars
-                        line_after_keyword = re.sub(r'^[:\s]+', '', line_after_keyword)
-                        if line_after_keyword and not line_after_keyword.isdigit():
-                            cleaned = clean_nationality(line_after_keyword)
-                            if cleaned and cleaned != 'Unknown':
-                                logger.info(f"✓ Extracted nationality from same line (after keyword): {cleaned}")
-                                return cleaned
                     
                     # Check the next line
                     if i + 1 < len(lines):
                         next_line = lines[i + 1].strip()
-                        logger.info(f"Checking next line {i+1} for nationality: {next_line}")
+                        logger.info(f"Checking next line for nationality: {next_line}")
                         
-                        # Skip if next line looks like a date or number
-                        if next_line and not re.match(r'^\d', next_line):
+                        if next_line and not any(char.isdigit() for char in next_line[:5]):
                             cleaned = clean_nationality(next_line)
                             if cleaned and cleaned != 'Unknown':
-                                logger.info(f"✓ Extracted nationality from next line: {cleaned}")
+                                logger.info(f"Extracted nationality from next line: {cleaned}")
                                 return cleaned
         
-        # Method 4: Look for common nationalities in the text
+        # Method 2: Look for common nationality patterns (country names)
         common_nationalities = [
-            'Bahraini', 'BAHRAINI', 'بحريني',
             'Indian', 'INDIAN', 'هندي',
             'Pakistani', 'PAKISTANI', 'باكستاني',
             'Bangladeshi', 'BANGLADESHI', 'بنغلاديشي',
             'Filipino', 'FILIPINO', 'فلبيني',
             'Egyptian', 'EGYPTIAN', 'مصري',
+            'Bahraini', 'BAHRAINI', 'بحريني',
             'Saudi', 'SAUDI', 'سعودي',
-            'Emirati', 'EMIRATI', 'إماراتي',
-            'Nepali', 'NEPALI', 'نيبالي',
-            'Sri Lankan', 'SRI LANKAN', 'سريلانكي',
-            'Jordanian', 'JORDANIAN', 'أردني',
-            'Lebanese', 'LEBANESE', 'لبناني',
-            'Syrian', 'SYRIAN', 'سوري',
-            'Iraqi', 'IRAQI', 'عراقي',
-            'Kuwaiti', 'KUWAITI', 'كويتي',
-            'Omani', 'OMANI', 'عماني',
-            'Qatari', 'QATARI', 'قطري',
-            'Yemeni', 'YEMENI', 'يمني',
-            'Sudanese', 'SUDANESE', 'سوداني',
-            'Chinese', 'CHINESE', 'صيني',
-            'Indonesian', 'INDONESIAN', 'إندونيسي',
-            'Malaysian', 'MALAYSIAN', 'ماليزي',
-            'Thai', 'THAI', 'تايلندي',
-            'Vietnamese', 'VIETNAMESE', 'فيتنامي'
+            'Emirati', 'EMIRATI', 'إماراتي'
         ]
         
         for nationality in common_nationalities:
-            # Use word boundary to avoid partial matches
-            pattern = r'\b' + re.escape(nationality) + r'\b'
-            if re.search(pattern, full_text, re.IGNORECASE):
+            if nationality in full_text:
                 cleaned = clean_nationality(nationality)
-                logger.info(f"✓ Found nationality by pattern matching: {cleaned}")
+                logger.info(f"Found nationality by pattern matching: {cleaned}")
+                return cleaned
+        
+        # Method 3: Look for text that appears between "Nationality" and "Name" sections
+        nationality_match = re.search(
+            r'(?:Nationality|الجنسية|NATIONALITY|NAT\.)[:\s]*([A-Za-z\u0600-\u06FF\s]+?)(?:\s*(?:Name|الاسم|NAME)|$)',
+            full_text,
+            re.IGNORECASE | re.UNICODE
+        )
+        
+        if nationality_match:
+            extracted = nationality_match.group(1).strip()
+            logger.info(f"Found nationality by regex pattern: {extracted}")
+            cleaned = clean_nationality(extracted)
+            if cleaned and cleaned != 'Unknown':
                 return cleaned
         
         logger.warning("Could not extract nationality from document")
@@ -1093,7 +1051,7 @@ def extract_nationality_from_mrz(lines, full_text):
         logger.info(f"Falling back to full text search: {text_upper}")
         
         # Look for common patterns:
-        # 1. Digit followed by 3 uppercase letters (e.g., "3BHR" in second MRZ line)
+        # 1. Digit followed by 3 uppercase letters 
         pattern = r'\d([A-Z]{3})'
         matches = re.findall(pattern, text_upper)
         
