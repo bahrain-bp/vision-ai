@@ -523,10 +523,90 @@ def verify_s3_object_exists(s3_key):
         logger.error(f"Object not found in S3: {s3_key} - {str(e)}")
         return False
 
+def check_document_quality(document_key):
+    """Check quality of document image before processing"""
+    try:
+        logger.info(f"Checking document quality for: {document_key}")
+        
+        quality_response = rekognition.detect_faces(
+            Image={
+                'S3Object': {
+                    'Bucket': BUCKET_NAME,
+                    'Name': document_key
+                }
+            },
+            Attributes=['ALL']
+        )
+        
+        if not quality_response.get('FaceDetails'):
+            return {
+                'success': False,
+                'error': 'No face detected in the document. Please upload a clear ID document with a visible face photo.',
+                'details': 'Face detection returned no results'
+            }
+        
+        face_detail = quality_response['FaceDetails'][0]
+        quality = face_detail.get('Quality', {})
+        brightness = quality.get('Brightness', 0)
+        sharpness = quality.get('Sharpness', 0)
+        
+        logger.info(f"Document quality - Brightness: {brightness}, Sharpness: {sharpness}")
+        
+        # Quality thresholds for documents
+        if brightness < 35:
+            return {
+                'success': False,
+                'error': 'The document image is too dark. Please take a photo in better lighting conditions.',
+                'details': f'Brightness score: {brightness}/100 (minimum 35 required)'
+            }
+        
+        if sharpness < 25:
+            return {
+                'success': False,
+                'error': 'The document image is too blurry. Please take a clearer, focused photo of the document.',
+                'details': f'Sharpness score: {sharpness}/100 (minimum 25 required)'
+            }
+        
+        if brightness > 95:
+            return {
+                'success': False,
+                'error': 'The document image is overexposed (too bright). Please take a photo with better lighting.',
+                'details': f'Brightness score: {brightness}/100 (maximum 95)'
+            }
+        
+        logger.info(f"✓ Document quality check passed")
+        return {
+            'success': True,
+            'brightness': brightness,
+            'sharpness': sharpness
+        }
+        
+    except rekognition.exceptions.InvalidImageFormatException as e:
+        return {
+            'success': False,
+            'error': 'Invalid document image format. Please upload a valid JPG or PNG image.',
+            'details': str(e)
+        }
+    except Exception as e:
+        logger.warning(f"Document quality check failed: {str(e)}")
+        # Continue with processing even if quality check fails
+        return {'success': True}
 
 def extract_data_from_document(document_key, document_type='cpr'):
     """Extract CPR number and person name from document using Textract"""
     try:
+        # Check document quality first
+        quality_check = check_document_quality(document_key)
+        if not quality_check['success']:
+            logger.error(f"Document quality check failed: {quality_check['error']}")
+            return {
+                'success': False,
+                'error': quality_check['error'],
+                'details': quality_check.get('details', ''),
+                'extractedText': ''
+            }
+        
+
         logger.info(f"Calling Textract for: {document_key} (document_type: {document_type})")
         
         response = textract.detect_document_text(
@@ -857,7 +937,9 @@ def extract_nationality_from_text(lines, full_text):
                                 return cleaned
         
         # Method 2: Look for common nationality patterns (country names)
+
         common_nationalities = [
+            # Existing nationalities
             'Indian', 'INDIAN', 'هندي',
             'Pakistani', 'PAKISTANI', 'باكستاني',
             'Bangladeshi', 'BANGLADESHI', 'بنغلاديشي',
@@ -865,7 +947,49 @@ def extract_nationality_from_text(lines, full_text):
             'Egyptian', 'EGYPTIAN', 'مصري',
             'Bahraini', 'BAHRAINI', 'بحريني',
             'Saudi', 'SAUDI', 'سعودي',
-            'Emirati', 'EMIRATI', 'إماراتي'
+            'Emirati', 'EMIRATI', 'إماراتي',
+            'Nepali', 'NEPALI', 'نيبالي',
+            'Sri Lankan', 'SRI LANKAN', 'سريلانكي',
+            
+            # Additional nationalities for language speakers
+            # Arabic speakers
+            'Jordanian', 'JORDANIAN', 'أردني',
+            'Lebanese', 'LEBANESE', 'لبناني',
+            'Syrian', 'SYRIAN', 'سوري',
+            'Iraqi', 'IRAQI', 'عراقي',
+            'Kuwaiti', 'KUWAITI', 'كويتي',
+            'Omani', 'OMANI', 'عماني',
+            'Qatari', 'QATARI', 'قطري',
+            'Yemeni', 'YEMENI', 'يمني',
+            'Sudanese', 'SUDANESE', 'سوداني',
+            'Tunisian', 'TUNISIAN', 'تونسي',
+            'Algerian', 'ALGERIAN', 'جزائري',
+            'Moroccan', 'MOROCCAN', 'مغربي',
+            'Palestinian', 'PALESTINIAN', 'فلسطيني',
+            'Libyan', 'LIBYAN', 'ليبي',
+            
+            # French speakers
+            'French', 'FRENCH', 'فرنسي',
+            'Belgian', 'BELGIAN', 'بلجيكي',
+            'Swiss', 'SWISS', 'سويسري',
+            'Canadian', 'CANADIAN', 'كندي',
+            'Senegalese', 'SENEGALESE', 'سنغالي',
+            'Ivorian', 'IVORIAN', 'إيفواري',
+            'Cameroonian', 'CAMEROONIAN', 'كاميروني',
+            
+
+            # Other common nationalities in the region
+            'Chinese', 'CHINESE', 'صيني',
+            'Indonesian', 'INDONESIAN', 'إندونيسي',
+            'Malaysian', 'MALAYSIAN', 'ماليزي',
+            'Thai', 'THAI', 'تايلندي',
+            'Vietnamese', 'VIETNAMESE', 'فيتنامي',
+            'Korean', 'KOREAN', 'كوري',
+            'Japanese', 'JAPANESE', 'ياباني',
+            'Singaporean', 'SINGAPOREAN', 'سنغافوري',
+            'British', 'BRITISH', 'بريطاني',
+            'American', 'AMERICAN', 'أمريكي',
+            'Australian', 'AUSTRALIAN', 'أسترالي'
         ]
         
         for nationality in common_nationalities:
