@@ -92,6 +92,22 @@ def handle_verification_request(event, context):
     if not verify_s3_object_exists(person_photo_key):
         return error_response(404, f'Person photo not found in S3: {person_photo_key}')
     
+        # Validate file extensions
+    logger.info("\n--- Validating file extensions ---")
+    allowed_extensions = ['.jpg', '.jpeg', '.png']
+
+    document_ext = os.path.splitext(document_key)[1].lower()
+    if document_ext not in allowed_extensions:
+        logger.error(f"Invalid document file extension: {document_ext}")
+        return error_response(400, f'Invalid document file type. Only JPG, JPEG, and PNG files are allowed. Uploaded: {document_ext}')
+
+    person_photo_ext = os.path.splitext(person_photo_key)[1].lower()
+    if person_photo_ext not in allowed_extensions:
+        logger.error(f"Invalid person photo file extension: {person_photo_ext}")
+        return error_response(400, f'Invalid person photo file type. Only JPG, JPEG, and PNG files are allowed. Uploaded: {person_photo_ext}')
+
+    logger.info(f"✓ File extensions validated - Document: {document_ext}, Photo: {person_photo_ext}")
+    
     # STEP 1: Extract CPR and Name OR Use Manual Data
     logger.info("\n" + "=" * 60)
     logger.info("STEP 1: Processing document data")
