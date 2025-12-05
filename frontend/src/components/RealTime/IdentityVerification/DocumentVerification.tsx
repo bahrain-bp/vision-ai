@@ -336,6 +336,13 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
         }
         setShowManualOverride(false);
       } else {
+        // Set appropriate error message based on confidence level
+        let errorMessage = `Verification failed after ${MAX_VERIFICATION_ATTEMPTS} attempts. Please choose an option below.`;
+
+        if (result.confidence === "MEDIUM") {
+          errorMessage = `Face match confidence is too low (${result.similarity}%). The photos may be of the same person but image quality is insufficient. Please upload clearer, well-lit photos and try again.`;
+        }
+
         if (currentAttempt >= MAX_VERIFICATION_ATTEMPTS) {
           console.log(
             "Maximum attempts reached, showing manual override options"
@@ -343,7 +350,13 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
           setShowManualOverride(true);
           setVerificationState((prev) => ({
             ...prev,
-            error: `Verification failed after ${MAX_VERIFICATION_ATTEMPTS} attempts. Please choose an option below.`,
+            error: errorMessage,
+          }));
+        } else {
+          // Show the confidence error even before max attempts
+          setVerificationState((prev) => ({
+            ...prev,
+            error: errorMessage,
           }));
         }
       }
@@ -737,22 +750,6 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
                 (showManualOverride &&
                   verificationAttempts >= MAX_VERIFICATION_ATTEMPTS)) && (
                 <div className="verification-actions">
-                  {canRetry && !showManualOverride && (
-                    <VerificationActions
-                      isVerified={identityData.isVerified}
-                      isVerifying={verificationState.isVerifying}
-                      verificationAttempts={verificationAttempts}
-                      maxAttempts={MAX_VERIFICATION_ATTEMPTS}
-                      attemptsRemaining={attemptsRemaining}
-                      isVerificationDisabled={isVerificationDisabled}
-                      canRetry={canRetry}
-                      onCompleteVerification={handleCompleteVerification}
-                      onRetryVerification={handleRetryVerification}
-                      onStartInvestigation={onStartInvestigation}
-                      t={t}
-                    />
-                  )}
-
                   {showManualOverride && (
                     <ManualOverrideForm
                       manualParticipantName={manualParticipantName}
