@@ -19,7 +19,6 @@ import { getTimeString } from "../common/Timer/Timer";
 
 import { CameraFootageProvider } from "../../context/CameraFootageContext";
 
-
 interface ParticipantData {
   fullName: string;
   idNumber: string;
@@ -77,6 +76,7 @@ const SessionPage: React.FC<SessionPageProps> = ({
     updateSessionStatus,
     setCurrentSession,
     setCurrentPersonName,
+    setCurrentPersonType,
   } = useCaseContext();
 
   const [activeMainTab, setActiveMainTab] = useState<MainTab>("real-time");
@@ -173,6 +173,7 @@ const SessionPage: React.FC<SessionPageProps> = ({
     }
     setCurrentSession(null);
     setCurrentPersonName(null);
+    setCurrentPersonType(null);
 
     // Trigger switch to summarization tab
     setTriggerSummarization(true);
@@ -191,6 +192,7 @@ const SessionPage: React.FC<SessionPageProps> = ({
     sessionCreationAttempted.current = false;
     setCurrentSession(null);
     setCurrentPersonName(null);
+    setCurrentPersonType(null);
     if (onEndSession) {
       onEndSession();
     } else {
@@ -255,7 +257,7 @@ const SessionPage: React.FC<SessionPageProps> = ({
         try {
           sessionCreationAttempted.current = true;
           const investigator = getInvestigatorName();
-          await createSession(currentCase.caseId, investigator, "witness");
+          await createSession(currentCase.caseId, investigator);
         } catch (error) {
           console.error("Failed to create session:", error);
           sessionCreationAttempted.current = false;
