@@ -142,7 +142,6 @@ const SessionPage: React.FC<SessionPageProps> = ({
 
     // Trigger switch to summarization tab
     setTriggerSummarization(true);
-    setShowSummaryModal(true);
   };
 
   const handleCloseSummary = () => {
