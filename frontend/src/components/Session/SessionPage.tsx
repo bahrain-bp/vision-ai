@@ -157,25 +157,21 @@ const SessionPage: React.FC<SessionPageProps> = ({
   }, [setupData.witnessData.fullName]);
 
   const handleEndSession = async () => {
-    stopRecording(setSessionState);
-
-    if (currentSession && currentCase) {
-      try {
-        await updateSessionStatus(
-          currentCase.caseId,
-          currentSession.sessionId,
-          "completed"
-        );
-      } catch (error) {
-        console.error("Failed to update session status:", error);
-      }
+  stopRecording(setSessionState);
+  if (currentSession && currentCase) {
+    try {
+      await updateSessionStatus(
+        currentCase.caseId,
+        currentSession.sessionId,
+        "completed"
+      );
+    } catch (error) {
+      console.error("Failed to update session status:", error);
     }
-    setCurrentSession(null);
-    setCurrentPersonName(null);
-
-    // Trigger switch to summarization tab
-    setTriggerSummarization(true);
-    setShowSummaryModal(true);
+  }
+  setCurrentSession(null);
+  // Trigger switch to summarization tab
+  setTriggerSummarization(true);
   };
 
   const handleCloseSummary = () => {
