@@ -60,6 +60,17 @@
   border: 1px solid #e5e7eb;
 }
 
+.report-paragraph {
+  margin-bottom: 12px;
+  line-height: 1.6;
+}
+
+.report-paragraph p {
+  text-align: justify;
+  color: #333;
+  font-size: 14px;
+}
+
 /* Responsive design */
 @media (max-width: 768px) {
   .translation-settings-row {
@@ -80,3 +91,5 @@
     justify-content: center;
   }
 }
+
+

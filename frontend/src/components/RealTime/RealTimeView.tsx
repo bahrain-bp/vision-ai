@@ -1,10 +1,5 @@
 import React, { useState, useEffect } from "react";
-import {
-  User,
-  ChevronUp,
-  ChevronDown,
-  FileText,
-} from "lucide-react";
+import { User, ChevronUp, ChevronDown, FileText } from "lucide-react";
 import LiveTranscription from "../LiveTranscription/LiveTranscription";
 import Translation from "./Translation";
 import SessionInfo from "./SessionInfo";
@@ -12,8 +7,13 @@ import IdentityVerification from "./IdentityVerification/IdentityVerification";
 import TranscriptionSessionSetup from "../LiveTranscription/TranscriptionSessionSetup"
 import QuestionGenerator from './AIAssistant/QuestionGenerator';
 import { TranslationProvider } from '../../context/TranslationContext';
-import { RecordingStatus, sessionType, LanguagePreferences } from "../../types/";
+import {
+  RecordingStatus,
+  SessionType,
+  LanguagePreferences,
+} from "../../types/";
 import SummarizationReport from "./SummarizationReport";
+import { useLanguage } from "../../context/LanguageContext";
 
 interface SessionData {
   sessionId: string;
@@ -77,19 +77,20 @@ const RealTimeView: React.FC<RealTimeViewProps> = ({
   sessionData,
   triggerSummarization,
 }) => {
-  const [activeTab, setActiveTab] = useState<"identity" | "transcription" | "summarization">(
-    "identity"
-  );
+  const { t } = useLanguage();
+  const [activeTab, setActiveTab] = useState<
+    "identity" | "transcription" | "summarization"
+  >("identity");
   const [aiExpanded, setAiExpanded] = useState(false);
   const [isIdentityVerified, setIsIdentityVerified] = useState(false);
   const [startRecording, setStartRecording] = useState(false);
-  const [sessionType, setSessionType] = useState<sessionType>("standard");
+  const [sessionType, setSessionType] = useState<SessionType>("standard");
   const [detectionLanguages, setDetectionLanguages] = useState([]);
 
   const [languagePreferences, setLanguagePreferences] =
     useState<LanguagePreferences>({
       languageMode: "unified",
-      sharedLanguage: "ar-SA",
+      sharedLanguage: "en-US",
       investigatorLanguage: "",
       witnessLanguage: "",
     });
@@ -150,8 +151,8 @@ const RealTimeView: React.FC<RealTimeViewProps> = ({
                   setSessionType={setSessionType}
                   sessionType={sessionType}
                 />
-                <TranslationProvider 
-                  investigatorLanguage="en" 
+                <TranslationProvider
+                  investigatorLanguage="en"
                   witnessLanguage="ar"
                 >
                   <Translation />
@@ -160,7 +161,7 @@ const RealTimeView: React.FC<RealTimeViewProps> = ({
             )}
           </div>
         )}
-        
+
         {activeTab === "summarization" && (
           <div className="recording-content">
             <SummarizationReport sessionData={sessionData} />
@@ -178,15 +179,14 @@ const RealTimeView: React.FC<RealTimeViewProps> = ({
             disabled={isIdentityVerified}
           >
             <User className="btn-icon" />
-            <span>Identity Verification</span>
+            <span>{t("identity.title")}</span>
           </button>
 
           <button
             onClick={() => setActiveTab("transcription")}
             className={`sidebar-btn ${
               activeTab === "transcription" ? "active" : ""
-            } ${!isIdentityVerified ? "disabled" : ""}`}
-            disabled={!isIdentityVerified}
+            }`}
           >
             <User className="btn-icon" />
             <span>Transcription & Translation</span>

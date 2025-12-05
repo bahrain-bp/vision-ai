@@ -5,6 +5,7 @@ import App from "./App";
 import reportWebVitals from "./reportWebVitals";
 import { Buffer } from "buffer";
 import process from "process";
+import { LanguageProvider } from "./context/LanguageContext";
 
 window.Buffer = Buffer;
 window.process = process;
@@ -19,7 +20,9 @@ const root = ReactDOM.createRoot(rootElement);
 
 root.render(
   <React.StrictMode>
-    <App />
+    <LanguageProvider>
+      <App />
+    </LanguageProvider>
   </React.StrictMode>
 );
 

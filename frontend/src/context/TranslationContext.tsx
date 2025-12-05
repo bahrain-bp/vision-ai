@@ -60,7 +60,7 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({
   const extractSpeakerAndText = (content: string): { speaker: "Investigator" | "Witness"; text: string } => {
     console.log(` Raw transcription: "${content}"`);
     
-    // Remove timestamp patterns like [22:13:35]
+    // Remove timestamp patterns 
     let cleanedContent = content.replace(/\[\d{2}:\d{2}:\d{2}\]/g, '').trim();
     
     console.log(` After timestamp removal: "${cleanedContent}"`);
@@ -121,7 +121,7 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({
 
         // Skip if no actual text content after cleaning
         if (!actualText || actualText.length < 2) {
-          console.log('⏭ Skipping - no meaningful text after cleaning');
+          console.log(' Skipping - no meaningful text after cleaning');
           return;
         }
 

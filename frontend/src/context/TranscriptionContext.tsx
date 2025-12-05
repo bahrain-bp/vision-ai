@@ -6,8 +6,14 @@ import React, {
   useRef,
   useEffect,
 } from "react";
-import { RecordingStatus, sessionType,SaveTranscriptionRequest,LanguagePreferences } from "../types/";
-import { TranscriptionResult,TranscriptionStatus } from "../types";
+import {
+  RecordingStatus,
+  SessionType,
+  SaveTranscriptionRequest,
+  LanguagePreferences,
+  TranscriptionStats,
+} from "../types/";
+import { TranscriptionResult,TranscriptionStatus,FormattedTranscript } from "../types";
 import TranscribeService from "../services/LiveTranscription/TranscribeService";
 import StreamManager from "../services/LiveTranscription/StreamManager";
 import {useCaseContext} from "../hooks/useCaseContext"
@@ -17,19 +23,22 @@ export interface TranscriptionContextType {
   startRecording: (
     setSessionState?: (state: RecordingStatus) => void,
     languagePreferences?: LanguagePreferences,
-    sessionType?: sessionType,
+    sessionType?: SessionType,
     detectionLanguages?: string
   ) => Promise<TranscriptionStatus>;
   stopRecording: (setSessionState?: (state: RecordingStatus) => void) => void;
   getFullTranscript: string;
-  getTranscriptSegments: () => getFormatedTranscript[];
+  getTranscriptSegments: () => FormattedTranscript[];
+  toggleRecordingPause: (isPaused: boolean) => void;
+
+  toggleReset: () => void;
+
+  //Used to change state if reset not to track it
+  resetTrigger: boolean;
+
+  transcriptStats: TranscriptionStats;
 }
 
-interface getFormatedTranscript {
-  speaker: string;
-  formattedTranscript: string;
-  timeStamp?: string;
-}
 
 export const TranscriptionContext = createContext<
   TranscriptionContextType | undefined
@@ -43,8 +52,17 @@ export const TranscriptionProvider: React.FC<{ children: ReactNode }> = ({
     useState<TranscriptionResult | null>(null);
   const [fullTranscript, setFullTranscript] = useState<string>("");
   const [transcriptSegments, setTranscriptSegments] = useState<
-    getFormatedTranscript[]
+    FormattedTranscript[]
   >([]); 
+  const [transcriptStats, setTranscriptStats] = useState<TranscriptionStats>({
+    avgWitnessConfidenceLevel: 0,
+    witnessWordCount: 0,
+    investigatorWordCount: 0,
+    totalWordCount: 0,
+  });
+
+
+  const [isResetTrigger, setIsResetTrigger] = useState(false);
 
   const [recordingStatus, setRecordingStatus] =
     useState<RecordingStatus>("off");
@@ -57,7 +75,7 @@ export const TranscriptionProvider: React.FC<{ children: ReactNode }> = ({
     async (
       setSessionState?: (state: RecordingStatus) => void,
       languagePreferences?: LanguagePreferences,
-      sessionType?: sessionType,
+      sessionType?: SessionType,
       detectionLanguages?: string
     ): Promise<TranscriptionStatus> => {
       if (isStartingRef.current) {
@@ -75,8 +93,14 @@ export const TranscriptionProvider: React.FC<{ children: ReactNode }> = ({
       isStartingRef.current = true;
 
       try {
-              setTranscriptSegments([]);
-              setFullTranscript("");
+        setTranscriptSegments([]);
+        setFullTranscript("");
+        setTranscriptStats({
+          avgWitnessConfidenceLevel: 0,
+          witnessWordCount: 0,
+          investigatorWordCount: 0,
+          totalWordCount: 0,
+        });
         const result = await TranscribeService.startRecording(
           setTranscriptUpdate,
           languagePreferences,
@@ -86,7 +110,7 @@ export const TranscriptionProvider: React.FC<{ children: ReactNode }> = ({
 
         if (result.success) {
           const newStatus = TranscribeService.getRecordingStatus();
-          const newAudioStatus = TranscribeService.getAudioStatus();
+          const newAudioStatus = TranscribeService.isAudioActive();
 
           setRecordingStatus(newStatus);
           setAudioStatus(newAudioStatus);
@@ -106,6 +130,9 @@ export const TranscriptionProvider: React.FC<{ children: ReactNode }> = ({
   );
 
   useEffect(() => {
+      if (recordingStatus !== "on") {
+        return;
+      }
      const newSpeaker = onTranscriptUpdate?.speaker || "N/A";
     const newText = onTranscriptUpdate?.formattedTranscript;
 
@@ -122,12 +149,41 @@ export const TranscriptionProvider: React.FC<{ children: ReactNode }> = ({
           timeStamp: newTimeStamp,
         },
       ]);
+    setTranscriptStats((prev) => {
+      if (!prev) return prev;
+
+      const newWitnessWords =
+        prev.witnessWordCount + onTranscriptUpdate.witnessWordCount;
+      const newInvestigatorWords =
+        prev.investigatorWordCount + onTranscriptUpdate.investigatorWordCount;
+      const newTotalWords = newWitnessWords + newInvestigatorWords;
+
+      let newAvgConfidence = prev.avgWitnessConfidenceLevel;
+
+      if (onTranscriptUpdate.witnessWordCount > 0 && newWitnessWords > 0) {
+        const prevTotalConfidence =
+          prev.avgWitnessConfidenceLevel * prev.witnessWordCount;
+        const newSegmentConfidence =
+          (onTranscriptUpdate?.avgWitnessConfidenceLevel ?? 0) *
+          onTranscriptUpdate.witnessWordCount;
+
+        newAvgConfidence =
+          (prevTotalConfidence + newSegmentConfidence) / newWitnessWords;
+      }
+
+      return {
+        avgWitnessConfidenceLevel: newAvgConfidence,
+        witnessWordCount: newWitnessWords,
+        investigatorWordCount: newInvestigatorWords,
+        totalWordCount: newTotalWords,
+      };
+    });
     }
     
   }, [onTranscriptUpdate]);
 
 
-  const getTranscriptSegments = useCallback((): getFormatedTranscript[] => {
+  const getTranscriptSegments = useCallback((): FormattedTranscript[] => {
     return transcriptSegments;
   }, [transcriptSegments]);
 
@@ -136,7 +192,7 @@ export const TranscriptionProvider: React.FC<{ children: ReactNode }> = ({
       TranscribeService.stopRecording();
 
       const newStatus = TranscribeService.getRecordingStatus();
-      const newAudioStatus = TranscribeService.getAudioStatus();
+      const newAudioStatus = TranscribeService.isAudioActive();
 
       setRecordingStatus(newStatus);
       setAudioStatus(newAudioStatus);
@@ -160,6 +216,24 @@ export const TranscriptionProvider: React.FC<{ children: ReactNode }> = ({
     [fullTranscript, currentCase, currentSession]
   );
 
+  const toggleRecordingPause = (isPaused: boolean) => {
+      TranscribeService.toggleRecordingPause(isPaused);
+  };
+
+  const toggleReset =()=>{
+    setFullTranscript("");
+    setTranscriptSegments([]);
+    setIsResetTrigger((prev) => !prev);
+    setTranscriptStats({
+      avgWitnessConfidenceLevel: 0,
+      witnessWordCount: 0,
+      investigatorWordCount: 0,
+      totalWordCount: 0,
+    });
+  };
+
+  const resetTrigger = isResetTrigger;
+
   return (
     <TranscriptionContext.Provider
       value={{
@@ -169,6 +243,10 @@ export const TranscriptionProvider: React.FC<{ children: ReactNode }> = ({
         stopRecording,
         getFullTranscript: fullTranscript,
         getTranscriptSegments,
+        toggleRecordingPause,
+        toggleReset,
+        resetTrigger,
+        transcriptStats,
       }}
     >
       {children}

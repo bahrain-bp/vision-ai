@@ -41,7 +41,7 @@ def handler(event, context):
 
         # Safe file extension extraction and validation
         file_extension = os.path.splitext(file_name)[1] or '.jpg'
-        allowed_extensions = ['.jpg', '.jpeg', '.png', '.pdf']
+        allowed_extensions = ['.jpg', '.jpeg', '.png']
         if file_extension.lower() not in allowed_extensions:
             logger.error(f"Invalid file extension uploaded: {file_extension}")
             return error_response(400, f'Invalid file extension. Allowed: {", ".join(allowed_extensions)}')
@@ -57,11 +57,20 @@ def handler(event, context):
 
         logger.info(f"Generated S3 key: {s3_key}")
 
-        presigned_url = s3.generate_presigned_url(
-            'put_object',
-            Params={'Bucket': BUCKET_NAME, 'Key': s3_key, 'ContentType': file_type},
+        presigned_post = s3.generate_presigned_post(
+            Bucket=BUCKET_NAME,
+            Key=s3_key,
+            Fields={'Content-Type': file_type},
+            Conditions=[
+                {'Content-Type': file_type},
+                ['content-length-range', 0, 10485760]  # 10MB limit
+            ],
             ExpiresIn=600
         )
+
+        # Extract the URL and fields
+        upload_url = presigned_post['url']
+        upload_fields = presigned_post['fields']
 
         logger.info(f"Successfully generated presigned URL for {upload_type} upload")
 
@@ -69,7 +78,8 @@ def handler(event, context):
             'statusCode': 200,
             'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
             'body': json.dumps({
-                'uploadUrl': presigned_url,
+                'uploadUrl': upload_url,
+                'uploadFields': upload_fields,
                 's3Key': s3_key,
                 'bucket': BUCKET_NAME,
                 'uploadType': upload_type,

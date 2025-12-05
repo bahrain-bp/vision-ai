@@ -1512,10 +1512,48 @@
   color: var(--text-dark);
 }
 
-.confidence-high {
-  color: #10b981;
+.confidence-excellent {
+  color: #059669; /* Dark Green - Excellent (95-100%) */
+  font-weight: 600;
+  animation: pulse 2s ease-in-out infinite;
+
 }
 
+.confidence-high {
+  color: #10b981; /* Green - High (85-94%) */
+  font-weight: 500;
+}
+
+.confidence-good {
+  color: #22c55e; /* Light Green - Good (75-84%) */
+}
+
+.confidence-medium {
+  color: #f59e0b; /* Orange - Medium (65-74%) */
+}
+
+.confidence-fair {
+  color: #f97316; /* Dark Orange - Fair (55-64%) */
+}
+
+.confidence-low {
+  color: #ef4444; /* Red - Low (45-54%) */
+}
+
+.confidence-poor {
+  color: #dc2626; /* Dark Red - Poor (35-44%) */
+  font-weight: 500;
+}
+
+.confidence-critical {
+  color: #991b1b; /* Very Dark Red - Critical (<35%) */
+  font-weight: 600;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
 /* Processing View */
 .processing-view {
   padding: 24px;
