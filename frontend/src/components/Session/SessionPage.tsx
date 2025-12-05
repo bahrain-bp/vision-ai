@@ -60,6 +60,8 @@ const SessionPage: React.FC<SessionPageProps> = ({
     createSession,
     updateSessionStatus,
     setCurrentSession,
+    setCurrentPersonName,
+    setCurrentPersonType,
   } = useCaseContext();
 
   const [activeMainTab, setActiveMainTab] = useState<MainTab>("real-time");
@@ -155,7 +157,8 @@ const SessionPage: React.FC<SessionPageProps> = ({
   const handleBackToHome = () => {
     sessionCreationAttempted.current = false;
     setCurrentSession(null);
-
+    setCurrentPersonName(null);
+    setCurrentPersonType(null);
     if (onEndSession) {
       onEndSession();
     } else {
