@@ -6,6 +6,7 @@ import "./Rewrite.css";
 
 interface SessionData {
   sessionId: string;
+  extractedTextKey?: string;
 }
 
 interface RewriteProps {
@@ -179,6 +180,12 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData }) => {
     setLoading(true);
     setError(null);
 
+    if (!sessionData.extractedTextKey) {
+      setError("No extracted text found. Save the extracted text in Classification first.");
+      setLoading(false);
+      return;
+    }
+
     // Set a timeout for the request (30 seconds)
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000);
@@ -189,10 +196,10 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData }) => {
         process.env.REACT_APP_API_ENDPOINT ||
         `${window.location.origin.replace("localhost", "localhost").split(":")[0]}://${window.location.hostname}:3000`;
 
-      // For now, use mock S3 key - later will be extractedText key from Classification
+      // Use the extracted text key saved from Classification
       const requestBody = {
         sessionId: sessionData.sessionId,
-        s3Key: "rewritten/report.txt",
+        s3Key: sessionData.extractedTextKey,
       };
 
       const response = await fetch(`${apiEndpoint}/rewrite`, {

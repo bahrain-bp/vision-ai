@@ -1,0 +1,251 @@
+.classification-page {
+  width: 100%;
+  padding: 18px 16px 40px;
+  background: var(--background-white);
+  box-sizing: border-box;
+  font-family: system-ui, sans-serif;
+}
+
+/* title + description (similar to other tabs) */
+.classification-header {
+  margin-bottom: 18px;
+}
+
+.classification-header h2 {
+  margin: 0 0 6px;
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text-dark);
+}
+
+.classification-header p {
+  margin: 0;
+  font-size: 15px;
+  color: var(--text-medium);
+}
+
+/* upload section */
+.upload-section {
+  width: 100%;
+  margin-bottom: 20px;
+}
+
+.upload-box {
+  background: var(--background-white);
+  border: 1px solid var(--border-light);
+  padding: 26px 28px;
+  border-radius: 16px;
+  box-shadow: var(--shadow-light);
+  text-align: center;
+  cursor: pointer;
+  transition: 0.15s ease;
+}
+
+.upload-box:hover {
+  border-color: var(--primary-color);
+  box-shadow: var(--shadow-medium);
+}
+
+.upload-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  background: var(--info-bg);
+  color: var(--info-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+}
+
+.upload-title {
+  font-size: 19px;
+  font-weight: 600;
+  margin: 0 0 6px;
+  color: var(--text-dark);
+}
+
+.upload-sub {
+  font-size: 15px;
+  color: var(--text-medium);
+  margin-bottom: 18px;
+}
+
+.upload-btn {
+  background: var(--primary-color);
+  color: white;
+  padding: 10px 22px;
+  border-radius: 999px;
+  font-size: 16px;
+  border: none;
+  cursor: pointer;
+  transition: 0.15s ease;
+}
+
+.upload-btn:hover:not(:disabled) {
+  background: var(--primary-dark);
+  box-shadow: var(--shadow-medium);
+}
+
+.upload-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.upload-input {
+  display: none;
+}
+
+.upload-file-name {
+  margin-top: 14px;
+  font-size: 15px;
+  color: var(--text-medium);
+}
+
+/* messages */
+.msg {
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 15px;
+  margin-top: 10px;
+}
+
+.msg-error {
+  background: #fee2e2;
+  border: 1px solid #fecaca;
+  color: var(--error-color);
+}
+
+.msg-success {
+  background: #ecfdf3;
+  border: 1px solid var(--success-color);
+  color: var(--success-color);
+}
+
+/* extraction card */
+.results-card {
+  background: white;
+  border: 1px solid var(--border-light);
+  padding: 22px 24px;
+  border-radius: 16px;
+  box-shadow: var(--shadow-light);
+}
+
+.results-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.results-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-dark);
+}
+
+.status-chip {
+  background: var(--info-bg);
+  padding: 4px 11px;
+  border-radius: 999px;
+  font-size: 13px;
+  border: 1px solid var(--info-border);
+  color: var(--info-text);
+}
+
+/* text area */
+.results-textarea {
+  width: 100%;
+  min-height: 200px;
+  padding: 10px 12px;
+  font-size: 15px;
+  line-height: 1.6;
+  border-radius: 12px;
+  border: 1px solid var(--border-light);
+  background: var(--background-light);
+  resize: vertical;
+  color: var(--text-dark);
+}
+
+/* category */
+.category-block {
+  margin-top: 14px;
+}
+
+.category-label {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: var(--text-dark);
+}
+
+.category-textarea {
+  width: 100%;
+  min-height: 72px;
+  resize: none;
+  padding: 8px 10px;
+  font-size: 15px;
+  border-radius: 10px;
+  border: 1px solid var(--border-light);
+  background: var(--background-light);
+  color: var(--text-dark);
+}
+
+/* buttons */
+.actions {
+  margin-top: 18px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.action-btn {
+  min-width: 120px;
+  padding: 10px 18px;
+  border-radius: 999px;
+  font-size: 16px;
+  cursor: pointer;
+  border: none;
+  transition: 0.15s ease;
+}
+
+.action-btn.primary {
+  background: #111827;
+  color: white;
+}
+
+.action-btn.primary:hover:not(:disabled) {
+  background: #020617;
+  box-shadow: var(--shadow-medium);
+}
+
+.action-btn.secondary {
+  background: white;
+  border: 1px solid var(--border-medium);
+  color: var(--text-dark);
+}
+
+.action-btn.secondary:hover:not(:disabled) {
+  background: var(--background-light);
+}
+
+.action-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* responsive */
+@media (max-width: 640px) {
+  .classification-page {
+    padding: 16px 10px 32px;
+  }
+
+  .results-card {
+    padding: 18px 16px;
+  }
+
+  .results-textarea {
+    min-height: 170px;
+  }
+}
