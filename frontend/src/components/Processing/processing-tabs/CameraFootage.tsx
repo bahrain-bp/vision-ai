@@ -1,5 +1,6 @@
 import React, { useRef } from "react";
-import { Pencil, Check, X, AlertTriangle } from "lucide-react";
+import { Pencil, Check, X, AlertTriangle, Video } from "lucide-react";
+import AudioAnalysis from "./AudioAnalysis";
 import "../../../ProcessingView.css";
 import { SessionData } from "../ProcessingView";
 import { exportAnalysisResultsAsPDF } from "../../../services/CamFootageAnalysis/AnalysisPdfExportService";
@@ -816,7 +817,9 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
                 />
                 <label htmlFor="video-upload" className="upload-label">
                   <div className="upload-content">
-                    <div className="upload-icon-cam">📹</div>
+                    <div className="upload-icon-cam">
+                      <Video size={50} color="#22417b" />
+                    </div>
                     <div className="upload-text">
                       {language === "ar"
                         ? "تحميل ملف فيديو"
@@ -1596,6 +1599,13 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
             )}
           </div>
         </div>
+      </div>
+      {/* Audio Analysis Wrapper */}
+      <div
+        className="audio-analysis-wrapper"
+        dir={language === "ar" ? "rtl" : "ltr"}
+      >
+        <AudioAnalysis language={language} />
       </div>
     </div>
   );

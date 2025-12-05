@@ -56,31 +56,34 @@ const ProcessingView: React.FC<ProcessingViewProps> = ({
 
   const tabs: Tab[] = [
     {
-       id: "Classification",
-       label: language === "en" ? "Classification" : "التصنيف",
-       render: () => (
-         <Classification
-           sessionData={sessionWithKey}
-           language={language}
-           onExtractedKey={handleExtractedKey}
-         />
-       ),
-       },
-    { 
+      id: "Classification",
+      label: language === "en" ? "Classification" : "التصنيف",
+      render: () => (
+        <Classification
+          sessionData={sessionWithKey}
+          language={language}
+          onExtractedKey={handleExtractedKey}
+        />
+      ),
+    },
+    {
       id: "Rewrite",
       label: language === "en" ? "Rewrite" : "إعادة صياغة التقرير",
       render: () => <Rewrite sessionData={sessionWithKey} />,
-     },
-    { id: "AISuggestions",
-     label: language === "en" ? "AI Suggestions" : "اقتراحات الذكاء الاصطناعي",
-     render: () => <AISuggestions sessionData={sessionWithKey} />,
     },
+
     {
       id: "CameraFootage",
-      label: language === "en" ? "Camera Footage" : "تحليل الفيديوهات ",
+      label:
+        language === "en" ? "Video & Audio Analysis" : "تحليل مرئي و صوتي ",
       render: () => (
         <CameraFootage sessionData={sessionData} language={language} />
       ),
+    },
+    {
+      id: "AISuggestions",
+      label: language === "en" ? "AI Suggestions" : "اقتراحات الذكاء الاصطناعي",
+      render: () => <AISuggestions sessionData={sessionWithKey} />,
     },
     {
       id: "Contradictions",
