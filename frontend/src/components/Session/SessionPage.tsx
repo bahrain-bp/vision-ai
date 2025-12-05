@@ -140,7 +140,6 @@ const SessionPage: React.FC<SessionPageProps> = ({
         console.error("Failed to update session status:", error);
       }
     }
-    setCurrentSession(null);
 
     // Trigger switch to summarization tab
     setTriggerSummarization(true);
