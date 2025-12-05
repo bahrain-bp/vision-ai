@@ -1,23 +1,23 @@
 import React, { useState, useEffect } from "react";
-import { ArrowLeft, Clock, Pause, Play, RotateCcw } from "lucide-react";
+import {
+  ArrowLeft,
+  Clock,
+  Pause,
+  Play,
+  RotateCcw,
+  ArrowRight,
+} from "lucide-react";
 import RealTimeView from "../RealTime/RealTimeView";
 import ProcessingView from "../Processing/ProcessingView";
 import SessionSummaryModal from "../RealTime/SessionSummaryModal";
 import { User, RecordingStatus } from "../../types/";
 import { useTranscription } from "../../hooks/useTranscription";
 import { useCaseContext } from "../../hooks/useCaseContext";
-import {getTimeString} from "../common/Timer/Timer"; 
 
-interface ParticipantData {
-  fullName: string;
-  idNumber: string;
-}
-interface IdentityData {
-  referencePhoto: File | null;
-  cpr: File | null;
-  passport: File | null;
-  isVerified: boolean;
-}
+import { useLanguage } from "../../context/LanguageContext";
+import { getTimeString } from "../common/Timer/Timer";
+
+import { CameraFootageProvider } from "../../context/CameraFootageContext";
 
 interface TranslationSettings {
   sourceLanguage: string;
@@ -25,20 +25,16 @@ interface TranslationSettings {
 }
 
 interface SetupData {
-  witnessData: ParticipantData;
-  identityData: IdentityData;
   translationSettings: TranslationSettings;
 }
 
 interface SessionData {
   sessionId: string;
   investigator: string;
+  participant: string;
   language: string;
   duration: string;
-  participant: string;
   status: string;
-  participantData?: ParticipantData;
-  identityData?: IdentityData;
   translationSettings?: TranslationSettings;
 }
 
@@ -57,46 +53,42 @@ const SessionPage: React.FC<SessionPageProps> = ({
   sessionData,
   onEndSession,
 }) => {
+  const { t } = useLanguage();
   const {
     currentCase,
     currentSession,
     createSession,
     updateSessionStatus,
     setCurrentSession,
-    setCurrentPersonName,
   } = useCaseContext();
+
   const [activeMainTab, setActiveMainTab] = useState<MainTab>("real-time");
   const [sessionState, setSessionState] = useState<RecordingStatus>("off");
   const [showSummaryModal, setShowSummaryModal] = useState<boolean>(false);
-  const [triggerSummarization, setTriggerSummarization] = useState<boolean>(false);
-  const { stopRecording,toggleRecordingPause,toggleReset} = useTranscription();
-  
-const [isPaused, setIsPaused] = useState(false);
- const [timerMs, setTimerMs] = useState(0);
- const [timerString, setTimerString] = useState("00:00:00");
+  const { stopRecording, toggleRecordingPause, toggleReset } =
+    useTranscription();
+
+  const [language, setLanguage] = useState<"en" | "ar">("en");
+
+  const [triggerSummarization, setTriggerSummarization] =
+    useState<boolean>(false);
+
+  const [isPaused, setIsPaused] = useState(false);
+  const [timerMs, setTimerMs] = useState(0);
+  const [timerString, setTimerString] = useState("00:00:00");
 
   const [setupData, setSetupData] = useState<SetupData>({
-    witnessData: {
-      fullName: sessionData?.participantData?.fullName || "",
-      idNumber: sessionData?.participantData?.idNumber || "",
-    },
-    identityData: {
-      referencePhoto: sessionData?.identityData?.referencePhoto || null,
-      cpr: sessionData?.identityData?.cpr || null,
-      passport: sessionData?.identityData?.passport || null,
-      isVerified: sessionData?.identityData?.isVerified || false,
-    },
     translationSettings: {
       sourceLanguage: sessionData?.translationSettings?.sourceLanguage || "ar",
       targetLanguage: sessionData?.translationSettings?.targetLanguage || "en",
     },
   });
 
-    const getInvestigatorName = () => {
-      if (user?.username) return user.username;
-      return "Unknown Investigator";
-    };
-    
+  const getInvestigatorName = () => {
+    if (user?.username) return user.username;
+    return "Unknown Investigator";
+  };
+
   useEffect(() => {
     let intervalId: any;
 
@@ -114,35 +106,27 @@ const [isPaused, setIsPaused] = useState(false);
     setTimerString(formatted);
   }, [timerMs]);
 
-
-
   const currentSessionData: SessionData = currentSession
     ? {
         sessionId: currentSession.sessionId,
         investigator: currentSession.investigator || getInvestigatorName(),
-        language: "Arabic",
+        language: language === "en" ? "English" : "Arabic",
         duration: timerString,
-        participant: setupData.witnessData.fullName || "Not set",
+        participant: "",
         status: currentSession.status,
       }
     : {
         sessionId: "#2025-INV-0042",
         investigator: getInvestigatorName(),
-        language: "Arabic",
+        language: language === "en" ? "English" : "Arabic",
         duration: timerString,
-        participant: "Not set",
+        participant: "",
         status: "Active",
       };
 
-  useEffect(() => {
-    if (setupData.witnessData.fullName) {
-      currentSessionData.participant = setupData.witnessData.fullName;
-    }
-  }, [setupData.witnessData.fullName]);
-
   const handleEndSession = async () => {
     stopRecording(setSessionState);
-    
+
     if (currentSession && currentCase) {
       try {
         await updateSessionStatus(
@@ -155,7 +139,6 @@ const [isPaused, setIsPaused] = useState(false);
       }
     }
     setCurrentSession(null);
-    setCurrentPersonName(null);
 
     // Trigger switch to summarization tab
     setTriggerSummarization(true);
@@ -172,32 +155,12 @@ const [isPaused, setIsPaused] = useState(false);
   const handleBackToHome = () => {
     sessionCreationAttempted.current = false;
     setCurrentSession(null);
-    setCurrentPersonName(null);
+
     if (onEndSession) {
       onEndSession();
     } else {
       onSignOut();
     }
-  };
-
-  const updateWitnessData = (field: keyof ParticipantData, value: string) => {
-    setSetupData((prev) => ({
-      ...prev,
-      witnessData: {
-        ...prev.witnessData,
-        [field]: value,
-      },
-    }));
-  };
-
-  const updateIdentityData = (field: keyof IdentityData, value: any) => {
-    setSetupData((prev) => ({
-      ...prev,
-      identityData: {
-        ...prev.identityData,
-        [field]: value,
-      },
-    }));
   };
 
   const updateTranslationSettings = (
@@ -213,21 +176,6 @@ const [isPaused, setIsPaused] = useState(false);
     }));
   };
 
-  const handleVerifyIdentity = () => {
-    if (!setupData.witnessData.fullName) {
-      alert("Please enter witness full name.");
-      return;
-    }
-
-    if (!setupData.identityData.referencePhoto) {
-      alert("Please upload a reference photo.");
-      return;
-    }
-
-    updateIdentityData("isVerified", true);
-    alert("Identity verification completed successfully!");
-  };
-
   const sessionCreationAttempted = React.useRef(false);
 
   useEffect(() => {
@@ -235,61 +183,81 @@ const [isPaused, setIsPaused] = useState(false);
       if (sessionCreationAttempted.current) {
         return;
       }
-
       if (currentCase && !currentSession) {
         try {
           sessionCreationAttempted.current = true;
           const investigator = getInvestigatorName();
-          await createSession(currentCase.caseId, investigator, "witness");
+          await createSession(currentCase.caseId, investigator);
         } catch (error) {
           console.error("Failed to create session:", error);
           sessionCreationAttempted.current = false;
         }
       }
     };
-
     initializeSession();
   }, [currentCase, currentSession, createSession, user]);
 
   return (
     <div className="session-page-container">
-      <nav className="session-nav">
+      <nav className="session-nav" dir={language === "ar" ? "rtl" : "ltr"}>
         <div className="nav-content">
           <div className="nav-items">
             <button onClick={handleBackToHome} className="back-button">
-              <ArrowLeft className="icon" />
-              <span>Back to Home</span>
+              {language === "ar" ? (
+                <ArrowRight className="icon" />
+              ) : (
+                <ArrowLeft className="icon" />
+              )}
+              <span>
+                {language === "ar"
+                  ? "العودة إلى الصفحة الرئيسية"
+                  : "Back to Home"}
+              </span>
             </button>
 
             <div className="nav-center">
               <h1 className="app-logo-text">VISION-AI</h1>
               <div className="session-info-header">
-                <span className="session-label">Session</span>
+                <span className="session-label">{t("session.session")}</span>
                 <span className="session-id">
                   {currentSessionData.sessionId}
                 </span>
                 {sessionState === "on" && (
                   <span className="live-indicator">
                     <span className="live-dot"></span>
-                    <span>LIVE</span>
+                    <span>{t("session.live")}</span>
                   </span>
                 )}
               </div>
               <p className="investigator-info">
-                Investigator: {currentSessionData.investigator}
+                {language === "ar" ? "المحقق" : "Investigator"}:{" "}
+                {currentSessionData.investigator}
               </p>
               {currentCase && (
                 <p className="case-info">
-                  Case: {currentCase.caseTitle} ({currentCase.caseId})
+                  {t("session.case")}: {currentCase.caseTitle} (
+                  {currentCase.caseId})
                 </p>
               )}
             </div>
 
             <div className="nav-controls">
               <div className="language-controls">
-                <span className="language-label">Language:</span>
-                <button className="lang-btn active">EN</button>
-                <button className="lang-btn">AR</button>
+                <span className="language-label">
+                  {language === "ar" ? "اللغة:" : "Language:"}
+                </span>
+                <button
+                  className={`lang-btn ${language === "en" ? "active" : ""}`}
+                  onClick={() => setLanguage("en")}
+                >
+                  EN
+                </button>
+                <button
+                  className={`lang-btn ${language === "ar" ? "active" : ""}`}
+                  onClick={() => setLanguage("ar")}
+                >
+                  AR
+                </button>
               </div>
               <div className="time-display">
                 <Clock className="icon" />
@@ -325,7 +293,7 @@ const [isPaused, setIsPaused] = useState(false);
                   </button>
 
                   <button
-                    onClick={()=> toggleReset()}
+                    onClick={() => toggleReset()}
                     className="reset-btn"
                     style={{
                       padding: "10px 20px",
@@ -368,7 +336,7 @@ const [isPaused, setIsPaused] = useState(false);
               activeMainTab === "real-time" ? "active" : ""
             }`}
           >
-            Real-time
+            {t("session.realTime")}
           </button>
           <button
             onClick={() => setActiveMainTab("processing")}
@@ -376,7 +344,7 @@ const [isPaused, setIsPaused] = useState(false);
               activeMainTab === "processing" ? "active" : ""
             }`}
           >
-            Processing
+            {t("session.processing")}
           </button>
         </div>
       </div>
@@ -387,15 +355,17 @@ const [isPaused, setIsPaused] = useState(false);
             sessionState={sessionState}
             setSessionState={setSessionState}
             sessionData={currentSessionData}
-            setupData={setupData}
-            onWitnessDataChange={updateWitnessData}
-            onIdentityDataChange={updateIdentityData}
+            translationSettings={setupData.translationSettings}
             onTranslationSettingsChange={updateTranslationSettings}
-            onVerifyIdentity={handleVerifyIdentity}
             triggerSummarization={triggerSummarization}
           />
         ) : (
-          <ProcessingView sessionData={currentSessionData} />
+          <CameraFootageProvider>
+            <ProcessingView
+              sessionData={currentSessionData}
+              language={language}
+            />
+          </CameraFootageProvider>
         )}
       </div>
 

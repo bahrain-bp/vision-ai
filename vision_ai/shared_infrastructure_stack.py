@@ -3,6 +3,7 @@ from aws_cdk import (
     aws_s3 as s3,
     aws_apigateway as apigateway,
     RemovalPolicy,
+    aws_iam as iam, 
     CfnOutput,
 )
 from constructs import Construct
@@ -20,7 +21,7 @@ class SharedInfrastructureStack(Stack):
         # ==========================================
         self.investigation_bucket = s3.Bucket(
             self, "InvestigationBucket",
-            bucket_name="vision-rt-investigation-system",
+            bucket_name=f"vision-investigation-system-{self.account}",
             versioned=True,
             encryption=s3.BucketEncryption.S3_MANAGED,
             removal_policy=RemovalPolicy.RETAIN,
@@ -29,15 +30,16 @@ class SharedInfrastructureStack(Stack):
                     s3.HttpMethods.GET,
                     s3.HttpMethods.PUT,
                     s3.HttpMethods.POST,
-                    s3.HttpMethods.DELETE
+                    s3.HttpMethods.DELETE,
+                    s3.HttpMethods.HEAD
                 ],
-                allowed_origins=["http://localhost:3000"],
+                allowed_origins=["*"]
+                ,
                 allowed_headers=["*"],
                 exposed_headers=["ETag"],
                 max_age=3000
             )]
         )
-        
         # ==========================================
         # API GATEWAY - SHARED ACROSS ALL FEATURES
         # ==========================================

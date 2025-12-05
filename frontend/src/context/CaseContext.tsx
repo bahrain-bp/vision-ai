@@ -28,11 +28,7 @@ export interface CaseContextType {
     description: string,
     createdBy: string
   ) => Promise<Case>;
-  createSession: (
-    caseId: string,
-    investigator: string,
-    personType: "witness" | "accused" | "victim"
-  ) => Promise<Session>;
+  createSession: (caseId: string, investigator: string) => Promise<Session>;
   setCurrentSession: (session: Session | null) => void;
   clearContext: () => void;
   clearError: () => void;
@@ -185,18 +181,13 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({
    * Create a new session within a case
    */
   const createSession = useCallback(
-    async (
-      caseId: string,
-      investigator: string,
-      personType: "witness" | "accused" | "victim"
-    ): Promise<Session> => {
+    async (caseId: string, investigator: string): Promise<Session> => {
       setIsLoading(true);
       setError(null);
       try {
         const newSession = await caseService.createSession(
           caseId,
-          investigator,
-          personType
+          investigator
         );
 
         setCurrentSession(newSession);

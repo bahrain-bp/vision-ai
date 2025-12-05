@@ -1,5 +1,5 @@
-import axios, { AxiosError } from "axios";
-
+import axios from "axios";
+import { AxiosError } from "../types/caseManagement";
 const API_BASE_URL = process.env.REACT_APP_API_ENDPOINT;
 
 export interface Case {
@@ -127,11 +127,7 @@ class CaseService {
    * Create a new session within a case
 
    */
-  async createSession(
-    caseId: string,
-    investigator: string,
-    personType: "witness" | "accused" | "victim"
-  ): Promise<Session> {
+  async createSession(caseId: string, investigator: string): Promise<Session> {
     if (!caseId.trim()) {
       throw new Error("Case ID is required");
     }
@@ -141,11 +137,9 @@ class CaseService {
     }
 
     try {
-      // Send only the data needed
       const requestBody = {
         caseId,
         investigator: investigator.trim(),
-        personType,
       };
 
       const response = await this.axiosInstance.post<Session>(
@@ -153,7 +147,6 @@ class CaseService {
         requestBody
       );
 
-      // Return the complete session object from backend
       return response.data;
     } catch (error: unknown) {
       console.error("Error creating session:", error);

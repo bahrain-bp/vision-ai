@@ -36,7 +36,6 @@ def handler(event, context):
             'createdAt': datetime.utcnow().isoformat() + 'Z',
             'createdBy': created_by,
             'status': 'active',
-            'totalSessions': 0,
             'lastUpdated': datetime.utcnow().isoformat() + 'Z'
         }
         
@@ -47,6 +46,13 @@ def handler(event, context):
             Key=case_key,
             Body=json.dumps(case_data, indent=2),
             ContentType='application/json'
+        )
+
+        police_docs_key = f"cases/{case_id}/police-documents/"
+        s3_client.put_object(
+        Bucket=bucket_name,
+        Key=police_docs_key,
+        Body=''
         )
         
         print(f"Successfully created case: {case_id}")

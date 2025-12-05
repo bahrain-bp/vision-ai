@@ -1,52 +1,27 @@
 import React, { useState, useEffect } from "react";
-import {
-  User,
-  ChevronUp,
-  ChevronDown,
-  FileText,
-} from "lucide-react";
+import { User, ChevronUp, ChevronDown, FileText } from "lucide-react";
 import LiveTranscription from "../LiveTranscription/LiveTranscription";
 import Translation from "./Translation";
 import SessionInfo from "./SessionInfo";
 import IdentityVerification from "./IdentityVerification/IdentityVerification";
-import TranscriptionSessionSetup from "../LiveTranscription/TranscriptionSessionSetup"
-import QuestionGenerator from './AIAssistant/QuestionGenerator';
-import { TranslationProvider } from '../../context/TranslationContext';
+import TranscriptionSessionSetup from "../LiveTranscription/TranscriptionSessionSetup";
+import QuestionGenerator from "./AIAssistant/QuestionGenerator";
+import { TranslationProvider } from "../../context/TranslationContext";
 import {
   RecordingStatus,
   SessionType,
   LanguagePreferences,
 } from "../../types/";
 import SummarizationReport from "./SummarizationReport";
+import { useLanguage } from "../../context/LanguageContext";
 
 interface SessionData {
   sessionId: string;
-  participant: string;
   language: string;
+  participant: string; //should remove it after all components use the context in their code
   duration: string;
   status: string;
   investigator?: string;
-}
-
-interface IdentityData {
-  referencePhoto: File | null;
-  cpr: File | null;
-  passport: File | null;
-  isVerified: boolean;
-}
-
-interface InvestigationData {
-  witness: string;
-  idNumber: string;
-  identityData: IdentityData;
-  investigator: string;
-  duration: string;
-  status: string;
-}
-
-interface WitnessData {
-  fullName: string;
-  idNumber: string;
 }
 
 interface TranslationSettings {
@@ -54,24 +29,15 @@ interface TranslationSettings {
   targetLanguage: string;
 }
 
-interface SetupData {
-  witnessData: WitnessData;
-  identityData: IdentityData;
-  translationSettings: TranslationSettings;
-}
-
 interface RealTimeViewProps {
   sessionState: RecordingStatus;
   setSessionState: (state: RecordingStatus) => void;
   sessionData: SessionData;
-  setupData: SetupData;
-  onWitnessDataChange: (field: keyof WitnessData, value: string) => void;
-  onIdentityDataChange: (field: keyof IdentityData, value: any) => void;
+  translationSettings: TranslationSettings;
   onTranslationSettingsChange: (
     field: keyof TranslationSettings,
     value: string
   ) => void;
-  onVerifyIdentity: () => void;
   triggerSummarization: boolean;
 }
 
@@ -81,9 +47,10 @@ const RealTimeView: React.FC<RealTimeViewProps> = ({
   sessionData,
   triggerSummarization,
 }) => {
-  const [activeTab, setActiveTab] = useState<"identity" | "transcription" | "summarization">(
-    "identity"
-  );
+  const { t } = useLanguage();
+  const [activeTab, setActiveTab] = useState<
+    "identity" | "transcription" | "summarization"
+  >("identity");
   const [aiExpanded, setAiExpanded] = useState(false);
   const [isIdentityVerified, setIsIdentityVerified] = useState(false);
   const [startRecording, setStartRecording] = useState(false);
@@ -98,8 +65,8 @@ const RealTimeView: React.FC<RealTimeViewProps> = ({
       witnessLanguage: "",
     });
 
-  const handleStartInvestigation = (investigationData: InvestigationData) => {
-    console.log("Starting investigation with data:", investigationData);
+  const handleStartInvestigation = () => {
+    console.log("Starting investigation");
     setIsIdentityVerified(true);
     setActiveTab("transcription");
   };
@@ -182,7 +149,7 @@ const RealTimeView: React.FC<RealTimeViewProps> = ({
             disabled={isIdentityVerified}
           >
             <User className="btn-icon" />
-            <span>Identity Verification</span>
+            <span>{t("identity.title")}</span>
           </button>
 
           <button
@@ -194,7 +161,7 @@ const RealTimeView: React.FC<RealTimeViewProps> = ({
             <User className="btn-icon" />
             <span>Transcription & Translation</span>
           </button>
-          
+
           <button
             onClick={() => setActiveTab("summarization")}
             className={`sidebar-btn ${

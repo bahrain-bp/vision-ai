@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import "./Contradictions.css";
 
 interface Contradiction {
@@ -6,94 +6,153 @@ interface Contradiction {
   severity: "red" | "yellow" | "green";
 }
 
-interface Witness {
-  name: string;
-  contradictions: Contradiction[];
+interface ContradictionsProps {
+  language: "en" | "ar";
 }
 
-// mock data 
-const witnesses: Witness[] = [
-  {
-    name: "Robert Johnson - Witness Statement #3",
-    contradictions: [
-      { text: "Subject claimed to have never been to the location, but phone GPS data shows presence at the scene.", severity: "red" },
-      { text: "Subject denied knowing the complainant personally, but text messages show frequent communication.", severity: "yellow" },
-      { text: "Subject mentioned being alone, but earlier stated someone else was present. This requires clarification.", severity: "yellow" },
-    ],
-  },
-  {
-    name: "Emily Smith - Witness Statement #1",
-    contradictions: [
-      { text: "Subject stated they were at home, but security footage shows them outside.", severity: "red" },
-      { text: "Subject claimed not to know the other party, but emails indicate previous contact.", severity: "yellow" },
-      { text: "Timing of the phone call conflicts with their stated location.", severity: "yellow" },
-    ],
-  },
-  {
-    name: "Michael Brown - Witness Statement #2",
-    contradictions: [
-      { text: "Subject reported no involvement, but credit card records show purchases at the scene.", severity: "red" },
-      { text: "Subject denied seeing anyone else, but CCTV footage contradicts this.", severity: "yellow" },
-      { text: "Subject claimed they were alone, and a neighbor confirms they were indeed alone.", severity: "green" },
-    ],
-  },
-];
+interface AnalysisResponse {
+  witnessId: string;
+  results: Contradiction[];
+  storedAt: string;
+}
 
-// severity levels
-const severityIcons: { [key: string]: string } = {
+const severityIcons: Record<string, string> = {
   red: "❌",
   yellow: "⚠️",
   green: "✅",
 };
 
+const translations = {
+  en: {
+    title: "Contradiction Analysis",
+    selectWitness: "Select Witness:",
+    loadingWitnesses: "Loading witnesses...",
+    selectOption: "-- Select Witness --",
+    analyzeBtn: "Analyze Contradictions",
+    analyzing: "Analyzing...",
+    results: "Results – "
+  },
+  ar: {
+    title: "تحليل التناقضات",
+    selectWitness: "اختر الشاهد:",
+    loadingWitnesses: "جاري تحميل الشهود...",
+    selectOption: "-- اختر الشاهد --",
+    analyzeBtn: "تحليل التناقضات",
+    analyzing: "جاري التحليل...",
+    results: "النتائج – "
+  }
+};
 
-const Contradictions: React.FC = () => {
-  const [selectedWitness, setSelectedWitness] = useState<Witness | null>(witnesses[0]);
-  const [showResults, setShowResults] = useState(false);
+const API_BASE_URL = process.env.REACT_APP_API_ENDPOINT;
 
-  const handleAnalyzeClick = () => {
-    setShowResults(true);
+const Contradictions: React.FC<ContradictionsProps> = ({ language }) => {
+  const [witnesses, setWitnesses] = useState<string[]>([]);
+  const [selectedWitness, setSelectedWitness] = useState("");
+  const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [loadingWitnesses, setLoadingWitnesses] = useState(false);
+
+  useEffect(() => {
+    const loadWitnesses = async () => {
+      setLoadingWitnesses(true);
+      try {
+        const res = await fetch(
+          `${API_BASE_URL}/contradictions/witnesses`
+        );
+        const json = await res.json();
+        setWitnesses(json.witnesses || []);
+      } catch (err) {
+        console.error("Error loading witnesses:", err);
+        setWitnesses([]);
+      }
+      setLoadingWitnesses(false);
+    };
+    loadWitnesses();
+  }, []);
+
+  const handleAnalyzeClick = async () => {
+    if (!selectedWitness) return;
+    setLoading(true);
+    setAnalysis(null);
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/contradictions/analyze`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ witnessId: selectedWitness }),
+      });
+
+      const raw = await res.json();
+      let parsed: AnalysisResponse;
+      if (typeof raw.body === "string") {
+        parsed = JSON.parse(raw.body);
+      } else if (typeof raw.body === "object") {
+        parsed = raw.body;
+      } else {
+        parsed = raw;
+      }
+      setAnalysis(parsed);
+    } catch (err) {
+      console.error("Error analyzing contradictions:", err);
+    }
+    setLoading(false);
   };
 
   return (
     <div className="contradictions-container">
-      <h2>Analyze Contradictions</h2>
+      <h2>{translations[language].title}</h2>
 
+      {/* WITNESS DROPDOWN */}
       <div className="dropdown-container">
-        <label htmlFor="witness-select">Select Witness:</label>
-        <select
-          id="witness-select"
-          value={selectedWitness?.name}
-          onChange={(e) => {
-            const witness = witnesses.find((w) => w.name === e.target.value) || null;
-            setSelectedWitness(witness);
-            setShowResults(false); // reset results when switching witness
-          }}
-        >
-          {witnesses.map((w) => (
-            <option key={w.name} value={w.name}>
-              {w.name}
+        <label>{translations[language].selectWitness}</label>
+        {loadingWitnesses ? (
+          <p>{translations[language].loadingWitnesses}</p>
+        ) : (
+          <select
+            value={selectedWitness}
+            onChange={(e) => setSelectedWitness(e.target.value)}
+            disabled={loadingWitnesses}
+          >
+            <option value="">
+              {loadingWitnesses
+                ? translations[language].loadingWitnesses
+                : translations[language].selectOption}
             </option>
-          ))}
-        </select>
+            {witnesses.map((w) => (
+              <option key={w} value={w}>
+                {w}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
 
+      {/* BUTTON */}
       <div className="analyze-button-container">
-        <button className="analyze-btn" onClick={handleAnalyzeClick}>
-          Analyze Contradictions
+        <button
+          className="analyze-btn"
+          onClick={handleAnalyzeClick}
+          disabled={loading || !selectedWitness}
+        >
+          {loading
+            ? translations[language].analyzing
+            : translations[language].analyzeBtn}
         </button>
       </div>
 
-      {showResults && selectedWitness && (
+      {/* RESULTS */}
+      {analysis && (
         <div className="results-container">
           <h3 className="results-heading">
-           Contradiction Analysis Results
+            {translations[language].results}{analysis.witnessId}
           </h3>
           <div className="contradiction-cards">
-            {selectedWitness.contradictions.map((c, idx) => (
-              <div key={idx} className={`contradiction-card ${c.severity}`}>
-                <span className="severity-icon">{severityIcons[c.severity]}</span>
-                <span>{c.text}</span>
+            {analysis.results.map((item, index) => (
+              <div key={index} className={`contradiction-card ${item.severity}`}>
+                <span className="severity-icon">
+                  {severityIcons[item.severity]}
+                </span>
+                <span>{item.text}</span>
               </div>
             ))}
           </div>
