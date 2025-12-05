@@ -560,12 +560,6 @@ def check_document_quality(document_key):
                 'details': f'Brightness score: {brightness}/100 (minimum 35 required)'
             }
         
-        if sharpness < 25:
-            return {
-                'success': False,
-                'error': 'The document image is too blurry. Please take a clearer, focused photo of the document.',
-                'details': f'Sharpness score: {sharpness}/100 (minimum 25 required)'
-            }
         
         if brightness > 95:
             return {
