@@ -1,5 +1,6 @@
 import json
 import boto3
+import re
 import os
 from datetime import datetime
 import logging
@@ -18,6 +19,14 @@ def handler(event, context):
         body = json.loads(event.get('body', '{}'))
         case_id = body.get('caseId')
         session_id = body.get('sessionId')
+        if not validate_id_format(case_id, 'caseId'):
+            return error_response(400, 'Invalid caseId format')
+        
+        if not validate_id_format(session_id, 'sessionId'):
+            return error_response(400, 'Invalid sessionId format')
+        
+        if not verify_session_belongs_to_case(case_id, session_id):
+            return error_response(403, 'Session does not belong to specified case or does not exist')
         file_type = body.get('fileType', 'image/jpeg')
         file_name = body.get('fileName', 'document.jpg')
         upload_type = body.get('uploadType', 'document')
@@ -97,3 +106,27 @@ def error_response(status_code, message, additional_data=None):
         body.update(additional_data)
     logger.error(f"Returning error response: {status_code} - {message}")
     return {'statusCode': status_code, 'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'}, 'body': json.dumps(body)}
+
+def validate_id_format(value, field_name):
+    """Validate that ID contains only safe characters"""
+    if not value:
+        return False
+    # Allow only alphanumeric, hyphens, and underscores
+    if not re.match(r'^[a-zA-Z0-9_-]+$', value):
+        logger.error(f"Invalid {field_name} format: {value}")
+        return False
+    # Prevent path traversal
+    if '..' in value or '/' in value or '\\' in value:
+        logger.error(f"Path traversal attempt in {field_name}: {value}")
+        return False
+    return True
+
+
+def verify_session_belongs_to_case(case_id, session_id):
+    """Verify that session exists and belongs to the specified case"""
+    try:
+        metadata_key = f"cases/{case_id}/sessions/{session_id}/session-metadata.json"
+        s3.head_object(Bucket=BUCKET_NAME, Key=metadata_key)
+        return True
+    except:
+        return False
