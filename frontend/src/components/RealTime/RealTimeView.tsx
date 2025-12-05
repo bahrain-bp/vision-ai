@@ -4,9 +4,9 @@ import LiveTranscription from "../LiveTranscription/LiveTranscription";
 import Translation from "./Translation";
 import SessionInfo from "./SessionInfo";
 import IdentityVerification from "./IdentityVerification/IdentityVerification";
-import TranscriptionSessionSetup from "../LiveTranscription/TranscriptionSessionSetup"
-import QuestionGenerator from './AIAssistant/QuestionGenerator';
-import { TranslationProvider } from '../../context/TranslationContext';
+import TranscriptionSessionSetup from "../LiveTranscription/TranscriptionSessionSetup";
+import QuestionGenerator from "./AIAssistant/QuestionGenerator";
+import { TranslationProvider } from "../../context/TranslationContext";
 import {
   RecordingStatus,
   SessionType,
@@ -17,32 +17,11 @@ import { useLanguage } from "../../context/LanguageContext";
 
 interface SessionData {
   sessionId: string;
-  participant: string;
   language: string;
+  participant: string; //should remove it after all components use the context in their code
   duration: string;
   status: string;
   investigator?: string;
-}
-
-interface IdentityData {
-  referencePhoto: File | null;
-  cpr: File | null;
-  passport: File | null;
-  isVerified: boolean;
-}
-
-interface InvestigationData {
-  witness: string;
-  idNumber: string;
-  identityData: IdentityData;
-  investigator: string;
-  duration: string;
-  status: string;
-}
-
-interface WitnessData {
-  fullName: string;
-  idNumber: string;
 }
 
 interface TranslationSettings {
@@ -50,24 +29,15 @@ interface TranslationSettings {
   targetLanguage: string;
 }
 
-interface SetupData {
-  witnessData: WitnessData;
-  identityData: IdentityData;
-  translationSettings: TranslationSettings;
-}
-
 interface RealTimeViewProps {
   sessionState: RecordingStatus;
   setSessionState: (state: RecordingStatus) => void;
   sessionData: SessionData;
-  setupData: SetupData;
-  onWitnessDataChange: (field: keyof WitnessData, value: string) => void;
-  onIdentityDataChange: (field: keyof IdentityData, value: any) => void;
+  translationSettings: TranslationSettings;
   onTranslationSettingsChange: (
     field: keyof TranslationSettings,
     value: string
   ) => void;
-  onVerifyIdentity: () => void;
   triggerSummarization: boolean;
 }
 
@@ -95,8 +65,8 @@ const RealTimeView: React.FC<RealTimeViewProps> = ({
       witnessLanguage: "",
     });
 
-  const handleStartInvestigation = (investigationData: InvestigationData) => {
-    console.log("Starting investigation with data:", investigationData);
+  const handleStartInvestigation = () => {
+    console.log("Starting investigation");
     setIsIdentityVerified(true);
     setActiveTab("transcription");
   };

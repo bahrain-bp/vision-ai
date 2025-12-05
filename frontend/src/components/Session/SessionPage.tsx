@@ -19,37 +19,22 @@ import { getTimeString } from "../common/Timer/Timer";
 
 import { CameraFootageProvider } from "../../context/CameraFootageContext";
 
-interface ParticipantData {
-  fullName: string;
-  idNumber: string;
-}
-interface IdentityData {
-  referencePhoto: File | null;
-  cpr: File | null;
-  passport: File | null;
-  isVerified: boolean;
-}
-
 interface TranslationSettings {
   sourceLanguage: string;
   targetLanguage: string;
 }
 
 interface SetupData {
-  witnessData: ParticipantData;
-  identityData: IdentityData;
   translationSettings: TranslationSettings;
 }
 
 interface SessionData {
   sessionId: string;
   investigator: string;
+  participant: string;
   language: string;
   duration: string;
-  participant: string;
   status: string;
-  participantData?: ParticipantData;
-  identityData?: IdentityData;
   translationSettings?: TranslationSettings;
 }
 
@@ -75,8 +60,6 @@ const SessionPage: React.FC<SessionPageProps> = ({
     createSession,
     updateSessionStatus,
     setCurrentSession,
-    setCurrentPersonName,
-    setCurrentPersonType,
   } = useCaseContext();
 
   const [activeMainTab, setActiveMainTab] = useState<MainTab>("real-time");
@@ -95,16 +78,6 @@ const SessionPage: React.FC<SessionPageProps> = ({
   const [timerString, setTimerString] = useState("00:00:00");
 
   const [setupData, setSetupData] = useState<SetupData>({
-    witnessData: {
-      fullName: sessionData?.participantData?.fullName || "",
-      idNumber: sessionData?.participantData?.idNumber || "",
-    },
-    identityData: {
-      referencePhoto: sessionData?.identityData?.referencePhoto || null,
-      cpr: sessionData?.identityData?.cpr || null,
-      passport: sessionData?.identityData?.passport || null,
-      isVerified: sessionData?.identityData?.isVerified || false,
-    },
     translationSettings: {
       sourceLanguage: sessionData?.translationSettings?.sourceLanguage || "ar",
       targetLanguage: sessionData?.translationSettings?.targetLanguage || "en",
@@ -139,7 +112,7 @@ const SessionPage: React.FC<SessionPageProps> = ({
         investigator: currentSession.investigator || getInvestigatorName(),
         language: language === "en" ? "English" : "Arabic",
         duration: timerString,
-        participant: setupData.witnessData.fullName || "Not set",
+        participant: "",
         status: currentSession.status,
       }
     : {
@@ -147,15 +120,9 @@ const SessionPage: React.FC<SessionPageProps> = ({
         investigator: getInvestigatorName(),
         language: language === "en" ? "English" : "Arabic",
         duration: timerString,
-        participant: "Not set",
+        participant: "",
         status: "Active",
       };
-
-  useEffect(() => {
-    if (setupData.witnessData.fullName) {
-      currentSessionData.participant = setupData.witnessData.fullName;
-    }
-  }, [setupData.witnessData.fullName]);
 
   const handleEndSession = async () => {
     stopRecording(setSessionState);
@@ -172,8 +139,6 @@ const SessionPage: React.FC<SessionPageProps> = ({
       }
     }
     setCurrentSession(null);
-    setCurrentPersonName(null);
-    setCurrentPersonType(null);
 
     // Trigger switch to summarization tab
     setTriggerSummarization(true);
@@ -191,33 +156,12 @@ const SessionPage: React.FC<SessionPageProps> = ({
   const handleBackToHome = () => {
     sessionCreationAttempted.current = false;
     setCurrentSession(null);
-    setCurrentPersonName(null);
-    setCurrentPersonType(null);
+
     if (onEndSession) {
       onEndSession();
     } else {
       onSignOut();
     }
-  };
-
-  const updateWitnessData = (field: keyof ParticipantData, value: string) => {
-    setSetupData((prev) => ({
-      ...prev,
-      witnessData: {
-        ...prev.witnessData,
-        [field]: value,
-      },
-    }));
-  };
-
-  const updateIdentityData = (field: keyof IdentityData, value: any) => {
-    setSetupData((prev) => ({
-      ...prev,
-      identityData: {
-        ...prev.identityData,
-        [field]: value,
-      },
-    }));
   };
 
   const updateTranslationSettings = (
@@ -231,19 +175,6 @@ const SessionPage: React.FC<SessionPageProps> = ({
         [field]: value,
       },
     }));
-  };
-
-  const handleVerifyIdentity = () => {
-    if (!setupData.witnessData.fullName) {
-      alert("Please enter witness full name.");
-      return;
-    }
-    if (!setupData.identityData.referencePhoto) {
-      alert("Please upload a reference photo.");
-      return;
-    }
-    updateIdentityData("isVerified", true);
-    alert("Identity verification completed successfully!");
   };
 
   const sessionCreationAttempted = React.useRef(false);
@@ -425,11 +356,8 @@ const SessionPage: React.FC<SessionPageProps> = ({
             sessionState={sessionState}
             setSessionState={setSessionState}
             sessionData={currentSessionData}
-            setupData={setupData}
-            onWitnessDataChange={updateWitnessData}
-            onIdentityDataChange={updateIdentityData}
+            translationSettings={setupData.translationSettings}
             onTranslationSettingsChange={updateTranslationSettings}
-            onVerifyIdentity={handleVerifyIdentity}
             triggerSummarization={triggerSummarization}
           />
         ) : (
