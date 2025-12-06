@@ -69,7 +69,7 @@ const ProcessingView: React.FC<ProcessingViewProps> = ({
     { 
       id: "Rewrite",
       label: language === "en" ? "Rewrite" : "إعادة صياغة التقرير",
-      render: () => <Rewrite sessionData={sessionWithKey} />,
+      render: () => <Rewrite sessionData={sessionWithKey} selectedLanguage={language} />,
      },
     { id: "AISuggestions",
      label: language === "en" ? "AI Suggestions" : "اقتراحات الذكاء الاصطناعي",
