@@ -76,9 +76,7 @@ const ProcessingView: React.FC<ProcessingViewProps> = ({
       id: "CameraFootage",
       label:
         language === "en" ? "Video & Audio Analysis" : "تحليل مرئي و صوتي ",
-      render: () => (
-        <CameraFootage sessionData={sessionData} language={language} />
-      ),
+      render: () => <CameraFootage sessionData={sessionData} />,
     },
     {
       id: "AISuggestions",

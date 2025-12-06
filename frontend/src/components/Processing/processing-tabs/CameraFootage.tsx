@@ -9,10 +9,11 @@ import {
   ChapterData,
 } from "../../../context/CameraFootageContext";
 import { CaseContext } from "../../../context/CaseContext";
+import { useLanguage } from "../../../context/LanguageContext";
 
 interface CameraFootageProps {
   sessionData: SessionData;
-  language: "en" | "ar";
+  //language: "en" | "ar";
 }
 
 interface TranslatedText {
@@ -22,8 +23,9 @@ interface TranslatedText {
 
 const CameraFootage: React.FC<CameraFootageProps> = ({
   sessionData: _sessionData,
-  language,
+  //language,
 }) => {
+  const { language } = useLanguage();
   // Use context instead of local state
   const {
     state,
@@ -1605,7 +1607,7 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
         className="audio-analysis-wrapper"
         dir={language === "ar" ? "rtl" : "ltr"}
       >
-        <AudioAnalysis language={language} />
+        <AudioAnalysis />
       </div>
     </div>
   );

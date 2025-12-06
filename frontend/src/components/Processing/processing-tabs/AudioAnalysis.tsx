@@ -8,10 +8,11 @@ import {
   AlertCircle,
   AlertTriangle,
 } from "lucide-react";
+import { useLanguage } from "../../../context/LanguageContext";
 
-interface AudioAnalysisProps {
+/*interface AudioAnalysisProps {
   language: "en" | "ar";
-}
+}*/
 
 interface TranscriptionResult {
   status: "PROCESSING" | "COMPLETED" | "FAILED";
@@ -24,7 +25,8 @@ interface AnalysisResult {
   summary: string;
 }
 
-const AudioAnalysis: React.FC<AudioAnalysisProps> = ({ language }) => {
+const AudioAnalysis: React.FC = () => {
+  const { language } = useLanguage();
   // Upload state
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);

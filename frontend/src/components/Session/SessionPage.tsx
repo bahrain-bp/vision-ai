@@ -19,7 +19,6 @@ import { getTimeString } from "../common/Timer/Timer";
 
 import { CameraFootageProvider } from "../../context/CameraFootageContext";
 
-
 interface ParticipantData {
   fullName: string;
   idNumber: string;
@@ -70,6 +69,7 @@ const SessionPage: React.FC<SessionPageProps> = ({
   onEndSession,
 }) => {
   const { t } = useLanguage();
+  const { language, toggleLanguage } = useLanguage();
   const {
     currentCase,
     currentSession,
@@ -85,7 +85,7 @@ const SessionPage: React.FC<SessionPageProps> = ({
   const { stopRecording, toggleRecordingPause, toggleReset } =
     useTranscription();
 
-  const [language, setLanguage] = useState<"en" | "ar">("en");
+  //const [language, setLanguage] = useState<"en" | "ar">("en");
 
   const [triggerSummarization, setTriggerSummarization] =
     useState<boolean>(false);
@@ -312,17 +312,17 @@ const SessionPage: React.FC<SessionPageProps> = ({
             <div className="nav-controls">
               <div className="language-controls">
                 <span className="language-label">
-                  {language === "ar" ? "اللغة:" : "Language:"}
+                  {language === "en" ? "Language:" : "اللغة:"}
                 </span>
                 <button
                   className={`lang-btn ${language === "en" ? "active" : ""}`}
-                  onClick={() => setLanguage("en")}
+                  onClick={toggleLanguage}
                 >
                   EN
                 </button>
                 <button
                   className={`lang-btn ${language === "ar" ? "active" : ""}`}
-                  onClick={() => setLanguage("ar")}
+                  onClick={toggleLanguage}
                 >
                   AR
                 </button>
