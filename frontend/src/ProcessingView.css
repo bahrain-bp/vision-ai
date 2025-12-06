@@ -90,6 +90,7 @@
 .tab-content {
   display: flex;
   flex: 1;
+  flex-direction: column;
   justify-content: center;
   align-items: center;
   padding: 2rem;
@@ -177,7 +178,7 @@
   border-radius: 8px;
   padding: 1.5rem;
   margin-bottom: 0.5rem;
-  box-shadow: var(--shadow-light);
+  box-shadow: var(--shadow-medium);
   width: 100%;
   box-sizing: border-box;
 }
@@ -1083,7 +1084,7 @@
 
 .camera-description {
   color: var(--text-medium);
-  font-size: 0.875rem;
+  font-size: 0.95rem;
   margin-bottom: 1.5rem;
   line-height: 1.5;
 }
@@ -1924,6 +1925,28 @@
   flex-direction: row-reverse;
 }
 
+/* RTL Support for Event, Person, and Object Cards */
+.camera-footage-wrapper[dir="rtl"] .event-card {
+  border-left: none;
+  border-right: 4px solid #0066cc;
+}
+
+.camera-footage-wrapper[dir="rtl"] .person-card {
+  border-left: none;
+  border-right: 4px solid #7235dc;
+}
+
+.camera-footage-wrapper[dir="rtl"] .object-card {
+  border-left: none;
+  border-right: 4px solid #ff9800;
+}
+
+/* RTL Support for Event, Person, and Object Cards */
+.camera-footage-wrapper[dir="rtl"] .summary-card {
+  border-left: none;
+  border-right: 4px solid #0066cc;
+}
+
 /*End of Camera Footage Specific Styles*/
 
 /* Audio Analysis Styles */
@@ -1932,7 +1955,6 @@
   width: 100%;
   padding: 2rem;
   text-align: left;
-  margin-top: 60px;
 }
 
 .audio-main-title {
@@ -1944,7 +1966,7 @@
 
 .audio-main-description {
   color: var(--text-medium);
-  font-size: 0.875rem;
+  font-size: 0.95rem;
   margin-bottom: 1.5rem;
   line-height: 1.5;
 }
@@ -1962,7 +1984,7 @@
   border-radius: 8px;
   padding: 1.5rem;
   margin-bottom: 0.5rem;
-  box-shadow: var(--shadow-light);
+  box-shadow: var(--shadow-medium);
   width: 100%;
   box-sizing: border-box;
 }
@@ -2147,7 +2169,7 @@
   }
 }
 
-/* Audio Results - matches .analysis-results */
+/* Audio Results  */
 .audio-results {
   width: 100%;
   display: flex;
@@ -2155,12 +2177,12 @@
   gap: 16px;
 }
 
-/* Audio Results Block - matches .video-summary-section */
+/* Audio Results Block  */
 .audio-results-block {
   margin-bottom: 20px;
 }
 
-/* Audio Block Header - matches .section-header */
+/* Audio Block Header  */
 .audio-block-header {
   font-size: 18px;
   font-weight: 600;
@@ -2171,7 +2193,7 @@
   gap: 8px;
 }
 
-/* Audio Info Card - matches .summary-card */
+/* Audio Info Card  */
 .audio-info-card {
   background: #f8f9fa;
   border-radius: 8px;
@@ -2179,21 +2201,21 @@
   border-left: 4px solid #0066cc;
 }
 
-/* Audio Info Text - matches .summary-text */
+/* Audio Info Text  */
 .audio-info-text {
   color: #333;
   line-height: 1.6;
   margin: 0;
 }
 
-/* Audio Transcription List - matches .chapters-list */
+/* Audio Transcription List  */
 .audio-transcription-list {
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
 
-/* Audio Transcription Card - matches .chapter-card */
+/* Audio Transcription Card*/
 .audio-transcription-card {
   background: #fff;
   border: 1px solid #e0e0e0;
@@ -2201,7 +2223,7 @@
   overflow: hidden;
 }
 
-/* Audio Transcription Content - matches .chapter-summary */
+/* Audio Transcription Content  */
 .audio-transcription-content {
   padding: 16px 20px;
   background: white;
@@ -2213,7 +2235,7 @@
   margin: 0;
 }
 
-/* Audio Actions Row - matches .export-actions */
+/* Audio Actions Row */
 .audio-actions-row {
   display: flex;
   justify-content: center;
@@ -2221,7 +2243,7 @@
   gap: 12px;
 }
 
-/* Audio No Results - matches .no-results styling */
+/* Audio No Results */
 .audio-no-results {
   text-align: center;
   padding: 3rem 2rem;
@@ -2233,7 +2255,7 @@
   font-size: 14px;
 }
 
-/* Audio Banner - matches .notification-banner */
+/* Audio Banner */
 .audio-banner {
   display: flex;
   align-items: center;
@@ -2255,7 +2277,7 @@
   }
 }
 
-/* Audio Banner Types - matches .banner-success, .banner-error, etc. */
+/* Audio Banner Types */
 .audio-banner-success {
   background-color: #d4edda;
   border: 1px solid #c3e6cb;
@@ -2280,7 +2302,7 @@
   color: #0066cc;
 }
 
-/* Audio Banner Icon - matches .banner-icon */
+/* Audio Banner Icon  */
 .audio-banner-icon {
   font-size: 18px;
   font-weight: bold;
@@ -2288,14 +2310,14 @@
   align-items: center;
 }
 
-/* Audio Banner Message - matches .banner-message */
+/* Audio Banner Message  */
 .audio-banner-message {
   flex: 1;
   font-size: 14px;
   font-weight: 500;
 }
 
-/* Audio Modal - matches .modal-overlay */
+/* Audio Modal  */
 .audio-modal-overlay {
   position: fixed;
   top: 0;
@@ -2319,7 +2341,7 @@
   }
 }
 
-/* Audio Modal Content - matches .modal-content */
+/* Audio Modal Content  */
 .audio-modal-content {
   background-color: #ffffff;
   border-radius: 12px;
@@ -2342,7 +2364,7 @@
   }
 }
 
-/* Audio Modal Icon - matches .modal-icon */
+/* Audio Modal Icon  */
 .audio-modal-icon {
   display: flex;
   align-items: center;
@@ -2350,7 +2372,7 @@
   margin-bottom: 16px;
 }
 
-/* Audio Modal Title - matches .modal-title */
+/* Audio Modal Title  */
 .audio-modal-title {
   font-size: 20px;
   font-weight: 600;
@@ -2358,7 +2380,7 @@
   margin: 0 0 12px 0;
 }
 
-/* Audio Modal Message - matches .modal-message */
+/* Audio Modal Message  */
 .audio-modal-message {
   font-size: 14px;
   color: #666;
@@ -2366,14 +2388,14 @@
   margin: 0 0 24px 0;
 }
 
-/* Audio Modal Actions - matches .modal-actions */
+/* Audio Modal Actions  */
 .audio-modal-actions {
   display: flex;
   gap: 12px;
   justify-content: center;
 }
 
-/* Audio Modal Buttons - matches .modal-btn */
+/* Audio Modal Buttons  */
 .audio-modal-btn {
   padding: 12px 24px;
   border-radius: 8px;
@@ -2385,7 +2407,7 @@
   min-width: 120px;
 }
 
-/* Audio Modal Cancel - matches .modal-btn.cancel */
+/* Audio Modal Cancel */
 .audio-modal-cancel {
   background-color: #f0f0f0;
   color: #333;
@@ -2395,7 +2417,7 @@
   background-color: #e0e0e0;
 }
 
-/* Audio Modal Confirm - matches .modal-btn.confirm */
+/* Audio Modal Confirm  */
 .audio-modal-confirm {
   background-color: #dc3545;
   color: white;
@@ -2432,7 +2454,15 @@
 }
 
 .audio-wrapper-main[dir="rtl"] .audio-block-header {
+  direction: rtl;
+  text-align: right;
   flex-direction: row-reverse;
+  justify-content: flex-end;
+}
+
+.audio-wrapper-main[dir="rtl"] .audio-info-card {
+  border-left: none;
+  border-right: 4px solid #0066cc;
 }
 
 /* Responsive Design for Audio Analysis */

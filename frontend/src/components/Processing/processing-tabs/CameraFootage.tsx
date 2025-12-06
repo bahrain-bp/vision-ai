@@ -1,6 +1,14 @@
 import React, { useRef } from "react";
-import { Pencil, Check, X, AlertTriangle, Video } from "lucide-react";
-import AudioAnalysis from "./AudioAnalysis";
+import {
+  Pencil,
+  Check,
+  X,
+  Video,
+  Loader2,
+  CheckCircle,
+  AlertCircle,
+  AlertTriangle,
+} from "lucide-react";
 import "../../../ProcessingView.css";
 import { SessionData } from "../ProcessingView";
 import { exportAnalysisResultsAsPDF } from "../../../services/CamFootageAnalysis/AnalysisPdfExportService";
@@ -746,10 +754,12 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
       {banner && (
         <div className={`notification-banner banner-${banner.type}`}>
           <span className="banner-icon">
-            {banner.type === "success"}
-            {banner.type === "error"}
-            {banner.type === "warning"}
-            {banner.type === "info"}
+            {banner.type === "success" && <CheckCircle size={18} />}
+            {banner.type === "error" && <AlertCircle size={18} />}
+            {banner.type === "warning" && <AlertCircle size={18} />}
+            {banner.type === "info" && (
+              <Loader2 size={18} className="audio-spinning" />
+            )}
           </span>
           <span className="banner-message">{banner.message}</span>
         </div>
@@ -793,8 +803,8 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
       </div>
       <p className="camera-description" dir={language === "ar" ? "rtl" : "ltr"}>
         {language === "ar"
-          ? "*قم بتحميل وتحليل فيديوهات المراقبة لاستخراج الأدلة"
-          : "*Upload and analyze surveillance footage for evidence extraction"}
+          ? "* قم بتحميل وتحليل فيديوهات المراقبة لاستخراج الأدلة"
+          : "* Upload and analyze surveillance footage for evidence extraction"}
       </p>
 
       <div className="camera-footage-container">
@@ -1601,13 +1611,6 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
             )}
           </div>
         </div>
-      </div>
-      {/* Audio Analysis Wrapper */}
-      <div
-        className="audio-analysis-wrapper"
-        dir={language === "ar" ? "rtl" : "ltr"}
-      >
-        <AudioAnalysis />
       </div>
     </div>
   );

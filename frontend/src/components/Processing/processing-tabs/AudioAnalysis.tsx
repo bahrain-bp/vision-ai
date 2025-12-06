@@ -1,58 +1,76 @@
-import React, { useState } from "react";
+import React from "react";
 import {
   Mic,
   FileAudio,
-  Play,
   Loader2,
   CheckCircle,
   AlertCircle,
   AlertTriangle,
 } from "lucide-react";
 import { useLanguage } from "../../../context/LanguageContext";
+import { useAudioAnalysis } from "../../../context/AudioAnalysisContext";
 
 /*interface AudioAnalysisProps {
   language: "en" | "ar";
 }*/
 
-interface TranscriptionResult {
-  status: "PROCESSING" | "COMPLETED" | "FAILED";
-  transcription?: string;
-  originalLanguage?: string;
-  error?: string;
+// Add parsing helper function
+function parseArabicSummary(summary: string) {
+  const sections: { header: string; content: string }[] = [];
+
+  // Split by double asterisks pattern
+  const parts = summary.split(/\*\*(.*?)\*\*:?\n/g);
+
+  for (let i = 1; i < parts.length; i += 2) {
+    const header = parts[i].trim();
+    let content = parts[i + 1]?.trim() || "";
+
+    if (header && content) {
+      sections.push({ header, content });
+    }
+  }
+
+  return sections;
 }
 
-interface AnalysisResult {
-  summary: string;
+// Helper function to convert markdown bold to JSX
+function renderContentWithBold(text: string) {
+  const parts = text.split(/\*\*(.*?)\*\*/g);
+  return parts.map((part, idx) =>
+    idx % 2 === 1 ? <strong key={idx}>{part}</strong> : part
+  );
 }
 
 const AudioAnalysis: React.FC = () => {
   const { language } = useLanguage();
-  // Upload state
-  const [audioFile, setAudioFile] = useState<File | null>(null);
-  const [audioUrl, setAudioUrl] = useState<string | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadedS3Key, setUploadedS3Key] = useState<string | null>(null);
+  const {
+    state,
+    setAudioFile,
+    setAudioUrl,
+    setIsUploading,
+    setUploadedS3Key,
+    setIsTranscribing,
+    setTranscriptionResult,
+    setResultKey,
+    setIsAnalyzing,
+    setAnalysisResult,
+    setBanner,
+    setShowResetModal,
+    resetState,
+  } = useAudioAnalysis();
 
-  // Transcription state
-  const [isTranscribing, setIsTranscribing] = useState(false);
-  const [transcriptionResult, setTranscriptionResult] =
-    useState<TranscriptionResult | null>(null);
-  const [, setResultKey] = useState<string | null>(null);
-
-  // Analysis state
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(
-    null
-  );
-
-  // Banner state
-  const [banner, setBanner] = useState<{
-    type: "success" | "error" | "warning" | "info";
-    message: string;
-  } | null>(null);
-
-  // Reset modal state
-  const [showResetModal, setShowResetModal] = useState(false);
+  const {
+    audioFile,
+    audioUrl,
+    isUploading,
+    uploadedS3Key,
+    isTranscribing,
+    transcriptionResult,
+    isAnalyzing,
+    analysisResult,
+    banner,
+    showResetModal,
+  } = state;
 
   // Helper function to show banner
   const showBanner = (
@@ -403,13 +421,7 @@ const AudioAnalysis: React.FC = () => {
 
   // Reset for new upload
   const resetForNewUpload = () => {
-    setAudioFile(null);
-    setAudioUrl(null);
-    setUploadedS3Key(null);
-    setTranscriptionResult(null);
-    setAnalysisResult(null);
-    setResultKey(null);
-    setShowResetModal(false);
+    resetState();
     showBanner(
       "info",
       language === "ar"
@@ -484,8 +496,8 @@ const AudioAnalysis: React.FC = () => {
         dir={language === "ar" ? "rtl" : "ltr"}
       >
         {language === "ar"
-          ? "*قم بتحميل ملفات صوتية للنسخ والترجمة والتحليل"
-          : "*Upload audio files for transcription, translation, and analysis"}
+          ? "* قم بتحميل ملف صوتي بأي لغة. سيتم نسخ الملف الصوتي وترجمة النص إلى اللغة العربية تلقائياً، ثم سيتم عرض النص المترجم وتحليله "
+          : "* Upload an audio file in any language. The audio will be transcribed and automatically translated to Arabic. The translated text will be displayed and analyzed for key insights."}
       </p>
 
       <div className="audio-container">
@@ -589,7 +601,6 @@ const AudioAnalysis: React.FC = () => {
                         </>
                       ) : (
                         <>
-                          <Play size={16} />
                           {language === "ar"
                             ? "بدء النسخ والترجمة"
                             : "Start Transcription & Translation"}
@@ -629,7 +640,7 @@ const AudioAnalysis: React.FC = () => {
                 <div className="audio-results-block">
                   <h3 className="audio-block-header">
                     {language === "ar"
-                      ? "معلومات اللغة"
+                      ? " اللغة التي تم التعرف عليها"
                       : "Language Information"}
                   </h3>
                   <div className="audio-info-card">
@@ -688,7 +699,6 @@ const AudioAnalysis: React.FC = () => {
                         </>
                       ) : (
                         <>
-                          <Play size={16} />
                           {language === "ar" ? "بدء التحليل" : "Start Analysis"}
                         </>
                       )}
@@ -719,20 +729,24 @@ const AudioAnalysis: React.FC = () => {
             </div>
             <div className="audio-section-content">
               <div className="audio-results">
-                <div className="audio-results-block">
-                  <h3 className="audio-block-header">
-                    {language === "ar" ? "ملخص التحليل" : "Analysis Summary"}
-                  </h3>
-                  <div className="audio-info-card">
-                    <p
-                      className="audio-info-text"
-                      dir={language === "ar" ? "rtl" : "ltr"}
-                      style={{ whiteSpace: "pre-wrap", lineHeight: 1.8 }}
-                    >
-                      {analysisResult.summary}
-                    </p>
-                  </div>
-                </div>
+                {parseArabicSummary(analysisResult.summary).map(
+                  (section, idx) => (
+                    <div key={idx} className="audio-results-block">
+                      <h3 className="audio-block-header" dir="rtl">
+                        {section.header}
+                      </h3>
+                      <div className="audio-info-card">
+                        <p
+                          className="audio-info-text"
+                          dir="rtl"
+                          style={{ whiteSpace: "pre-wrap", lineHeight: 1.8 }}
+                        >
+                          {renderContentWithBold(section.content)}
+                        </p>
+                      </div>
+                    </div>
+                  )
+                )}
               </div>
             </div>
           </div>
