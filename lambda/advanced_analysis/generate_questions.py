@@ -79,23 +79,32 @@ REQUIREMENTS
    - Be directed toward police officers.
    - Critique or examine police decisions or investigative steps.
    - Contain speculative or guilt-assuming phrasing.
-8) Each "text" ≤140 characters; each "context" ≤140 characters.
-9) Cover diverse investigative dimensions: timeline, sequence, physical actions, witness interactions, object handling, motivations, surroundings, events.
-10) Avoid duplicates; ensure each question targets a distinct aspect of the suspect's involvement.
-11) Order items by priority: High → Medium → Low.
-12) IDs must be zero-padded: q01, q02, ..., up to q10.
+8) Questions should be detailed and comprehensive, including specific references to dates, times, locations, names, and actions from the report.
+9) Context should provide clear investigative rationale explaining why this question matters for the case.
+10) Cover diverse investigative dimensions: timeline, sequence, physical actions, witness interactions, object handling, motivations, surroundings, events.
+11) Avoid duplicates; ensure each question targets a distinct aspect of the suspect's involvement.
+12) Order items by priority: High → Medium → Low.
+13) IDs must be zero-padded: q01, q02, ..., up to q10.
 
-RETURN ONLY THIS JSON SHAPE:
+OUTPUT REQUIREMENTS:
+- Return ONLY a valid JSON array
+- NO markdown code blocks (no ```json or ```)
+- NO explanatory text before or after the JSON
+- Ensure all strings are properly escaped
+- Questions can be as long as needed to be specific and detailed
+- Context should be comprehensive and explain the investigative importance
+
+JSON FORMAT:
 [
   {{
     "id": "q01",
-    "text": "Direct suspect-focused question (≤140 chars, {language})",
-    "context": "Why this suspect detail matters (≤140 chars, {language})",
+    "text": "Question text in {language}",
+    "context": "Context in {language}",
     "priority": "High"
   }}
 ]
 
-Generate 7–10 items total."""
+Generate 7–10 questions. Output ONLY the JSON array, nothing else."""
 
         questions = []
         max_retries = 3
@@ -109,7 +118,7 @@ Generate 7–10 items total."""
                             modelId=inference_profile_arn,
                             body=json.dumps({
                                 "messages": [{"role": "user", "content": [{"text": prompt}]}],
-                                "inferenceConfig": {"maxTokens": 2000, "temperature": 0.7}
+                                "inferenceConfig": {"maxTokens": 4000, "temperature": 0.7}
                             })
                         )
                         result = json.loads(response['body'].read())
@@ -118,22 +127,50 @@ Generate 7–10 items total."""
                         print("The inference profile does not match a Nova model")
                         break
                     
-                    # Extract JSON from response
-                    try:
-                        start = content.find('[')
-                        end = content.rfind(']') + 1
-                        if start >= 0 and end > start:
-                            questions = json.loads(content[start:end])
+                    # Extract and repair JSON
+                    start = content.find('[')
+                    end = content.rfind(']') + 1
+                    if start >= 0 and end > start:
+                        json_str = content[start:end]
+                        parsed = False
+                        
+                        # Strategy 1: Direct parse
+                        try:
+                            questions = json.loads(json_str)
                             print(f"Generated {len(questions)} questions on attempt {attempt + 1}")
+                            parsed = True
                             break
-                    except (json.JSONDecodeError, IndexError) as parse_error:
-                        print(f"Failed to parse on attempt {attempt + 1}: {parse_error}")
-                        if attempt < max_retries - 1:
-                            print("Retrying...")
-                            continue
-                        else:
-                            print(f"Failed after {max_retries} attempts")
-                            questions = []
+                        except json.JSONDecodeError:
+                            pass
+                        
+                        # Strategy 2: Remove markdown
+                        if not parsed:
+                            try:
+                                cleaned = json_str.replace('```json', '').replace('```', '').strip()
+                                questions = json.loads(cleaned)
+                                print(f"Generated {len(questions)} questions (cleaned)")
+                                parsed = True
+                                break
+                            except json.JSONDecodeError:
+                                pass
+                        
+                        # Strategy 3: Aggressive repair
+                        if not parsed:
+                            try:
+                                import re
+                                repaired = json_str.replace('\n', ' ').replace('\r', '')
+                                questions = json.loads(repaired)
+                                print(f"Generated {len(questions)} questions (repaired)")
+                                parsed = True
+                                break
+                            except json.JSONDecodeError as e:
+                                print(f"Parse failed attempt {attempt + 1}: {e}")
+                                if attempt < max_retries - 1:
+                                    print("Retrying...")
+                                    continue
+                                else:
+                                    print(f"Failed after {max_retries} attempts")
+                                    questions = []
                     
                 except Exception as bedrock_error:
                     print(f"Bedrock error on attempt {attempt + 1}: {str(bedrock_error)}")

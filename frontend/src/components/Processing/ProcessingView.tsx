@@ -36,6 +36,12 @@ const ProcessingView: React.FC<ProcessingViewProps> = ({ sessionData, language }
   const [extractedTextKey, setExtractedTextKey] = useState<string | undefined>(
     sessionData.extractedTextKey
   );
+  
+  // State persistence for AI Suggestions
+  const [aiSuggestionsData, setAiSuggestionsData] = useState<any>(null);
+  
+  // State persistence for Outcome
+  const [outcomeData, setOutcomeData] = useState<any>(null);
 
   useEffect(() => {
     setExtractedTextKey(sessionData.extractedTextKey);
@@ -69,7 +75,14 @@ const ProcessingView: React.FC<ProcessingViewProps> = ({ sessionData, language }
      },
     { id: "AISuggestions",
      label: language === "en" ? "AI Suggestions" : "اقتراحات الذكاء الاصطناعي",
-     render: () => <AISuggestions sessionData={sessionWithKey} language={language} />,
+     render: () => (
+       <AISuggestions 
+         sessionData={sessionWithKey} 
+         language={language}
+         persistedData={aiSuggestionsData}
+         onDataChange={setAiSuggestionsData}
+       />
+     ),
     },
     { 
       id: "CameraFootage",
@@ -83,7 +96,14 @@ const ProcessingView: React.FC<ProcessingViewProps> = ({ sessionData, language }
     },
     { id: "Outcome",
     label: language === "en" ? "Outcome" : "النتيجة",
-    render: () => <Outcome sessionData={sessionWithKey} language={language} />,
+    render: () => (
+      <Outcome 
+        sessionData={sessionWithKey} 
+        language={language}
+        persistedData={outcomeData}
+        onDataChange={setOutcomeData}
+      />
+    ),
   },
   ];
 

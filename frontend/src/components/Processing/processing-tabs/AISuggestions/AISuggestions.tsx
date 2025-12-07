@@ -86,6 +86,15 @@ const AISuggestions: React.FC<AISuggestionsProps> = ({
   const [questions, setQuestions] = useState<Question[]>(persistedData?.questions || []);
   const [gaps, setGaps] = useState<Gap[]>(persistedData?.gaps || []);
   const [focusAreas, setFocusAreas] = useState<string[]>(persistedData?.focusAreas || []);
+  
+  // Sync with persisted data when returning to tab
+  useEffect(() => {
+    if (persistedData) {
+      if (persistedData.questions) setQuestions(persistedData.questions);
+      if (persistedData.gaps) setGaps(persistedData.gaps);
+      if (persistedData.focusAreas) setFocusAreas(persistedData.focusAreas);
+    }
+  }, [persistedData]);
   const [customQuestion, setCustomQuestion] = useState<string>("");
   const [customPriority, setCustomPriority] =
     useState<Question["priority"]>("Medium");
@@ -415,11 +424,13 @@ const AISuggestions: React.FC<AISuggestionsProps> = ({
   };
 
   const handleToggleGapResolved = (id: string): void => {
-    setGaps((prev) =>
-      prev.map((gap) =>
+    setGaps((prev) => {
+      const updated = prev.map((gap) =>
         gap.id === id ? { ...gap, resolved: !gap.resolved } : gap
-      )
-    );
+      );
+      onDataChange?.({ questions, gaps: updated, focusAreas });
+      return updated;
+    });
   };
 
   const priorityRank: Record<Question["priority"], number> = {

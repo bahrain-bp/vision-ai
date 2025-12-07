@@ -32,6 +32,15 @@ const Outcome: React.FC<OutcomeProps> = ({ sessionData, language, persistedData 
   const [rationale, setRationale] = useState<string[]>(persistedData?.rationale || []);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [statusMessage, setStatusMessage] = useState<string>("");
+  
+  // Sync with persisted data when returning to tab
+  React.useEffect(() => {
+    if (persistedData) {
+      if (persistedData.confidenceScore !== undefined) setConfidenceScore(persistedData.confidenceScore);
+      if (persistedData.verdict) setVerdict(persistedData.verdict);
+      if (persistedData.rationale) setRationale(persistedData.rationale);
+    }
+  }, [persistedData]);
   const circleCircumference = useMemo(() => 2 * Math.PI * 52, []);
   const strokeDashoffset = useMemo(() => circleCircumference * (1 - confidenceScore / 100), [circleCircumference, confidenceScore]);
 
