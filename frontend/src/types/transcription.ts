@@ -102,6 +102,7 @@ export interface SourceSettings {
 
 export interface TranscriptionStats {
   avgWitnessConfidenceLevel: number;
+  curWitnessConfidenceLevel: number;
   //avgInvestigatorConfidenceLevel: number;
   witnessWordCount: number;
   investigatorWordCount: number;

@@ -55,6 +55,7 @@ export const TranscriptionProvider: React.FC<{ children: ReactNode }> = ({
   >([]); 
   const [transcriptStats, setTranscriptStats] = useState<TranscriptionStats>({
     avgWitnessConfidenceLevel: 0,
+    curWitnessConfidenceLevel: 0,
     witnessWordCount: 0,
     investigatorWordCount: 0,
     totalWordCount: 0,
@@ -96,6 +97,7 @@ export const TranscriptionProvider: React.FC<{ children: ReactNode }> = ({
         setFullTranscript("");
         setTranscriptStats({
           avgWitnessConfidenceLevel: 0,
+          curWitnessConfidenceLevel: 0,
           witnessWordCount: 0,
           investigatorWordCount: 0,
           totalWordCount: 0,
@@ -172,6 +174,7 @@ export const TranscriptionProvider: React.FC<{ children: ReactNode }> = ({
 
       return {
         avgWitnessConfidenceLevel: newAvgConfidence,
+        curWitnessConfidenceLevel: onTranscriptUpdate.avgWitnessConfidenceLevel > 0 ? onTranscriptUpdate.avgWitnessConfidenceLevel : (prev.curWitnessConfidenceLevel ?? 0),
         witnessWordCount: newWitnessWords,
         investigatorWordCount: newInvestigatorWords,
         totalWordCount: newTotalWords,
@@ -229,6 +232,7 @@ export const TranscriptionProvider: React.FC<{ children: ReactNode }> = ({
     setIsResetTrigger((prev) => !prev);
     setTranscriptStats({
       avgWitnessConfidenceLevel: 0,
+      curWitnessConfidenceLevel:0,
       witnessWordCount: 0,
       investigatorWordCount: 0,
       totalWordCount: 0,
