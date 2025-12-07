@@ -60,6 +60,8 @@ const SessionPage: React.FC<SessionPageProps> = ({
     createSession,
     updateSessionStatus,
     setCurrentSession,
+    setCurrentPersonName,
+    setCurrentPersonType,
   } = useCaseContext();
 
   const [activeMainTab, setActiveMainTab] = useState<MainTab>("real-time");
@@ -138,7 +140,6 @@ const SessionPage: React.FC<SessionPageProps> = ({
         console.error("Failed to update session status:", error);
       }
     }
-    setCurrentSession(null);
 
     // Trigger switch to summarization tab
     setTriggerSummarization(true);
@@ -155,7 +156,8 @@ const SessionPage: React.FC<SessionPageProps> = ({
   const handleBackToHome = () => {
     sessionCreationAttempted.current = false;
     setCurrentSession(null);
-
+    setCurrentPersonName(null);
+    setCurrentPersonType(null);
     if (onEndSession) {
       onEndSession();
     } else {
