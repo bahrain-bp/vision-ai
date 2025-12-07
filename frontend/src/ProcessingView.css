@@ -2076,6 +2076,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  transition: all 0.3s ease;
 }
 
 .audio-action-btn:hover {
@@ -2085,6 +2086,12 @@
 .audio-action-btn:disabled {
   opacity: 0.7;
   cursor: not-allowed;
+}
+
+.audio-action-btn:hover:not(:disabled) {
+  background: #1a2f5a;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(34, 65, 123, 0.3);
 }
 
 /* Audio Button Processing  */
@@ -2506,43 +2513,6 @@
     width: 100%;
     justify-content: center;
   }
-}
-
-/* Audio Export Actions */
-.audio-export-actions {
-  display: flex;
-  justify-content: center;
-  gap: 12px;
-  margin-top: 20px;
-  padding-top: 20px;
-  border-top: 1px solid #e0e0e0;
-}
-
-.audio-action-btn {
-  padding: 10px 24px;
-  background: #22417b;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  transition: all 0.3s ease;
-}
-
-.audio-action-btn:hover:not(:disabled) {
-  background: #1a2f5a;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(34, 65, 123, 0.3);
-}
-
-.audio-action-btn:disabled {
-  background: #ccc;
-  cursor: not-allowed;
-  opacity: 0.6;
 }
 
 .audio-spinner {

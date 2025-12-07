@@ -10,10 +10,12 @@ import {
 import { useLanguage } from "../../../context/LanguageContext";
 import { useAudioAnalysis } from "../../../context/AudioAnalysisContext";
 import { exportAudioAnalysisAsPDF } from "../../../services/AudioAnalysis/AudioAnalysisPdfExportService";
+import { CaseContext } from "../../../context/CaseContext";
+import { SessionData } from "../ProcessingView";
 
-/*interface AudioAnalysisProps {
-  language: "en" | "ar";
-}*/
+interface AudioAnalysisProps {
+  sessionData: SessionData;
+}
 
 // Add parsing helper function
 function parseArabicSummary(summary: string) {
@@ -42,7 +44,7 @@ function renderContentWithBold(text: string) {
   );
 }
 
-const AudioAnalysis: React.FC = () => {
+const AudioAnalysis: React.FC<AudioAnalysisProps> = ({ sessionData }) => {
   const { language } = useLanguage();
   const {
     state,
@@ -59,6 +61,12 @@ const AudioAnalysis: React.FC = () => {
     setShowResetModal,
     resetState,
   } = useAudioAnalysis();
+
+  const caseContext = React.useContext(CaseContext);
+
+  // Extract sessionId and caseId
+  const sessionId = sessionData?.sessionId || "Unknown";
+  const caseId = caseContext?.currentCase?.caseId || "Unknown Case ID";
 
   const {
     audioFile,
@@ -760,7 +768,9 @@ const AudioAnalysis: React.FC = () => {
                     onClick={() =>
                       exportAudioAnalysisAsPDF(
                         audioFile?.name || "audio",
-                        language
+                        language,
+                        sessionId,
+                        caseId
                       )
                     }
                   >

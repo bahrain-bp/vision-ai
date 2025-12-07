@@ -2,7 +2,9 @@ import html2pdf from "html2pdf.js";
 
 export const exportAudioAnalysisAsPDF = (
   fileName: string,
-  language: "en" | "ar"
+  language: "en" | "ar",
+  sessionId: string = "Unknown",
+  caseId: string = "Unknown"
 ) => {
   try {
     const element = document.getElementById("audio-analysis-content");
@@ -50,6 +52,12 @@ export const exportAudioAnalysisAsPDF = (
         <div><strong>${
           language === "ar" ? "الملف:" : "File:"
         }</strong> ${fileName}</div>
+        <div><strong>${
+          language === "ar" ? "رقم القضية:" : "Case ID:"
+        }</strong> ${caseId}</div>
+        <div><strong>${
+          language === "ar" ? "رقم الجلسة:" : "Session ID:"
+        }</strong> ${sessionId}</div>
         <div><strong>${
           language === "ar" ? "تم الإنشاء:" : "Generated:"
         }</strong> ${new Date().toLocaleString()}</div>

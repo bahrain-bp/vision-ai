@@ -82,7 +82,7 @@ const ProcessingView: React.FC<ProcessingViewProps> = ({
             <CameraFootage sessionData={sessionData} />
           </div>
           <div className="tab-content">
-            <AudioAnalysis />
+            <AudioAnalysis sessionData={sessionData} />
           </div>
         </>
       ),
