@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Loader } from "lucide-react";
 import "../../ProcessingView.css";
 
@@ -16,6 +16,7 @@ export interface SessionData {
   duration?: string;
   witness?: string;
   status?: string;
+  extractedTextKey?: string;
 }
 
 interface ProcessingViewProps {
@@ -32,36 +33,57 @@ interface Tab {
 const ProcessingView: React.FC<ProcessingViewProps> = ({ sessionData, language }) => {
   const [activeTab, setActiveTab] = useState<string>("Classification");
   const [isProcessing, setIsProcessing] = useState<boolean>(true);
-  const [aiSuggestionsData, setAiSuggestionsData] = useState<any>(null);
-  const [outcomeData, setOutcomeData] = useState<any>(null);
+  const [extractedTextKey, setExtractedTextKey] = useState<string | undefined>(
+    sessionData.extractedTextKey
+  );
+
+  useEffect(() => {
+    setExtractedTextKey(sessionData.extractedTextKey);
+  }, [sessionData.sessionId, sessionData.extractedTextKey]);
+
+  const handleExtractedKey = (key: string) => {
+    setExtractedTextKey(key);
+  };
+
+  const sessionWithKey: SessionData = {
+    ...sessionData,
+    extractedTextKey,
+  };
 
   const tabs: Tab[] = [
     {
        id: "Classification",
        label: language === "en" ? "Classification" : "التصنيف",
-       render: () => <Classification />,
+       render: () => (
+         <Classification
+           sessionData={sessionWithKey}
+           language={language}
+           onExtractedKey={handleExtractedKey}
+         />
+       ),
        },
     { 
       id: "Rewrite",
-      label: language === "en" ? "Rewrite" : "إعادة الصياغة",
-      render: () => <Rewrite sessionData={sessionData} />,
-     },
-    { id: "CameraFootage",
-      label: language === "en" ? "Camera Footage" : "لقطات الكاميرا",
-      render: () => <CameraFootage sessionData={sessionData} language={language} />,
+      label: language === "en" ? "Rewrite" : "إعادة صياغة التقرير",
+      render: () => <Rewrite sessionData={sessionWithKey} />,
      },
     { id: "AISuggestions",
      label: language === "en" ? "AI Suggestions" : "اقتراحات الذكاء الاصطناعي",
-     render: () => <AISuggestions sessionData={sessionData} language={language} persistedData={aiSuggestionsData} onDataChange={setAiSuggestionsData} />,
+     render: () => <AISuggestions sessionData={sessionWithKey} language={language} />,
     },
     { 
+      id: "CameraFootage",
+      label: language === "en" ? "Camera Footage" : "تحليل الفيديوهات ",
+      render: () => <CameraFootage sessionData={sessionData} language={language} />,
+     },
+    {
       id: "Contradictions",
       label: language === "en" ? "Contradictions" : "التناقضات",
       render: () => <Contradictions language={language} />,
     },
     { id: "Outcome",
     label: language === "en" ? "Outcome" : "النتيجة",
-    render: () => <Outcome sessionData={sessionData} language={language} persistedData={outcomeData} onDataChange={setOutcomeData} />,
+    render: () => <Outcome sessionData={sessionWithKey} language={language} />,
   },
   ];
 

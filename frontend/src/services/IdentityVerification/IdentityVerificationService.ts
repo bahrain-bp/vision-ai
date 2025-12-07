@@ -1,14 +1,15 @@
-import axios, { AxiosError, AxiosRequestConfig } from "axios";
+import axios from "axios";
 import {
   UploadUrlRequest,
   UploadUrlResponse,
   VerificationRequest,
   VerificationResponse,
-  ApiError,
   PersonType,
   FileValidation,
   ProgressCallback,
   DEFAULT_CONFIG,
+  AxiosError,
+  AxiosRequestConfig,
 } from "../../types/identityVerification";
 
 const API_BASE_URL = process.env.REACT_APP_API_ENDPOINT;
@@ -35,8 +36,8 @@ const getFileMimeType = (file: File): string => {
 };
 
 const handleApiError = (error: unknown, context: string): never => {
-  if (axios.isAxiosError(error)) {
-    const axiosError = error as AxiosError<ApiError>;
+  if (error && typeof error === "object" && "response" in error) {
+    const axiosError = error as AxiosError;
     const status = axiosError.response?.status;
     const errorMessage = axiosError.response?.data?.error || axiosError.message;
     const errorDetails = axiosError.response?.data?.details;
@@ -175,22 +176,63 @@ export const uploadFileToS3 = async (
   try {
     validateProgressCallback(onProgress);
 
-    await axios.put(presignedUrl, file, {
-      ...REQUEST_CONFIG,
-      headers: {
-        "Content-Type": getFileMimeType(file),
-      },
-      onUploadProgress: (progressEvent) => {
-        if (onProgress && progressEvent.total) {
-          const progress = Math.round(
-            (progressEvent.loaded * 100) / progressEvent.total
-          );
-          onProgress(progress);
-        }
-      },
-    });
+    // Check if presignedUrl is actually an object with uploadFields (POST) or just a string (PUT)
+    const isPresignedPost =
+      typeof presignedUrl === "object" &&
+      "uploadUrl" in presignedUrl &&
+      "uploadFields" in presignedUrl;
+
+    if (isPresignedPost) {
+      // Use POST with FormData for presigned POST (with file size validation)
+      const urlData = presignedUrl as any;
+      const formData = new FormData();
+
+      // Add all the fields from uploadFields
+      Object.entries(urlData.uploadFields).forEach(([key, value]) => {
+        formData.append(key, value as string);
+      });
+
+      // Add the file last
+      formData.append("file", file);
+
+      await axios.post(urlData.uploadUrl, formData, {
+        ...REQUEST_CONFIG,
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+        onUploadProgress: (progressEvent: any) => {
+          if (onProgress && progressEvent.total) {
+            const progress = Math.round(
+              (progressEvent.loaded * 100) / progressEvent.total
+            );
+            onProgress(progress);
+          }
+        },
+      });
+    } else {
+      // Use PUT for regular presigned URL (backward compatibility)
+      await axios.put(presignedUrl as string, file, {
+        ...REQUEST_CONFIG,
+        headers: {
+          "Content-Type": getFileMimeType(file),
+        },
+        onUploadProgress: (progressEvent: any) => {
+          if (onProgress && progressEvent.total) {
+            const progress = Math.round(
+              (progressEvent.loaded * 100) / progressEvent.total
+            );
+            onProgress(progress);
+          }
+        },
+      });
+    }
   } catch (error) {
-    if (axios.isAxiosError(error) && error.code === "ECONNABORTED") {
+    if (
+      error &&
+      typeof error === "object" &&
+      "code" in error &&
+      (error as any).code === "ECONNABORTED"
+    ) {
       throw new IdentityVerificationError(
         "Upload timeout. Please try again.",
         "UPLOAD_TIMEOUT",
@@ -225,7 +267,8 @@ export const uploadDocument = async (
     file,
     "document"
   );
-  await uploadFileToS3(uploadUrlResponse.uploadUrl, file, onProgress);
+  // Pass the entire response object instead of just uploadUrl
+  await uploadFileToS3(uploadUrlResponse as any, file, onProgress);
   return uploadUrlResponse.s3Key;
 };
 
@@ -249,10 +292,10 @@ export const uploadPersonPhoto = async (
     personType,
     personType
   );
-  await uploadFileToS3(uploadUrlResponse.uploadUrl, file, onProgress);
+  // Pass the entire response object instead of just uploadUrl
+  await uploadFileToS3(uploadUrlResponse as any, file, onProgress);
   return uploadUrlResponse.s3Key;
 };
-
 export const completeIdentityVerification = async (
   caseId: string,
   sessionId: string,
@@ -294,6 +337,7 @@ export const completeIdentityVerification = async (
   }
 
   // Step 4: Trigger verification
+
   const verificationResult = await verifyIdentity({
     caseId,
     sessionId,

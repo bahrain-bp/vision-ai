@@ -10,7 +10,7 @@
     "axios": "^1.13.2",
     "buffer": "^6.0.3",
     "docx": "^8.5.0",
-    "html2pdf.js": "^0.10.3",
+    "html2pdf.js": "^0.12.1",
     "jspdf": "^3.0.3",
     "lucide-react": "^0.548.0",
     "microphone-stream": "^6.0.1",

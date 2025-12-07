@@ -169,3 +169,6 @@ export const DEFAULT_CONFIG: ServiceConfig = {
 };
 
 export const MAX_VERIFICATION_ATTEMPTS = 3;
+
+export type AxiosError = any;
+export type AxiosRequestConfig = any;

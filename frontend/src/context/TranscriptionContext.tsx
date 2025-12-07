@@ -17,9 +17,12 @@ import { TranscriptionResult,TranscriptionStatus,FormattedTranscript } from "../
 import TranscribeService from "../services/LiveTranscription/TranscribeService";
 import StreamManager from "../services/LiveTranscription/StreamManager";
 import {useCaseContext} from "../hooks/useCaseContext"
+
+
 export interface TranscriptionContextType {
   audioStatus: boolean;
   recordingStatus: RecordingStatus;
+  setParticipantType: (personType: string) => void;
   startRecording: (
     setSessionState?: (state: RecordingStatus) => void,
     languagePreferences?: LanguagePreferences,
@@ -30,12 +33,8 @@ export interface TranscriptionContextType {
   getFullTranscript: string;
   getTranscriptSegments: () => FormattedTranscript[];
   toggleRecordingPause: (isPaused: boolean) => void;
-
   toggleReset: () => void;
-
-  //Used to change state if reset not to track it
   resetTrigger: boolean;
-
   transcriptStats: TranscriptionStats;
 }
 
@@ -187,6 +186,10 @@ export const TranscriptionProvider: React.FC<{ children: ReactNode }> = ({
     return transcriptSegments;
   }, [transcriptSegments]);
 
+ const setParticipantType = useCallback((personType: string) => {
+   TranscribeService.setPersonType(personType);
+ }, []);
+
   const stopRecording = useCallback(
     (setSessionState?: (state: RecordingStatus) => void) => {
       TranscribeService.stopRecording();
@@ -239,6 +242,7 @@ export const TranscriptionProvider: React.FC<{ children: ReactNode }> = ({
       value={{
         audioStatus,
         recordingStatus,
+        setParticipantType,
         startRecording,
         stopRecording,
         getFullTranscript: fullTranscript,

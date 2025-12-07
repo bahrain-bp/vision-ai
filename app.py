@@ -11,6 +11,7 @@ from vision_ai.advanced_analysis_stack import AdvancedAnalysisStack
 from vision_ai.rewrite_stack import RewriteStack
 from vision_ai.summarization_stack import SummarizationStack
 from vision_ai.api_deployment_stack import APIDeploymentStack
+from vision_ai.classification_stack import classificationStack
 from vision_ai.transcription_stack import TranscriptionStack
 from vision_ai.frontend_stack import FrontendStack
 from vision_ai.detect_contradiction_stack import ContradictionStack
@@ -100,12 +101,23 @@ advanced_analysis_stack = AdvancedAnalysisStack(
     shared_api_root_resource_id=shared_stack.shared_api.rest_api_root_resource_id,
     description="Advanced Analysis: AI suggested questions and analysis"
 )
-
-# Ensure advanced analysis stack depends on shared stack
 advanced_analysis_stack.add_dependency(shared_stack)
 
 # ==========================================
-# 6. REWRITE STACK
+# 6. CLASSIFICATION STACK
+# extract text from document and classify the case
+# ==========================================
+classification_stack = classificationStack(
+    app, f"{app_name}-classification-stack", env=env,
+    investigation_bucket=shared_stack.investigation_bucket,
+    shared_api_id=shared_stack.shared_api.rest_api_id,
+    shared_api_root_resource_id=shared_stack.shared_api.rest_api_root_resource_id,
+    description="Classification Stack: Document upload to extract text and classify"
+)
+classification_stack.add_dependency(shared_stack)
+
+# ==========================================
+# 7. REWRITE STACK
 # Document rewriting with AWS Bedrock
 # ==========================================
 rewrite_stack = RewriteStack(
@@ -115,13 +127,10 @@ rewrite_stack = RewriteStack(
     shared_api_root_resource_id=shared_stack.shared_api.rest_api_root_resource_id,
     description="Rewrite Stack: Document rewriting using AWS Bedrock Nova Lite"
 )
-
-# Ensure rewrite stack depends on shared stack
 rewrite_stack.add_dependency(shared_stack)
 
-
 # ==========================================
-# 7. TRANSCRIPTION STACK
+# 8. TRANSCRIPTION STACK
 # ==========================================
 transcription_stack = TranscriptionStack(
     app, f"{app_name}-transcription-stack", env=env,
@@ -191,6 +200,7 @@ deployment_stack.add_dependency(case_management_stack)
 
 deployment_stack.add_dependency(advanced_analysis_stack)
 deployment_stack.add_dependency(rewrite_stack)
+deployment_stack.add_dependency(classification_stack)
 deployment_stack.add_dependency(detect_contradiction_stack)
 deployment_stack.add_dependency(transcription_stack)
 deployment_stack.add_dependency(summarization_stack)

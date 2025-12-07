@@ -92,6 +92,22 @@ def handle_verification_request(event, context):
     if not verify_s3_object_exists(person_photo_key):
         return error_response(404, f'Person photo not found in S3: {person_photo_key}')
     
+        # Validate file extensions
+    logger.info("\n--- Validating file extensions ---")
+    allowed_extensions = ['.jpg', '.jpeg', '.png']
+
+    document_ext = os.path.splitext(document_key)[1].lower()
+    if document_ext not in allowed_extensions:
+        logger.error(f"Invalid document file extension: {document_ext}")
+        return error_response(400, f'Invalid document file type. Only JPG, JPEG, and PNG files are allowed. Uploaded: {document_ext}')
+
+    person_photo_ext = os.path.splitext(person_photo_key)[1].lower()
+    if person_photo_ext not in allowed_extensions:
+        logger.error(f"Invalid person photo file extension: {person_photo_ext}")
+        return error_response(400, f'Invalid person photo file type. Only JPG, JPEG, and PNG files are allowed. Uploaded: {person_photo_ext}')
+
+    logger.info(f"✓ File extensions validated - Document: {document_ext}, Photo: {person_photo_ext}")
+    
     # STEP 1: Extract CPR and Name OR Use Manual Data
     logger.info("\n" + "=" * 60)
     logger.info("STEP 1: Processing document data")
@@ -507,10 +523,84 @@ def verify_s3_object_exists(s3_key):
         logger.error(f"Object not found in S3: {s3_key} - {str(e)}")
         return False
 
+def check_document_quality(document_key):
+    """Check quality of document image before processing"""
+    try:
+        logger.info(f"Checking document quality for: {document_key}")
+        
+        quality_response = rekognition.detect_faces(
+            Image={
+                'S3Object': {
+                    'Bucket': BUCKET_NAME,
+                    'Name': document_key
+                }
+            },
+            Attributes=['ALL']
+        )
+        
+        if not quality_response.get('FaceDetails'):
+            return {
+                'success': False,
+                'error': 'No face detected in the document. Please upload a clear ID document with a visible face photo.',
+                'details': 'Face detection returned no results'
+            }
+        
+        face_detail = quality_response['FaceDetails'][0]
+        quality = face_detail.get('Quality', {})
+        brightness = quality.get('Brightness', 0)
+        sharpness = quality.get('Sharpness', 0)
+        
+        logger.info(f"Document quality - Brightness: {brightness}, Sharpness: {sharpness}")
+        
+        # Quality thresholds for documents
+        if brightness < 35:
+            return {
+                'success': False,
+                'error': 'The document image is too dark. Please take a photo in better lighting conditions.',
+                'details': f'Brightness score: {brightness}/100 (minimum 35 required)'
+            }
+        
+        
+        if brightness > 95:
+            return {
+                'success': False,
+                'error': 'The document image is overexposed (too bright). Please take a photo with better lighting.',
+                'details': f'Brightness score: {brightness}/100 (maximum 95)'
+            }
+        
+        logger.info(f"✓ Document quality check passed")
+        return {
+            'success': True,
+            'brightness': brightness,
+            'sharpness': sharpness
+        }
+        
+    except rekognition.exceptions.InvalidImageFormatException as e:
+        return {
+            'success': False,
+            'error': 'Invalid document image format. Please upload a valid JPG or PNG image.',
+            'details': str(e)
+        }
+    except Exception as e:
+        logger.warning(f"Document quality check failed: {str(e)}")
+        # Continue with processing even if quality check fails
+        return {'success': True}
 
 def extract_data_from_document(document_key, document_type='cpr'):
     """Extract CPR number and person name from document using Textract"""
     try:
+        # Check document quality first
+        quality_check = check_document_quality(document_key)
+        if not quality_check['success']:
+            logger.error(f"Document quality check failed: {quality_check['error']}")
+            return {
+                'success': False,
+                'error': quality_check['error'],
+                'details': quality_check.get('details', ''),
+                'extractedText': ''
+            }
+        
+
         logger.info(f"Calling Textract for: {document_key} (document_type: {document_type})")
         
         response = textract.detect_document_text(
@@ -554,6 +644,7 @@ def extract_data_from_document(document_key, document_type='cpr'):
         # Validate document type matches uploaded document
         document_validation = validate_document_type(extracted_lines, full_text, document_type)
         if not document_validation['valid']:
+            logger.error(f"Document type validation failed: {document_validation['error']}")
             return {
                 'success': False,
                 'error': document_validation['error'],
@@ -576,9 +667,21 @@ def extract_data_from_document(document_key, document_type='cpr'):
         cpr_number = cpr_matches[0]
         logger.info(f"Found CPR: {cpr_number}")
         
-        # Extract nationality
-        nationality = extract_nationality_from_text(extracted_lines, full_text)
-        logger.info(f"Extracted nationality: {nationality}")
+        # Extract nationality - For passports, prioritize MRZ
+        if document_type == 'passport':
+                    logger.info("Document is passport - prioritizing MRZ for nationality extraction")
+                    nationality = extract_nationality_from_mrz(extracted_lines, full_text)
+                    
+                    # If MRZ extraction failed, fallback to text extraction
+                    if not nationality or nationality == "Unknown":
+                        logger.info("MRZ extraction failed, falling back to text extraction")
+                        nationality = extract_nationality_from_text(extracted_lines, full_text)
+        else:
+            # For CPR cards, use text extraction
+            logger.info("Document is CPR - using text extraction for nationality")
+            nationality = extract_nationality_from_text(extracted_lines, full_text)
+        
+        logger.info(f"FINAL Extracted nationality: {nationality}")
         
         # Extract name using unified function
         extracted_name = extract_name_unified(extracted_lines, full_text, document_type)
@@ -878,7 +981,103 @@ def extract_nationality_from_text(lines, full_text):
         logger.error(f"Error extracting nationality: {str(e)}", exc_info=True)
         return "Unknown"
 
-
+def extract_nationality_from_mrz(lines, full_text):
+    """Extract nationality from passport MRZ (Machine Readable Zone)"""
+    try:
+        logger.info("=== SIMPLIFIED MRZ NATIONALITY EXTRACTION ===")
+        
+        # MRZ nationality codes mapping
+        mrz_nationality_codes = {
+            'BHR': 'Bahraini',
+            'IND': 'Indian',
+            'PAK': 'Pakistani',
+            'BGD': 'Bangladeshi',
+            'PHL': 'Filipino',
+            'EGY': 'Egyptian',
+            'SAU': 'Saudi',
+            'ARE': 'Emirati',
+            'NPL': 'Nepali',
+            'LKA': 'Sri Lankan',
+            'JOR': 'Jordanian',
+            'LBN': 'Lebanese',
+            'SYR': 'Syrian',
+            'IRQ': 'Iraqi',
+            'KWT': 'Kuwaiti',
+            'OMN': 'Omani',
+            'QAT': 'Qatari',
+            'YEM': 'Yemeni',
+            'SDN': 'Sudanese',
+            'CHN': 'Chinese',
+            'IDN': 'Indonesian',
+            'MYS': 'Malaysian',
+            'THA': 'Thai',
+            'VNM': 'Vietnamese',
+            'GBR': 'British',
+            'USA': 'American',
+            'CAN': 'Canadian',
+            'AUS': 'Australian',
+            'FRA': 'French',
+            'DEU': 'German',
+            'ITA': 'Italian',
+            'ESP': 'Spanish',
+            'JPN': 'Japanese',
+            'KOR': 'Korean'
+        }
+        
+        logger.info("Searching for MRZ lines...")
+        
+        # METHOD 1: Look for first MRZ line (starts with P< or PC)
+        for line in lines:
+            line_stripped = line.strip()
+            
+            # Check if line starts with passport MRZ pattern
+            if line_stripped.startswith('P<') or line_stripped.startswith('PC'):
+                logger.info(f"Found MRZ line: {line_stripped}")
+                
+                # The country code is ALWAYS positions 2-4 (indices 2,3,4)
+                # P<BHR... or PCBHR...
+                if len(line_stripped) >= 5:
+                    country_code = line_stripped[2:5].upper()
+                    logger.info(f"Extracted country code from positions 2-4: '{country_code}'")
+                    
+                    if country_code in mrz_nationality_codes:
+                        nationality = mrz_nationality_codes[country_code]
+                        logger.info(f"✓ Found nationality from MRZ first line: {nationality}")
+                        return nationality
+        
+        # METHOD 2: Fallback - search for 3-letter codes in full text
+        # This handles cases where the MRZ format might be slightly different
+        text_upper = full_text.upper()
+        logger.info(f"Falling back to full text search: {text_upper}")
+        
+        # Look for common patterns:
+        # 1. Digit followed by 3 uppercase letters 
+        pattern = r'\d([A-Z]{3})'
+        matches = re.findall(pattern, text_upper)
+        
+        for code in matches:
+            if code in mrz_nationality_codes:
+                logger.info(f"✓ Found pattern 'digit+{code}' in text")
+                nationality = mrz_nationality_codes[code]
+                logger.info(f"  Returning: {nationality}")
+                return nationality
+        
+        # 2. Just look for any 3-letter country code
+        for code in ['BHR', 'IND', 'PAK', 'BGD', 'PHL', 'EGY', 'SAU', 'ARE']:
+            if code in text_upper:
+                nationality = mrz_nationality_codes.get(code)
+                if nationality:
+                    logger.info(f"✓ Found country code '{code}' in text")
+                    logger.info(f"  Returning: {nationality}")
+                    return nationality
+        
+        logger.info("✗ No nationality found in MRZ")
+        return None
+        
+    except Exception as e:
+        logger.error(f"Error extracting nationality from MRZ: {str(e)}")
+        return None
+    
 def clean_nationality(nationality):
     """Clean and format extracted nationality"""
     if not nationality:
