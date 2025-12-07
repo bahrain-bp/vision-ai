@@ -778,7 +778,7 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
             <p className="modal-message">
               {language === "ar"
                 ? "نتائج التحليل الحالية ستفقد. قم بتصديرها إذا كنت تود الاحتفاظ بها"
-                : "Your current analysis results will be lost. Export the report as PDF if you want to keep them."}
+                : "Your current analysis results will be lost. Export the report as PDF if you wish to keep them."}
             </p>
             <div className="modal-actions">
               <button
@@ -1604,8 +1604,8 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
               <div className="no-results">
                 <p dir={language === "ar" ? "rtl" : "ltr"}>
                   {language === "ar"
-                    ? "قم بتحميل فيديو لبدء التحليل"
-                    : "Upload a video to start analysis"}
+                    ? "الرجاء قم بتحميل فيديو لبدء التحليل"
+                    : "Please upload a video to start analysis"}
                 </p>
               </div>
             )}

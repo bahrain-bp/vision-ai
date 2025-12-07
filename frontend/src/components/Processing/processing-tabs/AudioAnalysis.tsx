@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { useLanguage } from "../../../context/LanguageContext";
 import { useAudioAnalysis } from "../../../context/AudioAnalysisContext";
+import { exportAudioAnalysisAsPDF } from "../../../services/AudioAnalysis/AudioAnalysisPdfExportService";
 
 /*interface AudioAnalysisProps {
   language: "en" | "ar";
@@ -466,8 +467,8 @@ const AudioAnalysis: React.FC = () => {
             </h3>
             <p className="audio-modal-message">
               {language === "ar"
-                ? "نتائج النسخ والتحليل الحالية ستفقد."
-                : "Your current transcription and analysis results will be lost."}
+                ? "نتائج النسخ والتحليل الحالية ستفقد. قم بتصديرها إذا كنت تود الاحتفاظ بها"
+                : "Your current transcription and analysis results will be lost. Export the results as PDF if you wish to keep them."}
             </p>
             <div className="audio-modal-actions">
               <button
@@ -623,134 +624,155 @@ const AudioAnalysis: React.FC = () => {
           </div>
         </div>
 
-        {/* Transcription Results Section */}
-        <div className="audio-section">
-          <div
-            className="audio-section-title"
-            dir={language === "ar" ? "rtl" : "ltr"}
-          >
-            {language === "ar"
-              ? "نتائج النسخ والترجمة"
-              : "Transcription & Translation Results"}
-          </div>
-          <div className="audio-section-content">
-            {transcriptionResult?.transcription ? (
-              <div className="audio-results">
-                {/* Original Language Info */}
-                <div className="audio-results-block">
-                  <h3 className="audio-block-header">
-                    {language === "ar"
-                      ? " اللغة التي تم التعرف عليها"
-                      : "Language Information"}
-                  </h3>
-                  <div className="audio-info-card">
-                    <p
-                      className="audio-info-text"
-                      dir={language === "ar" ? "rtl" : "ltr"}
-                    >
-                      {language === "ar"
-                        ? "اللغة الأصلية: "
-                        : "Original Language: "}
-                      <strong>
-                        {transcriptionResult.originalLanguage?.toUpperCase() ||
-                          (language === "ar" ? "غير محدد" : "Unknown")}
-                      </strong>
-                    </p>
-                  </div>
-                </div>
-
-                {/* Transcription Text */}
-                <div className="audio-results-block">
-                  <h3 className="audio-block-header">
-                    {language === "ar"
-                      ? "النص المترجم (العربية)"
-                      : "Translated Text (Arabic)"}
-                  </h3>
-                  <div className="audio-transcription-list">
-                    <div className="audio-transcription-card">
-                      <div className="audio-transcription-content">
-                        <p
-                          dir="rtl"
-                          style={{ whiteSpace: "pre-wrap", lineHeight: 1.8 }}
-                        >
-                          {transcriptionResult.transcription}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Analysis Button */}
-                {!analysisResult && (
-                  <div className="audio-actions-row">
-                    <button
-                      onClick={startAnalysis}
-                      disabled={isAnalyzing}
-                      className={`audio-action-btn ${
-                        isAnalyzing ? "audio-btn-processing" : ""
-                      }`}
-                    >
-                      {isAnalyzing ? (
-                        <>
-                          <span className="audio-spinner">⟳</span>
-                          {language === "ar"
-                            ? "جاري التحليل..."
-                            : "Analyzing..."}
-                        </>
-                      ) : (
-                        <>
-                          {language === "ar" ? "بدء التحليل" : "Start Analysis"}
-                        </>
-                      )}
-                    </button>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="audio-no-results">
-                <p dir={language === "ar" ? "rtl" : "ltr"}>
-                  {language === "ar"
-                    ? "قم بتحميل ملف صوتي وابدأ النسخ لرؤية النتائج"
-                    : "Upload an audio file and start transcription to see results"}
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Analysis Results Section */}
-        {analysisResult && (
+        <div id="audio-analysis-content">
+          {/* Transcription Results Section */}
           <div className="audio-section">
             <div
               className="audio-section-title"
               dir={language === "ar" ? "rtl" : "ltr"}
             >
-              {language === "ar" ? "نتائج التحليل" : "Analysis Results"}
+              {language === "ar"
+                ? "نتائج النسخ والترجمة"
+                : "Transcription & Translation Results"}
             </div>
             <div className="audio-section-content">
-              <div className="audio-results">
-                {parseArabicSummary(analysisResult.summary).map(
-                  (section, idx) => (
-                    <div key={idx} className="audio-results-block">
-                      <h3 className="audio-block-header" dir="rtl">
-                        {section.header}
-                      </h3>
-                      <div className="audio-info-card">
-                        <p
-                          className="audio-info-text"
-                          dir="rtl"
-                          style={{ whiteSpace: "pre-wrap", lineHeight: 1.8 }}
-                        >
-                          {renderContentWithBold(section.content)}
-                        </p>
+              {transcriptionResult?.transcription ? (
+                <div className="audio-results">
+                  {/* Original Language Info */}
+                  <div className="audio-results-block">
+                    <h3 className="audio-block-header">
+                      {language === "ar"
+                        ? " اللغة التي تم التعرف عليها"
+                        : "Language Information"}
+                    </h3>
+                    <div className="audio-info-card">
+                      <p
+                        className="audio-info-text"
+                        dir={language === "ar" ? "rtl" : "ltr"}
+                      >
+                        {language === "ar"
+                          ? "اللغة الأصلية: "
+                          : "Original Language: "}
+                        <strong>
+                          {transcriptionResult.originalLanguage?.toUpperCase() ||
+                            (language === "ar" ? "غير محدد" : "Unknown")}
+                        </strong>
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Transcription Text */}
+                  <div className="audio-results-block">
+                    <h3 className="audio-block-header">
+                      {language === "ar"
+                        ? "النص المنسوخ أو المترجم (العربية)"
+                        : "Transcribed or Translated Text (Arabic)"}
+                    </h3>
+                    <div className="audio-transcription-list">
+                      <div className="audio-transcription-card">
+                        <div className="audio-transcription-content">
+                          <p
+                            dir="rtl"
+                            style={{ whiteSpace: "pre-wrap", lineHeight: 1.8 }}
+                          >
+                            {transcriptionResult.transcription}
+                          </p>
+                        </div>
                       </div>
                     </div>
-                  )
-                )}
-              </div>
+                  </div>
+
+                  {/* Analysis Button */}
+                  {!analysisResult && (
+                    <div className="audio-actions-row">
+                      <button
+                        onClick={startAnalysis}
+                        disabled={isAnalyzing}
+                        className={`audio-action-btn ${
+                          isAnalyzing ? "audio-btn-processing" : ""
+                        }`}
+                      >
+                        {isAnalyzing ? (
+                          <>
+                            <span className="audio-spinner">⟳</span>
+                            {language === "ar"
+                              ? "جاري التحليل..."
+                              : "Analyzing..."}
+                          </>
+                        ) : (
+                          <>
+                            {language === "ar"
+                              ? "بدء التحليل"
+                              : "Start Analysis"}
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="audio-no-results">
+                  <p dir={language === "ar" ? "rtl" : "ltr"}>
+                    {language === "ar"
+                      ? "الرجاء قم بتحميل ملف صوتي وابدأ النسخ لرؤية النتائج"
+                      : "Please upload an audio file and start transcription to see results"}
+                  </p>
+                </div>
+              )}
             </div>
           </div>
-        )}
+
+          {/* Analysis Results Section */}
+          {analysisResult && (
+            <div className="audio-section">
+              <div
+                className="audio-section-title"
+                dir={language === "ar" ? "rtl" : "ltr"}
+              >
+                {language === "ar" ? "نتائج التحليل" : "Analysis Results"}
+              </div>
+              <div className="audio-section-content">
+                <div className="audio-results">
+                  {parseArabicSummary(analysisResult.summary).map(
+                    (section, idx) => (
+                      <div key={idx} className="audio-results-block">
+                        <h3 className="audio-block-header" dir="rtl">
+                          {section.header}
+                        </h3>
+                        <div className="audio-info-card">
+                          <p
+                            className="audio-info-text"
+                            dir="rtl"
+                            style={{ whiteSpace: "pre-wrap", lineHeight: 1.8 }}
+                          >
+                            {renderContentWithBold(section.content)}
+                          </p>
+                        </div>
+                      </div>
+                    )
+                  )}
+                </div>
+
+                {/* Export Actions */}
+                <div className="audio-export-actions">
+                  <button
+                    className="audio-action-btn"
+                    onClick={() =>
+                      exportAudioAnalysisAsPDF(
+                        audioFile?.name || "audio",
+                        language
+                      )
+                    }
+                  >
+                    {language === "ar"
+                      ? "تصدير النتائج PDF"
+                      : "Export Results as PDF"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
