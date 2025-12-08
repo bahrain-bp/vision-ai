@@ -30,11 +30,6 @@ def handler(event, context):
             logger.error("Missing required fields: caseId or sessionId")
             return error_response(400, 'caseId and sessionId are required')
         
-        if not validate_id_format(case_id, 'caseId'):
-            return error_response(400, 'Invalid caseId format')
-        
-        if not validate_id_format(session_id, 'sessionId'):
-            return error_response(400, 'Invalid sessionId format')
 
         valid_upload_types = ['document', 'witness', 'accused', 'victim']
         if upload_type not in valid_upload_types:
@@ -46,7 +41,7 @@ def handler(event, context):
                 logger.error(f"Invalid or missing personType for photo upload: {person_type}")
                 return error_response(400, 'personType must be specified as "witness", "accused", or "victim" for photo uploads')
 
-        # Safe file extension extraction and validation
+
         file_extension = os.path.splitext(file_name)[1] or '.jpg'
         allowed_extensions = ['.jpg', '.jpeg', '.png']
         if file_extension.lower() not in allowed_extensions:
@@ -98,10 +93,7 @@ def handler(event, context):
         logger.error(f"✗ Error generating upload URL: {str(e)}", exc_info=True)
         return error_response(500, 'Failed to generate upload URL', {'details': str(e)})
 
-def validate_id_format(value, field_name):
-    """Validate that ID contains only safe characters"""
-    if not value:
-        return False
+
     
     # For case IDs: CASE-202512-A525ED1B format
     if field_name == 'caseId':

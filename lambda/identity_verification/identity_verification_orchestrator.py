@@ -59,11 +59,6 @@ def handle_verification_request(event, context):
         logger.error("Missing required parameters")
         return error_response(400, 'caseId, sessionId, documentKey, and personPhotoKey are required')
     
-    if not validate_id_format(case_id, 'caseId'):
-        return error_response(400, 'Invalid caseId format')
-    
-    if not validate_id_format(session_id, 'sessionId'):
-        return error_response(400, 'Invalid sessionId format')
 
     # Validate person type
     valid_person_types = ['witness', 'accused', 'victim']
@@ -418,13 +413,7 @@ def handle_cleanup_request(event, context):
     if not all([case_id, session_id, person_type]):
         logger.error("Missing required parameters")
         return error_response(400, 'caseId, sessionId, and personType are required')
-    
-    if not validate_id_format(case_id, 'caseId'):
-        return error_response(400, 'Invalid caseId format')
-    
-    if not validate_id_format(session_id, 'sessionId'):
-        return error_response(400, 'Invalid sessionId format')
-    
+
     # Define paths to delete
     base_path = f"cases/{case_id}/sessions/{session_id}/01-identity-verification"
     
@@ -1451,10 +1440,7 @@ def create_or_update_session_metadata(case_id, session_id, cpr_number, person_na
         logger.error(f"Error updating session metadata: {str(e)}", exc_info=True)
         return None
 
-def validate_id_format(value, field_name):
-    """Validate that ID contains only safe characters"""
-    if not value:
-        return False
+
     
     # For case IDs: CASE-202512-A525ED1B format
     if field_name == 'caseId':
