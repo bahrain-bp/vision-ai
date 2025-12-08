@@ -1,7 +1,7 @@
 import json
 import boto3
-import os
 import re
+import os
 from datetime import datetime
 import logging
 
@@ -31,6 +31,16 @@ def handle_verification_request(event, context):
     body = json.loads(event.get('body', '{}'))
     case_id = body.get('caseId')
     session_id = body.get('sessionId')
+    # Validate IDs to prevent injection
+    if not validate_id_format(case_id, 'caseId'):
+        return error_response(400, 'Invalid caseId format')
+        
+    if not validate_id_format(session_id, 'sessionId'):
+        return error_response(400, 'Invalid sessionId format')
+        
+    # Verify session belongs to case
+    if not verify_session_belongs_to_case(case_id, session_id):
+        return error_response(403, 'Session does not belong to specified case or does not exist')
     document_key = body.get('documentKey')
     person_photo_key = body.get('personPhotoKey')
     person_type = body.get('personType', 'witness')
@@ -58,12 +68,6 @@ def handle_verification_request(event, context):
     if not all([case_id, session_id, document_key, person_photo_key]):
         logger.error("Missing required parameters")
         return error_response(400, 'caseId, sessionId, documentKey, and personPhotoKey are required')
-    
-    if not validate_id_format(case_id, 'caseId'):
-        return error_response(400, 'Invalid caseId format')
-    
-    if not validate_id_format(session_id, 'sessionId'):
-        return error_response(400, 'Invalid sessionId format')
 
     # Validate person type
     valid_person_types = ['witness', 'accused', 'victim']
@@ -405,6 +409,16 @@ def handle_cleanup_request(event, context):
     body = json.loads(event.get('body', '{}'))
     case_id = body.get('caseId')
     session_id = body.get('sessionId')
+    # Validate IDs to prevent injection
+    if not validate_id_format(case_id, 'caseId'):
+        return error_response(400, 'Invalid caseId format')
+        
+    if not validate_id_format(session_id, 'sessionId'):
+        return error_response(400, 'Invalid sessionId format')
+        
+    # Verify session belongs to case
+    if not verify_session_belongs_to_case(case_id, session_id):
+        return error_response(403, 'Session does not belong to specified case or does not exist')
     person_type = body.get('personType')
     attempt_number = body.get('attemptNumber', 1)
     
@@ -418,12 +432,6 @@ def handle_cleanup_request(event, context):
     if not all([case_id, session_id, person_type]):
         logger.error("Missing required parameters")
         return error_response(400, 'caseId, sessionId, and personType are required')
-    
-    if not validate_id_format(case_id, 'caseId'):
-        return error_response(400, 'Invalid caseId format')
-    
-    if not validate_id_format(session_id, 'sessionId'):
-        return error_response(400, 'Invalid sessionId format')
     
     # Define paths to delete
     base_path = f"cases/{case_id}/sessions/{session_id}/01-identity-verification"
@@ -1451,35 +1459,6 @@ def create_or_update_session_metadata(case_id, session_id, cpr_number, person_na
         logger.error(f"Error updating session metadata: {str(e)}", exc_info=True)
         return None
 
-def validate_id_format(value, field_name):
-    """Validate that ID contains only safe characters"""
-    if not value:
-        return False
-    
-    # For case IDs: CASE-202512-A525ED1B format
-    if field_name == 'caseId':
-        if not re.match(r'^CASE-\d{6}-[A-F0-9]{8}$', value):
-            logger.error(f"Invalid {field_name} format: {value}")
-            return False
-    
-    # For session IDs: session-20241207123456-a1b2c3d4 format
-    elif field_name == 'sessionId':
-        if not re.match(r'^session-\d{14}-[a-fA-F0-9]{8}$', value):
-            logger.error(f"Invalid {field_name} format: {value}")
-            return False
-    
-    # For any other IDs: allow alphanumeric, hyphens, underscores
-    else:
-        if not re.match(r'^[a-zA-Z0-9_-]+$', value):
-            logger.error(f"Invalid {field_name} format: {value}")
-            return False
-    
-    # Always prevent path traversal
-    if '..' in value or '/' in value or '\\' in value:
-        logger.error(f"Path traversal attempt in {field_name}: {value}")
-        return False
-    
-    return True
 
 def error_response(status_code, message, additional_data=None):
     """Helper function to create error responses"""
@@ -1497,3 +1476,26 @@ def error_response(status_code, message, additional_data=None):
         },
         'body': json.dumps(body)
     }
+
+def verify_session_belongs_to_case(case_id, session_id):
+    """Verify that session exists and belongs to the specified case"""
+    try:
+        metadata_key = f"cases/{case_id}/sessions/{session_id}/session-metadata.json"
+        s3.head_object(Bucket=BUCKET_NAME, Key=metadata_key)
+        return True
+    except:
+        return False
+
+def validate_id_format(value, field_name):
+    """Validate that ID contains only safe characters"""
+    if not value:
+        return False
+    # Allow only alphanumeric, hyphens, and underscores
+    if not re.match(r'^[a-zA-Z0-9_-]+$', value):
+        logger.error(f"Invalid {field_name} format: {value}")
+        return False
+    # Prevent path traversal
+    if '..' in value or '/' in value or '\\' in value:
+        logger.error(f"Path traversal attempt in {field_name}: {value}")
+        return False
+    return True

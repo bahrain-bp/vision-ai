@@ -19,8 +19,14 @@ export interface IdentityData {
 }
 
 export interface InvestigationData {
-  participant: string;
+  witness: string;
+  idNumber: string;
   identityData: IdentityData;
+  investigator: string;
+  duration: string;
+  status: string;
+  caseId: string;
+  sessionId: string;
 }
 
 // ==========================================
@@ -156,7 +162,7 @@ export interface ServiceConfig {
 export const DEFAULT_CONFIG: ServiceConfig = {
   apiBaseUrl: process.env.REACT_APP_API_ENDPOINT || "",
   maxFileSizeMB: 10,
-  allowedFileTypes: ["image/jpeg", "image/jpg", "image/png"],
+  allowedFileTypes: ["image/jpeg", "image/jpg", "image/png", "application/pdf"],
   uploadTimeout: 300000, // 5 minutes
   maxRetries: 3,
   retryDelay: 1000,

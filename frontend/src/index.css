@@ -2,6 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
+
 /* CSS Variables for Consistent Colors */
 :root {
   --primary-color: #214080;
@@ -1515,6 +1516,7 @@
   color: #059669; /* Dark Green - Excellent (95-100%) */
   font-weight: 600;
   animation: pulse 2s ease-in-out infinite;
+
 }
 
 .confidence-high {
@@ -1549,13 +1551,8 @@
 }
 
 @keyframes pulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.7;
-  }
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
 }
 /* Processing View */
 .processing-view {
@@ -1757,7 +1754,7 @@
   flex: 1 1 100%;
   max-width: 100%;
   width: 100%;
-  min-width: 0;
+  min-width: 0; 
 }
 
 .classification-full-header {
@@ -1786,7 +1783,7 @@
   flex: 1 1 100%;
   max-width: 100%;
   width: 80%;
-  min-width: 0;
+  min-width: 0; 
 }
 
 /* === Upload Box === */
@@ -1877,15 +1874,13 @@
   background: #f8fafc;
   resize: none;
   margin-bottom: 20px;
-  max-height: 120px;
-  resize: vertical;
-  flex: 1;
+  max-height: 120px;       
+  resize: vertical;        
+  flex: 1;                 
   margin: 0;
 }
 
-.upload-subtitle {
-  margin: 5px 0 10px;
-}
+.upload-subtitle { margin: 5px 0 10px; }
 
 .category-row {
   display: flex;
@@ -1895,7 +1890,7 @@
 }
 
 .category-row h3 {
-  margin: 0;
+  margin: 0;               
   font-size: 18px;
   font-weight: 600;
   color: var(--text-dark);
@@ -1932,6 +1927,7 @@
     padding: 30px;
   }
 }
+
 
 /* Responsive Design */
 @media (max-width: 1024px) {
@@ -2939,9 +2935,6 @@
   cursor: default;
   transition: all 0.2s;
   background-color: white;
-  display: flex;
-  flex-direction: column;
-  min-height: 280px;
 }
 
 .case-card:hover {
@@ -3006,12 +2999,9 @@
   overflow: hidden;
   text-overflow: ellipsis;
   display: -webkit-box;
+  -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
-
-  -webkit-line-clamp: 3;
-  line-clamp: 3;
-  flex-grow: 1;
-  min-height: 4.2em;
+  line-clamp: 2;
 }
 
 .case-meta {
