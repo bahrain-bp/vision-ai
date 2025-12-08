@@ -48,7 +48,7 @@ def handler(event, context):
                 logger.error(f"Invalid or missing personType for photo upload: {person_type}")
                 return error_response(400, 'personType must be specified as "witness", "accused", or "victim" for photo uploads')
 
-        # Safe file extension extraction and validation
+
         file_extension = os.path.splitext(file_name)[1] or '.jpg'
         allowed_extensions = ['.jpg', '.jpeg', '.png']
         if file_extension.lower() not in allowed_extensions:
