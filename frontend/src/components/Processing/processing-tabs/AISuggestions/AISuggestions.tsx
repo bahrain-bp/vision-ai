@@ -417,9 +417,11 @@ const AISuggestions: React.FC<AISuggestionsProps> = ({
   };
 
   const handleAddFocusArea = (label: string): void => {
-    setFocusAreas((prev) =>
-      prev.includes(label) ? prev : [...prev, label]
-    );
+    setFocusAreas((prev) => {
+      const updated = prev.includes(label) ? prev : [...prev, label];
+      onDataChange?.({ questions, gaps, focusAreas: updated });
+      return updated;
+    });
     setStatusMessage(`Focus area added: ${label}`);
   };
 
