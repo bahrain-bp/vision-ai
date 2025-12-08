@@ -16,7 +16,6 @@ import { useCaseContext } from "../../hooks/useCaseContext";
 
 import { useLanguage } from "../../context/LanguageContext";
 import { getTimeString } from "../common/Timer/Timer";
-
 import { CameraFootageProvider } from "../../context/CameraFootageContext";
 
 interface TranslationSettings {
