@@ -1,5 +1,6 @@
 import json
 import boto3
+import re
 import os
 from datetime import datetime
 import logging
@@ -28,6 +29,7 @@ def handler(event, context):
         if not case_id or not session_id:
             logger.error("Missing required fields: caseId or sessionId")
             return error_response(400, 'caseId and sessionId are required')
+        
 
         valid_upload_types = ['document', 'witness', 'accused', 'victim']
         if upload_type not in valid_upload_types:
@@ -39,7 +41,7 @@ def handler(event, context):
                 logger.error(f"Invalid or missing personType for photo upload: {person_type}")
                 return error_response(400, 'personType must be specified as "witness", "accused", or "victim" for photo uploads')
 
-        # Safe file extension extraction and validation
+
         file_extension = os.path.splitext(file_name)[1] or '.jpg'
         allowed_extensions = ['.jpg', '.jpeg', '.png']
         if file_extension.lower() not in allowed_extensions:
@@ -90,6 +92,34 @@ def handler(event, context):
     except Exception as e:
         logger.error(f"✗ Error generating upload URL: {str(e)}", exc_info=True)
         return error_response(500, 'Failed to generate upload URL', {'details': str(e)})
+
+
+    
+    # For case IDs: CASE-202512-A525ED1B format
+    if field_name == 'caseId':
+        if not re.match(r'^CASE-\d{6}-[A-F0-9]{8}$', value):
+            logger.error(f"Invalid {field_name} format: {value}")
+            return False
+    
+    # For session IDs: session-20241207123456-a1b2c3d4 format
+    elif field_name == 'sessionId':
+        if not re.match(r'^session-\d{14}-[a-fA-F0-9]{8}$', value):
+            logger.error(f"Invalid {field_name} format: {value}")
+            return False
+    
+    # For any other IDs: allow alphanumeric, hyphens, underscores
+    else:
+        if not re.match(r'^[a-zA-Z0-9_-]+$', value):
+            logger.error(f"Invalid {field_name} format: {value}")
+            return False
+    
+    # Always prevent path traversal
+    if '..' in value or '/' in value or '\\' in value:
+        logger.error(f"Path traversal attempt in {field_name}: {value}")
+        return False
+    
+    return True
+
 
 def error_response(status_code, message, additional_data=None):
     body = {'error': message}

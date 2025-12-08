@@ -58,6 +58,7 @@ def handle_verification_request(event, context):
     if not all([case_id, session_id, document_key, person_photo_key]):
         logger.error("Missing required parameters")
         return error_response(400, 'caseId, sessionId, documentKey, and personPhotoKey are required')
+    
 
     # Validate person type
     valid_person_types = ['witness', 'accused', 'victim']
@@ -412,7 +413,7 @@ def handle_cleanup_request(event, context):
     if not all([case_id, session_id, person_type]):
         logger.error("Missing required parameters")
         return error_response(400, 'caseId, sessionId, and personType are required')
-    
+
     # Define paths to delete
     base_path = f"cases/{case_id}/sessions/{session_id}/01-identity-verification"
     
@@ -1439,6 +1440,32 @@ def create_or_update_session_metadata(case_id, session_id, cpr_number, person_na
         logger.error(f"Error updating session metadata: {str(e)}", exc_info=True)
         return None
 
+
+    
+    # For case IDs: CASE-202512-A525ED1B format
+    if field_name == 'caseId':
+        if not re.match(r'^CASE-\d{6}-[A-F0-9]{8}$', value):
+            logger.error(f"Invalid {field_name} format: {value}")
+            return False
+    
+    # For session IDs: session-20241207123456-a1b2c3d4 format
+    elif field_name == 'sessionId':
+        if not re.match(r'^session-\d{14}-[a-fA-F0-9]{8}$', value):
+            logger.error(f"Invalid {field_name} format: {value}")
+            return False
+    
+    # For any other IDs: allow alphanumeric, hyphens, underscores
+    else:
+        if not re.match(r'^[a-zA-Z0-9_-]+$', value):
+            logger.error(f"Invalid {field_name} format: {value}")
+            return False
+    
+    # Always prevent path traversal
+    if '..' in value or '/' in value or '\\' in value:
+        logger.error(f"Path traversal attempt in {field_name}: {value}")
+        return False
+    
+    return True
 
 def error_response(status_code, message, additional_data=None):
     """Helper function to create error responses"""
