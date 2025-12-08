@@ -2,7 +2,6 @@ import React, { useEffect, useState } from "react";
 import { Loader } from "lucide-react";
 import "../../ProcessingView.css";
 
-// import processing tab components
 import Classification from "./processing-tabs/Classification";
 import Rewrite from "./processing-tabs/Rewrite";
 import CameraFootage from "./processing-tabs/CameraFootage";
@@ -42,6 +41,12 @@ const ProcessingView: React.FC<ProcessingViewProps> = ({
     sessionData.extractedTextKey
   );
 
+  // State persistence for AI Suggestions
+  const [aiSuggestionsData, setAiSuggestionsData] = useState<any>(null);
+
+  // State persistence for Outcome
+  const [outcomeData, setOutcomeData] = useState<any>(null);
+
   useEffect(() => {
     setExtractedTextKey(sessionData.extractedTextKey);
   }, [sessionData.sessionId, sessionData.extractedTextKey]);
@@ -70,7 +75,9 @@ const ProcessingView: React.FC<ProcessingViewProps> = ({
     {
       id: "Rewrite",
       label: language === "en" ? "Rewrite" : "إعادة صياغة التقرير",
-      render: () => <Rewrite sessionData={sessionWithKey} />,
+      render: () => (
+        <Rewrite sessionData={sessionWithKey} selectedLanguage={language} />
+      ),
     },
     {
       id: "CameraFootageAudioAnalysis",
@@ -90,8 +97,16 @@ const ProcessingView: React.FC<ProcessingViewProps> = ({
     {
       id: "AISuggestions",
       label: language === "en" ? "AI Suggestions" : "اقتراحات الذكاء الاصطناعي",
-      render: () => <AISuggestions sessionData={sessionWithKey} />,
+      render: () => (
+        <AISuggestions
+          sessionData={sessionWithKey}
+          language={language}
+          persistedData={aiSuggestionsData}
+          onDataChange={setAiSuggestionsData}
+        />
+      ),
     },
+
     {
       id: "Contradictions",
       label: language === "en" ? "Contradictions" : "التناقضات",
@@ -99,8 +114,15 @@ const ProcessingView: React.FC<ProcessingViewProps> = ({
     },
     {
       id: "Outcome",
-      label: language === "en" ? "Outcome" : "الإدانة",
-      render: () => <Outcome />,
+      label: language === "en" ? "Outcome" : "النتيجة",
+      render: () => (
+        <Outcome
+          sessionData={sessionWithKey}
+          language={language}
+          persistedData={outcomeData}
+          onDataChange={setOutcomeData}
+        />
+      ),
     },
   ];
 

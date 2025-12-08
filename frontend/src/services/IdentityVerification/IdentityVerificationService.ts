@@ -176,20 +176,56 @@ export const uploadFileToS3 = async (
   try {
     validateProgressCallback(onProgress);
 
-    await axios.put(presignedUrl, file, {
-      ...REQUEST_CONFIG,
-      headers: {
-        "Content-Type": getFileMimeType(file),
-      },
-      onUploadProgress: (progressEvent: any) => {
-        if (onProgress && progressEvent.total) {
-          const progress = Math.round(
-            (progressEvent.loaded * 100) / progressEvent.total
-          );
-          onProgress(progress);
-        }
-      },
-    });
+    // Check if presignedUrl is actually an object with uploadFields (POST) or just a string (PUT)
+    const isPresignedPost =
+      typeof presignedUrl === "object" &&
+      "uploadUrl" in presignedUrl &&
+      "uploadFields" in presignedUrl;
+
+    if (isPresignedPost) {
+      // Use POST with FormData for presigned POST (with file size validation)
+      const urlData = presignedUrl as any;
+      const formData = new FormData();
+
+      // Add all the fields from uploadFields
+      Object.entries(urlData.uploadFields).forEach(([key, value]) => {
+        formData.append(key, value as string);
+      });
+
+      // Add the file last
+      formData.append("file", file);
+
+      await axios.post(urlData.uploadUrl, formData, {
+        ...REQUEST_CONFIG,
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+        onUploadProgress: (progressEvent: any) => {
+          if (onProgress && progressEvent.total) {
+            const progress = Math.round(
+              (progressEvent.loaded * 100) / progressEvent.total
+            );
+            onProgress(progress);
+          }
+        },
+      });
+    } else {
+      // Use PUT for regular presigned URL (backward compatibility)
+      await axios.put(presignedUrl as string, file, {
+        ...REQUEST_CONFIG,
+        headers: {
+          "Content-Type": getFileMimeType(file),
+        },
+        onUploadProgress: (progressEvent: any) => {
+          if (onProgress && progressEvent.total) {
+            const progress = Math.round(
+              (progressEvent.loaded * 100) / progressEvent.total
+            );
+            onProgress(progress);
+          }
+        },
+      });
+    }
   } catch (error) {
     if (
       error &&
@@ -231,7 +267,8 @@ export const uploadDocument = async (
     file,
     "document"
   );
-  await uploadFileToS3(uploadUrlResponse.uploadUrl, file, onProgress);
+  // Pass the entire response object instead of just uploadUrl
+  await uploadFileToS3(uploadUrlResponse as any, file, onProgress);
   return uploadUrlResponse.s3Key;
 };
 
@@ -255,10 +292,10 @@ export const uploadPersonPhoto = async (
     personType,
     personType
   );
-  await uploadFileToS3(uploadUrlResponse.uploadUrl, file, onProgress);
+  // Pass the entire response object instead of just uploadUrl
+  await uploadFileToS3(uploadUrlResponse as any, file, onProgress);
   return uploadUrlResponse.s3Key;
 };
-
 export const completeIdentityVerification = async (
   caseId: string,
   sessionId: string,

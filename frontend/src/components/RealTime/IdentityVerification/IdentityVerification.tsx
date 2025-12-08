@@ -9,6 +9,7 @@ import {
   PersonType,
 } from "../../../types/identityVerification";
 import { useCaseContext } from "../../../hooks/useCaseContext";
+import { useTranscription } from "../../../hooks/useTranscription";
 
 const IdentityVerification: React.FC<IdentityVerificationProps> = ({
   onStartInvestigation,
@@ -23,6 +24,8 @@ const IdentityVerification: React.FC<IdentityVerificationProps> = ({
     passport: null,
     isVerified: false,
   });
+  const { setParticipantType } = useTranscription();
+
 
   const updateIdentityData = useCallback(
     (field: keyof IdentityData, value: File | boolean | null) => {
@@ -37,14 +40,8 @@ const IdentityVerification: React.FC<IdentityVerificationProps> = ({
   const handleStartInvestigation = useCallback(
     (extractedPersonName?: string) => {
       const investigationData: InvestigationData = {
-        witness: extractedPersonName || "Name to be extracted",
-        idNumber: "To be extracted",
+        participant: extractedPersonName || "Name to be extracted",
         identityData: identityData,
-        investigator: "M. AlZebari",
-        duration: "00:00",
-        status: "Ready",
-        caseId: currentCase?.caseId || "",
-        sessionId: currentSession?.sessionId || "",
       };
 
       console.log("Starting investigation with data:", investigationData);
@@ -66,7 +63,13 @@ const IdentityVerification: React.FC<IdentityVerificationProps> = ({
                 </span>
                 <select
                   value={personType}
-                  onChange={(e) => setPersonType(e.target.value as PersonType)}
+                  onChange={(e) => {
+                    const newType = e.target.value;
+                    setPersonType(e.target.value as PersonType)
+                      const capitalized =
+                        newType.charAt(0).toUpperCase() + newType.slice(1);
+                      setParticipantType(capitalized);
+                  }}
                   className="person-type-select"
                   disabled={identityData.isVerified}
                 >

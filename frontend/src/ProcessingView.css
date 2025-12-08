@@ -604,6 +604,15 @@
   gap: 0.75rem;
 }
 
+.ai-suggestions-view.outcome-view.rtl .verdict-header {
+  flex-direction: row;
+}
+
+.ai-suggestions-view.outcome-view.rtl .verdict-label {
+  margin-left: auto;
+  margin-right: 0;
+}
+
 .verdict-label {
   font-size: 0.85rem;
   text-transform: uppercase;
@@ -624,6 +633,7 @@
   border-radius: 999px;
   font-weight: 600;
   font-size: 0.85rem;
+  margin-inline-start: 0.5rem; /* keep a small gap from the label */
 }
 
 .verdict-pill.guilty {
@@ -686,11 +696,41 @@
   box-shadow: 0 10px 22px rgba(34, 197, 94, 0.12);
 }
 
+/* RTL stripe positioning for question cards */
+.ai-suggestions-card[dir="rtl"] .ai-question-card.priority-high {
+  border-left: 0;
+  border-right: 4px solid rgba(239, 68, 68, 0.9);
+  background: linear-gradient(
+    270deg,
+    rgba(239, 68, 68, 0.12),
+    rgba(255, 255, 255, 0)
+  );
+}
+.ai-suggestions-card[dir="rtl"] .ai-question-card.priority-medium {
+  border-left: 0;
+  border-right: 4px solid rgba(250, 204, 21, 0.8);
+  background: linear-gradient(
+    270deg,
+    rgba(250, 204, 21, 0.12),
+    rgba(255, 255, 255, 0)
+  );
+}
+.ai-suggestions-card[dir="rtl"] .ai-question-card.priority-low {
+  border-left: 0;
+  border-right: 4px solid rgba(34, 197, 94, 0.8);
+  background: linear-gradient(
+    270deg,
+    rgba(34, 197, 94, 0.12),
+    rgba(255, 255, 255, 0)
+  );
+}
+
 .ai-question-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
+  width: 100%; /* ensure chips and actions can spread apart */
 }
 
 .ai-priority-chip {
@@ -715,6 +755,26 @@
 .ai-priority-chip.priority-low {
   background: rgba(34, 197, 94, 0.18);
   color: rgba(21, 128, 61, 1);
+}
+
+.ai-empty-state {
+  border: 1px dashed rgba(148, 163, 184, 0.35);
+  background: rgba(248, 250, 255, 0.65);
+  border-radius: 14px;
+  padding: 1rem 1.25rem;
+}
+
+.ai-empty-title {
+  margin: 0 0 0.25rem;
+  font-weight: 700;
+  color: var(--text-dark);
+}
+
+.ai-empty-subtitle {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text-light);
+  font-style: italic;
 }
 
 .ai-focus-add {
@@ -886,6 +946,79 @@
   font-size: 0.75rem;
 }
 
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(90deg, rgba(226, 232, 240, 0.35), rgba(226, 232, 240, 0.6), rgba(226, 232, 240, 0.35));
+}
+
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+  animation: aiSkeleton 1.4s ease-in-out infinite;
+}
+
+.ai-skeleton-line {
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(226, 232, 240, 0.8);
+  position: relative;
+  overflow: hidden;
+}
+
+.ai-skeleton-line.wide {
+  width: 80%;
+  margin: 0.35rem 0;
+}
+
+.ai-skeleton-line.short {
+  width: 40%;
+}
+
+.ai-skeleton-circle {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: linear-gradient(90deg, rgba(226, 232, 240, 0.4), rgba(226, 232, 240, 0.7), rgba(226, 232, 240, 0.4));
+  position: relative;
+  overflow: hidden;
+}
+
+.ai-skeleton-circle::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.65), transparent);
+  animation: aiSkeleton 1.4s ease-in-out infinite;
+}
+
+.skeleton-pill {
+  display: inline-flex;
+  width: 70px;
+  height: 22px;
+  border-radius: 999px;
+  background: rgba(226, 232, 240, 0.9);
+}
+
+.skeleton-chip {
+  display: inline-flex;
+  width: 80px;
+  height: 26px;
+  border-radius: 999px;
+  background: rgba(226, 232, 240, 0.9);
+}
+
+@keyframes aiSkeleton {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
 .ai-gap-grid {
   display: flex;
   flex-direction: column;
@@ -940,6 +1073,35 @@
   border-color: rgba(34, 197, 94, 0.25);
   border-left: 4px solid rgba(34, 197, 94, 0.8);
   box-shadow: 0 12px 28px rgba(34, 197, 94, 0.12);
+}
+
+/* RTL stripe positioning for gap cards */
+.ai-suggestions-card[dir="rtl"] .ai-gap-card.severity-high {
+  border-left: 0;
+  border-right: 4px solid rgba(239, 68, 68, 0.85);
+  background: linear-gradient(
+    270deg,
+    rgba(239, 68, 68, 0.12),
+    rgba(255, 255, 255, 0)
+  );
+}
+.ai-suggestions-card[dir="rtl"] .ai-gap-card.severity-medium {
+  border-left: 0;
+  border-right: 4px solid rgba(250, 204, 21, 0.8);
+  background: linear-gradient(
+    270deg,
+    rgba(250, 204, 21, 0.12),
+    rgba(255, 255, 255, 0)
+  );
+}
+.ai-suggestions-card[dir="rtl"] .ai-gap-card.severity-low {
+  border-left: 0;
+  border-right: 4px solid rgba(34, 197, 94, 0.8);
+  background: linear-gradient(
+    270deg,
+    rgba(34, 197, 94, 0.12),
+    rgba(255, 255, 255, 0)
+  );
 }
 
 .ai-gap-resolved {
@@ -1038,6 +1200,11 @@
   font-size: 0.8rem;
   color: rgba(107, 114, 128, 0.9);
   margin: 0.25rem 0 0;
+}
+
+.ai-suggestions-card[dir="rtl"] .ai-gap-resolved-section {
+  direction: rtl;
+  text-align: right;
 }
 
 .ai-gap-actions {
@@ -2710,8 +2877,158 @@
   text-align: left;
 }
 
+.outcome-muted {
+  margin: 0.25rem 0 0;
+  font-size: 0.95rem;
+  color: var(--text-light);
+  font-style: italic;
+}
+
 .outcome-verdict {
   display: flex;
   flex-direction: column;
   gap: 1rem;
+}
+
+/* RTL support for Outcome */
+.ai-suggestions-view.outcome-view.rtl,
+.outcome-integrated-card[dir="rtl"] {
+  direction: rtl;
+  text-align: right;
+}
+
+.outcome-integrated-card[dir="rtl"] .outcome-integrated-header {
+  flex-direction: row;
+  justify-content: space-between;
+  text-align: right;
+}
+
+.outcome-integrated-card[dir="rtl"] .outcome-panel,
+.outcome-integrated-card[dir="rtl"] .confidence-details,
+.outcome-integrated-card[dir="rtl"] .verdict-rationale {
+  text-align: right;
+}
+
+.outcome-integrated-card[dir="rtl"] .outcome-confidence {
+  direction: rtl;
+}
+
+.outcome-integrated-card[dir="rtl"] .verdict-header {
+  flex-direction: row;
+}
+
+
+/* RTL Support for AI Suggestions */
+.ai-suggestions-view.rtl,
+.ai-suggestions-card.rtl {
+  direction: rtl;
+  text-align: right;
+}
+
+.ai-suggestions-view.rtl *,
+.ai-suggestions-card.rtl * {
+  text-align: right;
+}
+
+.ai-suggestions-card[dir="rtl"] .ai-suggestions-header {
+  flex-direction: row;
+  justify-content: space-between;
+  text-align: right;
+}
+
+.ai-suggestions-card[dir="rtl"] .ai-suggestions-header > :first-child {
+  text-align: right;
+}
+
+.ai-suggestions-card[dir="rtl"] .ai-panel-header {
+  flex-direction: row;
+  justify-content: space-between;
+}
+
+/* RTL input row placement: add/priority on the left, input on the right */
+.ai-suggestions-card[dir="rtl"] .ai-question-input-row {
+  direction: ltr;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+.ai-suggestions-card[dir="rtl"] .ai-question-input {
+  text-align: right;
+}
+
+.ai-suggestions-card[dir="rtl"] .ai-question-input-row .ai-cta {
+  order: 0; /* leftmost */
+  margin-right: auto;
+  direction: ltr;
+}
+
+.ai-suggestions-card[dir="rtl"] .ai-question-input-row .ai-priority-selector {
+  order: 2; /* rightmost end */
+  direction: ltr;
+}
+
+.ai-suggestions-card[dir="rtl"] .ai-question-input-row .ai-question-input {
+  order: 1;
+  flex: 1;
+}
+
+.ai-suggestions-view.rtl .ai-question-input-row,
+.ai-suggestions-card.rtl .ai-question-input-row {
+  flex-direction: row;
+}
+
+.ai-suggestions-view.rtl .ai-question-header,
+.ai-suggestions-card.rtl .ai-question-header {
+  flex-direction: row-reverse;
+}
+
+.ai-suggestions-view.rtl .ai-gap-top,
+.ai-suggestions-card[dir="rtl"] .ai-gap-top {
+  direction: rtl;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.ai-suggestions-view.rtl .ai-gap-title-row,
+.ai-suggestions-card[dir="rtl"] .ai-gap-title-row {
+  direction: rtl;
+  text-align: right;
+  flex-direction: row;
+}
+
+.ai-suggestions-view.rtl .ai-gap-top .ai-cta,
+.ai-suggestions-card[dir="rtl"] .ai-gap-top .ai-cta {
+  direction: ltr;
+  margin-right: auto;
+  margin-left: 0;
+}
+
+.ai-suggestions-view.rtl .verdict-header,
+.ai-suggestions-card.rtl .verdict-header {
+  flex-direction: row-reverse;
+}
+
+.ai-suggestions-view.rtl .ai-gap-resolved-header,
+.ai-suggestions-card.rtl .ai-gap-resolved-header {
+  flex-direction: row-reverse;
+}
+
+.ai-suggestions-card[dir="rtl"] .ai-gap-resolved-header {
+  direction: rtl;
+  text-align: right;
+  justify-content: flex-end; /* push heading to the right edge */
+  align-items: flex-start;
+}
+
+.ai-gap-resolved-section[dir="rtl"] .ai-gap-resolved-header {
+  justify-content: flex-end;
+  text-align: right;
+}
+
+.ai-gap-resolved-section[dir="rtl"] .ai-gap-resolved-label,
+.ai-gap-resolved-section[dir="rtl"] .ai-gap-resolved-subtext {
+  text-align: right;
 }
