@@ -16,6 +16,7 @@ import {
   SaveTranscriptionRequest,
   LanguagePreferences,
   SourceSettings,
+  Sources,
 } from "../../types";
 import { LanguageCode } from "@aws-sdk/client-transcribe-streaming";
 import StreamManager from "./StreamManager";
@@ -31,9 +32,9 @@ class TranscribeService {
 
   private mediaManager = StreamManager;
 
-  private readonly microphoneAttempts: number = 15;
+  private readonly microphoneAttempts: number = 5;
 
-  private readonly displayAttempts: number = 15;
+  private readonly displayAttempts: number = 5;
 
   private transcribeClient: TranscribeStreamingClient | null = null;
 
@@ -45,6 +46,9 @@ class TranscribeService {
     null;
 
   private participantType: string = "Witness";
+
+  private micAbortController: AbortController | null = null;
+  private displayAbortController: AbortController | null = null;
 
   private static instance: TranscribeService;
 
@@ -87,10 +91,12 @@ class TranscribeService {
   ): Promise<TranscriptionStatus> {
     this.transcriptCallback = onTranscriptUpdate || null;
 
+    // Capture display and microphone streams
     const display = await this.mediaManager.getDisplayStream();
     const audio = await this.mediaManager.getMicStream();
 
-    if (display.displayStream === null || display.success === false){
+    // Validate display stream exists
+    if (display.displayStream === null || display.success === false) {
       return {
         success: false,
         timestamp: new Date().toISOString(),
@@ -105,6 +111,7 @@ class TranscribeService {
       };
     }
 
+    // Validate display stream has audio tracks
     if (!this.mediaManager.getDisplayStreamStatus().hasAudioTracks) {
       return {
         success: false,
@@ -120,6 +127,7 @@ class TranscribeService {
       };
     }
 
+    // Validate microphone stream exists
     if (audio.audioStream === null || audio.success === false)
       return {
         success: false,
@@ -135,6 +143,7 @@ class TranscribeService {
     this.audioStatus = "on";
     this.displayStatus = "on";
 
+    // Initialize AWS Transcribe client with authentication
     try {
       this.transcribeClient = await this.createTranscribeClient();
     } catch (error) {
@@ -151,6 +160,7 @@ class TranscribeService {
       };
     }
 
+    // Configure microphone connection settings
     this.micSettings = {
       source: "microphone",
       transcribeClient: this.transcribeClient,
@@ -164,6 +174,7 @@ class TranscribeService {
       detectionLanguages: detectionLanguages,
     };
 
+    // Attempt microphone connection with retry logic
     const micResult = await this.attemptConnection(this.micSettings);
 
     if (!micResult.success) {
@@ -176,6 +187,7 @@ class TranscribeService {
       };
     }
 
+    // Configure display connection settings
     this.displaySettings = {
       source: "display",
       transcribeClient: this.transcribeClient,
@@ -189,6 +201,7 @@ class TranscribeService {
       detectionLanguages: detectionLanguages,
     };
 
+    // Attempt display connection with retry logic
     const displayResult = await this.attemptConnection(this.displaySettings);
 
     if (!displayResult.success) {
@@ -209,17 +222,14 @@ class TranscribeService {
     settings: SourceSettings
   ): Promise<TranscriptionError> {
     let attempts = settings.maxAttempts;
-
     let connected = false;
-
     let result: TranscriptionError = {
       success: false,
       message: "No attempts made",
     };
 
+    // Retry connection until successful or attempts exhausted
     while (attempts > 0 && !connected) {
-   
-
       result = await this.startTranscriptionStream(
         settings.transcribeClient,
         settings.stream,
@@ -230,10 +240,9 @@ class TranscribeService {
         settings.detectionLanguages
       );
 
-      console.log(`📊 Result:`, result);
-
       connected = result.success;
 
+      // Wait 1 second before retry on failure
       if (!connected) {
         attempts--;
         if (attempts > 0) {
@@ -242,6 +251,7 @@ class TranscribeService {
         }
       }
     }
+
     return connected
       ? { success: true, message: `${settings.source} connected` }
       : {
@@ -256,22 +266,27 @@ class TranscribeService {
         };
   }
 
+  // Generator function that streams audio chunks to AWS Transcribe
   private async *getAudioStream(
     microphoneStream: MicrophoneStream,
     sampleRate: number
   ) {
+    // Convert float audio samples to 16-bit PCM format
     const encodePCMChunk = (chunk: any) => {
       const input = MicrophoneStream.toRaw(chunk);
       let offset = 0;
       const buffer = new ArrayBuffer(input.length * 2);
       const view = new DataView(buffer);
+
+      // Convert each float sample to 16-bit integer
       for (let i = 0; i < input.length; i++, offset += 2) {
-        let s = Math.max(-1, Math.min(1, input[i]));
+        let s = Math.max(-1, Math.min(1, input[i])); // Clamp to [-1, 1]
         view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7fff, true);
       }
       return Buffer.from(buffer);
     };
 
+    // Stream audio chunks as they arrive
     for await (const chunk of microphoneStream) {
       if (chunk.length <= sampleRate) {
         yield {
@@ -286,14 +301,19 @@ class TranscribeService {
   private async startTranscriptionStream(
     transcribeClient: TranscribeStreamingClient,
     stream: MediaStream,
-    source: "display" | "microphone",
+    source: Sources,
     sampleRate: number,
     selectedLanguage?: string,
     speakerMode?: SessionType,
     detectionLanguages?: string
   ): Promise<TranscriptionError> {
+    // Initialize audio stream processor for PCM conversion
     const microphoneStream: MicrophoneStream = new MicrophoneStream();
-
+    if (source === "microphone") {
+      this.micAbortController = new AbortController();
+    } else {
+      this.displayAbortController = new AbortController();
+    }
     try {
       microphoneStream.setStream(stream);
     } catch (error) {
@@ -307,6 +327,7 @@ class TranscribeService {
       };
     }
 
+    // Configure AWS Transcribe command based on language mode
     const command: StartStreamTranscriptionCommand =
       new StartStreamTranscriptionCommand({
         LanguageCode:
@@ -320,17 +341,25 @@ class TranscribeService {
           selectedLanguage === "auto" &&
           detectionLanguages &&
           detectionLanguages.length > 0
-            ? detectionLanguages
+            ? detectionLanguages // User-specified languages
             : selectedLanguage === "auto"
-            ? "ar-SA,en-US,fr-FR,es-ES,de-DE,hi-IN,pt-BR,zh-CN,ja-JP,ko-KR"
+            ? "ar-SA,en-US,hi-IN,fr-FR,es-ES,de-DE,pt-BR,zh-CN,ja-JP,ko-KR" // Default fallback
             : undefined,
         ShowSpeakerLabel: source === "display" && speakerMode === "multi",
         AudioStream: this.getAudioStream(microphoneStream, sampleRate),
       });
-    try {
-      const data: StartStreamTranscriptionCommandOutput =
-        await transcribeClient.send(command);
 
+    try {
+      // Send connection request to AWS Transcribe
+      const data: StartStreamTranscriptionCommandOutput =
+        await transcribeClient.send(command, {
+          abortSignal:
+            source === "microphone"
+              ? this.micAbortController?.signal
+              : this.displayAbortController?.signal,
+        });
+
+      // Validate response contains transcript stream
       if (!data || !data.TranscriptResultStream) {
         return {
           success: false,
@@ -339,6 +368,7 @@ class TranscribeService {
         };
       }
 
+      // Begin processing incoming transcription events
       this.processStream(data.TranscriptResultStream, source, speakerMode);
 
       return { success: true, message: `${source} connected` };
@@ -356,23 +386,25 @@ class TranscribeService {
 
   private async processStream(
     stream: AsyncIterable<any>,
-    source: "display" | "microphone",
+    source: Sources,
     speakerMode?: SessionType
   ) {
     try {
       for await (const event of stream) {
         let results = event.TranscriptEvent?.Transcript?.Results;
-        if (this.recordingStatus === "paused") {
-          continue;
-        }
+
+        // Skip processing if recording is paused
+        if (this.recordingStatus === "paused") continue;
         if (!results) continue;
 
         for (const result of results) {
+          // Skip partial results (wait for finalized transcription)
           if (!result?.Alternatives || result.IsPartial) continue;
-          //console.log("Partial ", result);
+
           const Items = result.Alternatives[0]?.Items;
           if (!Items || Items.length === 0) continue;
 
+          // Extract words with confidence scores from AWS response
           const transcriptWords: TranscribedWord[] = Items.map(
             (item: any, index: any) => ({
               id: index,
@@ -381,22 +413,24 @@ class TranscribeService {
               speaker: item.Speaker ?? "0",
             })
           );
-          // Determine speaker label based on mode
-          let speaker: string;
 
+          // Assign speaker labels based on audio source and session type
+          let speaker: string;
           if (source === "microphone") {
             speaker = "Investigator";
           } else {
-            // Display audio
+            // Display audio handling
             if (speakerMode === "standard") {
               speaker = this.participantType ?? "Witness";
             } else {
+              // Multi-participant mode: use AWS speaker labels
               const awsSpeakerLabel = transcriptWords[0]?.speaker || "0";
-              speaker = `${this.participantType ?? 'Speaker'} ${awsSpeakerLabel}`;
+              speaker = `${
+                this.participantType ?? "Speaker"
+              } ${awsSpeakerLabel}`;
             }
           }
 
-          //const speaker: Speakers = getSpeakerFromSource(source);
           const timeStamp = new Date().toLocaleString("en-US", {
             hour: "2-digit",
             minute: "2-digit",
@@ -404,6 +438,7 @@ class TranscribeService {
             hour12: false,
           });
 
+          // Build complete transcription result with metrics
           const fullDetailTranscript: TranscriptionResult = {
             words: transcriptWords,
             sentences: transcriptWords.map((item) => item.content).join(" "),
@@ -429,8 +464,7 @@ class TranscribeService {
               `\n`,
           };
 
-          //console.table(fullDetailTranscript)
-
+          // Send transcript to callback for UI update
           if (this.transcriptCallback) {
             this.transcriptCallback(fullDetailTranscript);
           }
@@ -470,9 +504,12 @@ class TranscribeService {
   }
 
   stopRecording(): void {
+    this.micAbortController?.abort();
+    this.displayAbortController?.abort();
     this.mediaManager.stopStreams();
     this.recordingStatus = "off";
   }
+
   toggleRecordingPause(isPaused: boolean): void {
     this.recordingStatus = isPaused ? "paused" : "on";
   }

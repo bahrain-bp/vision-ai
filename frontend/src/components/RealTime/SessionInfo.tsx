@@ -88,7 +88,16 @@ const SessionInfo: React.FC<SessionInfoProps> = ({ sessionData }) => {
                   <span className="stat-value">12</span>
                 </div>
               */}
-
+            <div className="stat-item">
+              <span className="stat-label">Current Witness Confidence:</span>
+              <span
+                className={`stat-value ${getConfidenceClass(
+                  transcriptStats.curWitnessConfidenceLevel * 100
+                )}`}
+              >
+                {(transcriptStats.curWitnessConfidenceLevel * 100).toFixed(1)}%
+              </span>
+            </div>
             <div className="stat-item">
               <span className="stat-label">Average Witness Confidence:</span>
               <span
