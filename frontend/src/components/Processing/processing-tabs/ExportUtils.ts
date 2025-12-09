@@ -1,34 +1,234 @@
-import html2pdf from 'html2pdf.js';
+import { jsPDF } from 'jspdf';
+import 'jspdf-autotable';
 import { Document, Packer, Paragraph, HeadingLevel, TextRun } from 'docx';
 
+// Arabic font support for jsPDF - using built-in fonts with Unicode support
+declare module 'jspdf' {
+  interface jsPDF {
+    autoTable: (options: any) => jsPDF;
+  }
+}
+
 export async function exportMarkdownToPDF(markdownHtml: string, fileName: string = 'report.pdf') {
-  const container = document.createElement('div');
-  container.innerHTML = markdownHtml;
-  container.style.fontFamily = 'Amiri, "Noto Naskh Arabic", "Traditional Arabic", Arial, sans-serif';
-
-  const opt = {
-    margin:       [0.5, 0.5, 0.5, 0.5],
-    filename:     fileName,
-    image:        { type: 'jpeg', quality: 0.98 },
-    html2canvas:  { 
-      scale: 3,
-      useCORS: true,
-      letterRendering: true,
-      allowTaint: true,
-      logging: false,
-      windowWidth: 1200
-    },
-    jsPDF:        { 
-      unit: 'in', 
-      format: 'a4', 
-      orientation: 'portrait',
-      compress: true,
-      putOnlyUsedFonts: true
-    },
-    pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
-  } as any;
-
-  await html2pdf().set(opt).from(container).save();
+  // Parse the HTML to extract structured content
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(markdownHtml, 'text/html');
+  
+  // Initialize PDF with RTL support
+  const pdf = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4',
+    compress: true
+  });
+  
+  // A4 dimensions
+  const pageWidth = 210;
+  const pageHeight = 297;
+  const margin = 15;
+  const usableWidth = pageWidth - (2 * margin);
+  let yPosition = margin;
+  
+  // Add header with Bahrain flag and title
+  const addHeader = () => {
+    pdf.setFillColor(220, 38, 38); // Red bar
+    pdf.rect(0, 0, pageWidth, 20, 'F');
+    
+    pdf.setTextColor(255, 255, 255);
+    pdf.setFontSize(18);
+    pdf.text('مملكة البحرين', pageWidth - margin, 12, { align: 'right' });
+    
+    pdf.setFontSize(12);
+    pdf.setTextColor(150, 150, 150);
+    pdf.text('Kingdom of Bahrain', pageWidth - margin, 16, { align: 'right' });
+    
+    yPosition = 25;
+  };
+  
+  addHeader();
+  
+  const checkPageBreak = (neededSpace: number = 10) => {
+    if (yPosition + neededSpace > pageHeight - margin) {
+      pdf.addPage();
+      addHeader();
+    }
+  };
+  
+  // Helper to reverse text for RTL rendering
+  const reverseText = (text: string): string => {
+    return text.split('').reverse().join('');
+  };
+  
+  // Process content
+  const elements = doc.body.children;
+  
+  for (let i = 0; i < elements.length; i++) {
+    const element = elements[i] as HTMLElement;
+    const tagName = element.tagName.toLowerCase();
+    
+    checkPageBreak(15);
+    
+    if (tagName === 'h1') {
+      checkPageBreak(20);
+      pdf.setFontSize(16);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setTextColor(15, 23, 42);
+      const text = element.textContent || '';
+      const reversed = reverseText(text);
+      pdf.text(reversed, pageWidth - margin, yPosition, { align: 'right' });
+      
+      // Underline
+      pdf.setDrawColor(220, 38, 38);
+      pdf.setLineWidth(0.5);
+      pdf.line(margin, yPosition + 2, pageWidth - margin, yPosition + 2);
+      
+      yPosition += 12;
+    } 
+    else if (tagName === 'h2') {
+      checkPageBreak(15);
+      pdf.setFontSize(14);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setTextColor(30, 41, 59);
+      const text = element.textContent || '';
+      const reversed = reverseText(text);
+      pdf.text(reversed, pageWidth - margin, yPosition, { align: 'right' });
+      yPosition += 10;
+    } 
+    else if (tagName === 'h3') {
+      checkPageBreak(12);
+      pdf.setFontSize(12);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setTextColor(51, 65, 85);
+      const text = element.textContent || '';
+      const reversed = reverseText(text);
+      pdf.text(reversed, pageWidth - margin, yPosition, { align: 'right' });
+      yPosition += 8;
+    }
+    else if (tagName === 'table') {
+      checkPageBreak(30);
+      
+      // Parse table data
+      const rows: string[][] = [];
+      const tableRows = element.querySelectorAll('tr');
+      
+      tableRows.forEach((tr) => {
+        const cells = tr.querySelectorAll('th, td');
+        const row: string[] = [];
+        cells.forEach(cell => {
+          row.push(cell.textContent || '');
+        });
+        rows.push(row);
+      });
+      
+      if (rows.length > 0) {
+        const headerRow = rows[0];
+        const bodyRows = rows.slice(1);
+        
+        (pdf as any).autoTable({
+          head: [headerRow],
+          body: bodyRows,
+          startY: yPosition,
+          margin: { left: margin, right: margin },
+          styles: {
+            font: 'helvetica',
+            fontSize: 10,
+            cellPadding: 4,
+            overflow: 'linebreak',
+            halign: 'center',
+            valign: 'middle',
+            textColor: [26, 26, 26]
+          },
+          headStyles: {
+            fillColor: [220, 38, 38],
+            textColor: [255, 255, 255],
+            fontStyle: 'bold',
+            fontSize: 11,
+            halign: 'center'
+          },
+          alternateRowStyles: {
+            fillColor: [248, 250, 252]
+          },
+          columnStyles: {
+            0: { halign: 'center' },
+            1: { halign: 'center' },
+            2: { halign: 'center' },
+            3: { halign: 'center' },
+            4: { halign: 'center' },
+            5: { halign: 'center' }
+          },
+          theme: 'grid',
+          tableLineColor: [203, 213, 225],
+          tableLineWidth: 0.1
+        });
+        
+        yPosition = (pdf as any).lastAutoTable.finalY + 8;
+      }
+    }
+    else if (tagName === 'p') {
+      const text = element.textContent || '';
+      if (!text.trim()) continue;
+      
+      checkPageBreak(10);
+      
+      pdf.setFontSize(11);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setTextColor(26, 26, 26);
+      
+      // Split text for multi-line if needed
+      const reversed = text.split('').reverse().join('');
+      const lines = pdf.splitTextToSize(reversed, usableWidth);
+      
+      lines.forEach((line: string) => {
+        checkPageBreak(6);
+        pdf.text(line, pageWidth - margin, yPosition, { align: 'right' });
+        yPosition += 6;
+      });
+      
+      yPosition += 2;
+    }
+    else if (tagName === 'ul' || tagName === 'ol') {
+      const items = element.querySelectorAll('li');
+      items.forEach((li) => {
+        checkPageBreak(8);
+        const text = li.textContent || '';
+        const reversed = text.split('').reverse().join('');
+        
+        pdf.setFontSize(10);
+        pdf.setFont('helvetica', 'normal');
+        pdf.setTextColor(26, 26, 26);
+        
+        // Bullet
+        pdf.setFillColor(220, 38, 38);
+        pdf.circle(pageWidth - margin - 2, yPosition - 1.5, 1, 'F');
+        
+        const lines = pdf.splitTextToSize(reversed, usableWidth - 8);
+        lines.forEach((line: string) => {
+          checkPageBreak(5);
+          pdf.text(line, pageWidth - margin - 6, yPosition, { align: 'right' });
+          yPosition += 5;
+        });
+      });
+      yPosition += 2;
+    }
+    else if (tagName === 'hr') {
+      checkPageBreak(5);
+      pdf.setDrawColor(226, 232, 240);
+      pdf.setLineWidth(0.3);
+      pdf.line(margin, yPosition, pageWidth - margin, yPosition);
+      yPosition += 5;
+    }
+  }
+  
+  // Add page numbers
+  const pageCount = (pdf as any).internal.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    pdf.setPage(i);
+    pdf.setFontSize(9);
+    pdf.setTextColor(150, 150, 150);
+    pdf.text(`${i} / ${pageCount}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+  }
+  
+  pdf.save(fileName);
 }
 
 export async function exportMarkdownToDocx(markdownText: string, fileName: string = 'report.docx') {
