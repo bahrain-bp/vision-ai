@@ -1,7 +1,7 @@
 ﻿import React, { useState } from "react";
 import MarkdownPreview from "./MarkdownPreview";
 import { exportMarkdownToPDF, exportMarkdownToDocx } from "./ExportUtils";
-import { Sparkles, Lock, AlertCircle } from "lucide-react";
+import { AlertCircle, FileText, Edit2, X, FileJson, Printer, Save } from "lucide-react";
 import "./Rewrite.css";
 import { translationService } from "../../../services/LiveTranslation/TranslationService";
 
@@ -21,6 +21,8 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData, selectedLanguage }) => {
   const [rewrittenText, setRewrittenText] = useState("");
   const [originalRewrittenText, setOriginalRewrittenText] = useState(""); // Store original Arabic
   const [translatedText, setTranslatedText] = useState("");
+  const [editableText, setEditableText] = useState(""); // For editing before save
+  const [isEditing, setIsEditing] = useState(false); // Toggle edit mode
   const [, setTranslationPhase] = useState<TranslationPhase>("idle");
   const [caseNumber, setCaseNumber] = useState<string>("");
   const [loading, setLoading] = useState(false);
@@ -93,8 +95,10 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData, selectedLanguage }) => {
   React.useEffect(() => {
     if (!originalRewrittenText) {
       setRewrittenText("");
+      setEditableText("");
     } else {
       setRewrittenText(originalRewrittenText);
+      setEditableText(originalRewrittenText);
     }
   }, [originalRewrittenText]);
 
@@ -478,6 +482,7 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData, selectedLanguage }) => {
     setTranslationPhase(selectedLanguage === "en" ? "loading" : "idle");
     setOriginalRewrittenText(cleanedText); // Store original Arabic
     setRewrittenText(cleanedText);
+    setEditableText(cleanedText); // Set editable text
     
     console.log("Rewritten text received, extracting case number...");
     const extractedCaseNumber = extractCaseNumber(cleanedText);
@@ -488,25 +493,49 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData, selectedLanguage }) => {
     setStatusMessage("");
   };
 
-  const displayMarkdown = selectedLanguage === "en" ? (translatedText || rewrittenText) : rewrittenText;
+  // Save function to store edited text
+  const handleSave = async () => {
+    if (!editableText.trim()) {
+      setError(t("Nothing to save.", "لا يوجد نص للحفظ."));
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Update the rewritten text with edited content
+      setRewrittenText(editableText);
+      setOriginalRewrittenText(editableText);
+      
+      // Re-extract case number if edited
+      const extractedCaseNumber = extractCaseNumber(editableText);
+      setCaseNumber(extractedCaseNumber);
+      
+      setIsEditing(false); // Exit edit mode
+      setStatusMessage(t("Saved successfully.", "تم الحفظ بنجاح."));
+      setTimeout(() => setStatusMessage(""), 3000);
+    } catch (err: any) {
+      setError(err.message || t("Save failed.", "فشل الحفظ."));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const displayMarkdown = selectedLanguage === "en" ? (translatedText || editableText) : editableText;
 
 
 
   return (
-    <div className="rewrite-container">
+    <div className="rewrite-container" dir={isArabic ? "rtl" : "ltr"}>
       <div className="rewrite-card">
-        <div className="rewrite-header-row">
-          <div className="rewrite-icon-circle">
-            <Sparkles size={28} />
-          </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <h2 className="rewrite-heading">
-              {t("Rewrite", "إعادة الكتابة")}
-            </h2>
-            <p className="rewrite-subheading">
-              {t("Rewrite and improve investigation reports", "إعادة كتابة وتحسين تقارير التحقيق")}
-            </p>
-          </div>
+        <div className="rewrite-header">
+          <h2 className="rewrite-heading">
+            {t("Rewrite", "إعادة الكتابة")}
+          </h2>
+          <p className="rewrite-subheading">
+            {t("Rewrite and improve investigation reports", "إعادة كتابة وتحسين تقارير التحقيق")}
+          </p>
         </div>
 
         {error && (
@@ -524,96 +553,167 @@ const Rewrite: React.FC<RewriteProps> = ({ sessionData, selectedLanguage }) => {
           </div>
         )}
 
-        <div className="rewrite-body">
-          <label className="rewrite-section-label">
-            {t("Rewritten Report", "التقرير المُعاد كتابته")}
-          </label>
-          {/* Case Number Display - Only show when case number is extracted */}
-          {caseNumber && (
-            <div className="case-number-banner">
-              <div className="case-number-label">
-                {t("Case Number", "القضية رقم")}
+        {/* Case Number Display - Only show when case number is extracted */}
+        {caseNumber && (
+          <div className="case-number-banner">
+            <div className="case-number-label">
+              {t("Case Number", "القضية رقم")}
+            </div>
+            <div className="case-number-value">{caseNumber}</div>
+          </div>
+        )}
+
+        {/* Results Card */}
+        <div className="results-card">
+          <div className="results-header">
+            <h3>{t("Rewritten Report", "التقرير المُعاد كتابته")}</h3>
+            <span className="status-chip">
+              {loading
+                ? t("Processing", "جارٍ المعالجة")
+                : rewrittenText
+                ? t("Completed", "اكتملت المعالجة")
+                : t("Pending", "قيد الانتظار")}
+            </span>
+          </div>
+
+          {isEditing ? (
+            // Edit Mode - Show textarea AND preview
+            <div className="edit-mode-container">
+              <div className="edit-section">
+                <h4 className="section-title">{t("Edit", "تعديل")}</h4>
+                <textarea
+                  className="results-textarea"
+                  placeholder={t("Rewritten text will appear here after processing...", "سيظهر النص المعاد كتابته هنا بعد المعالجة...")}
+                  value={editableText}
+                  onChange={(e) => setEditableText(e.target.value)}
+                  dir={isArabic ? "rtl" : "ltr"}
+                />
               </div>
-              <div className="case-number-value">{caseNumber}</div>
+              <div className="preview-section">
+                <h4 className="section-title">{t("Preview", "معاينة")}</h4>
+                <div className="rewrite-preview-scroll" dir={isArabic ? "rtl" : "ltr"}>
+                  <MarkdownPreview
+                    markdown={displayMarkdown}
+                    direction={isArabic ? "rtl" : "ltr"}
+                  />
+                </div>
+              </div>
+            </div>
+          ) : (
+            // Preview Mode - Show markdown only
+            <div className="rewrite-preview-scroll" dir={isArabic ? "rtl" : "ltr"}>
+              {editableText ? (
+                <MarkdownPreview
+                  markdown={displayMarkdown}
+                  direction={isArabic ? "rtl" : "ltr"}
+                />
+              ) : (
+                <p className="placeholder-text">
+                  {t(
+                    "Click the button below to generate a rewritten investigation report.",
+                    "انقر على الزر أدناه لإنشاء تقرير تحقيق معاد كتابته."
+                  )}
+                </p>
+              )}
             </div>
           )}
+
           {/* Export actions */}
           {rewrittenText && (
-            <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
-              <button
-                type="button"
-                className="rewrite-primary-btn"
-                onClick={() => {
-                  exportMarkdownToPDF(simpleMarkdownToHtmlForExport(displayMarkdown), `report_${caseNumber || 'case'}.pdf`);
-                }}
-                style={{ flex: 1 }}
-              >
-                <span>{t("📄 Export PDF", "📄 تصدير PDF")}</span>
-              </button>
-              <button
-                type="button"
-                className="rewrite-primary-btn"
-                onClick={() => {
-                  exportMarkdownToDocx(displayMarkdown, `report_${caseNumber || 'case'}.docx`);
-                }}
-                style={{ flex: 1 }}
-              >
-                <span>{t("📝 Export Word", "📝 تصدير Word")}</span>
-              </button>
-              <button
-                type="button"
-                className="rewrite-primary-btn"
-                onClick={handlePrint}
-                style={{ flex: 1 }}
-              >
-                <span>{t("🖨️ Print", "🖨️ طباعة")}</span>
-              </button>
+            <div className="actions">
+              {isEditing ? (
+                <>
+                  <button
+                    type="button"
+                    className="action-btn primary"
+                    onClick={handleSave}
+                    disabled={loading || !editableText.trim()}
+                  >
+                    {t("Save", "حفظ")}
+                  </button>
+                  <button
+                    type="button"
+                    className="action-btn secondary"
+                    onClick={() => {
+                      setEditableText(rewrittenText);
+                      setIsEditing(false);
+                    }}
+                  >
+                    <X size={16} />
+                    {t("Cancel", "إلغاء")}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    className="action-btn secondary"
+                    onClick={handleSave}
+                    disabled={loading || !editableText.trim()}
+                    title={t("Save document", "حفظ المستند")}
+                  >
+                    <Save size={16} />
+                    {t("Save", "حفظ")}
+                  </button>
+                  <button
+                    type="button"
+                    className="action-btn secondary"
+                    onClick={() => setIsEditing(true)}
+                    title={t("Edit document", "تعديل المستند")}
+                  >
+                    <Edit2 size={16} />
+                    {t("Edit", "تعديل")}
+                  </button>
+                  <button
+                    type="button"
+                    className="action-btn secondary"
+                    onClick={() => {
+                      exportMarkdownToPDF(simpleMarkdownToHtmlForExport(displayMarkdown), `report_${caseNumber || 'case'}.pdf`);
+                    }}
+                    title={t("Export as PDF", "تصدير كـ PDF")}
+                  >
+                    <FileJson size={16} />
+                    {t("PDF", "PDF")}
+                  </button>
+                  <button
+                    type="button"
+                    className="action-btn secondary"
+                    onClick={() => {
+                      exportMarkdownToDocx(displayMarkdown, `report_${caseNumber || 'case'}.docx`);
+                    }}
+                    title={t("Export as Word", "تصدير كـ Word")}
+                  >
+                    <FileText size={16} />
+                    {t("Word", "Word")}
+                  </button>
+                  <button
+                    type="button"
+                    className="action-btn secondary"
+                    onClick={handlePrint}
+                    title={t("Print document", "طباعة المستند")}
+                  >
+                    <Printer size={16} />
+                    {t("Print", "طباعة")}
+                  </button>
+                </>
+              )}
             </div>
           )}
-          {/* Preview formatted output */}
-          <div className={`rewrite-preview-card ${isArabic ? 'rtl' : 'ltr'}`}>
-            <div className="rewrite-preview-header">
-              <div>
-                <p className="preview-label">
-                  {t("Latest Generated Version", "أحدث نسخة معالجة")}
-                </p>
-                <h3 className="preview-title">
-                  {t("Investigation Report", "تقرير التحقيق")}
-                </h3>
-              </div>
-              <div className="preview-meta">
-                <span className="preview-chip">
-                  {isArabic ? "العربية" : "English"}
-                </span>
-                {caseNumber && (
-                  <span className="preview-chip highlight">
-                    {caseNumber}
-                  </span>
-                )}
-                <span className="preview-chip subtle">
-                  {t("Session", "الجلسة")} #{sessionData.sessionId.slice(-6)}
-                </span>
-              </div>
-            </div>
-            <div className="rewrite-preview-scroll">
-              <MarkdownPreview markdown={displayMarkdown} />
-            </div>
-          </div>
         </div>
 
-        <button
-          type="button"
-          className={`rewrite-primary-btn ${loading ? "loading" : ""}`}
-          onClick={handleRewrite}
-          disabled={loading}
-        >
-          <Lock size={18} className="rewrite-btn-icon" />
-          <span>
+        {/* Generate Button */}
+        <div className="actions-main">
+          <button
+            type="button"
+            className={`action-btn primary-main ${loading ? "loading" : ""}`}
+            onClick={handleRewrite}
+            disabled={loading}
+          >
             {loading 
               ? t("Rewriting...", "جارٍ إعادة الكتابة...") 
               : t("Rewrite Report", "إعادة كتابة التقرير")}
-            </span>
-        </button>
+          </button>
+        </div>
       </div>
     </div>
   );

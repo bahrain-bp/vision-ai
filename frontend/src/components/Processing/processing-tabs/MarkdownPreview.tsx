@@ -2,6 +2,142 @@ import React from "react";
 
 interface MarkdownPreviewProps {
   markdown: string;
+  direction?: "rtl" | "ltr";
+}
+
+// Comprehensive header normalization for ALL case types and PDF structures
+function normalizeTableHeaders(headers: string[]): string[] {
+  // Universal mapping covering all case areas (Rewrite, Classification, Contradiction, etc.)
+  const headerMap: { [key: string]: string } = {
+    // ===== PARTIES TABLE (الأطراف) =====
+    'الصفة': 'الصفة',
+    'الاسم الكامل': 'الاسم الكامل',
+    'الجنسية': 'الجنسية',
+    'الرقم الشخصي': 'الرقم الشخصي',
+    'الهاتف': 'الهاتف',
+    'ملاحظات': 'ملاحظات',
+    
+    // Variations for Parties
+    'الحالة': 'الصفة',
+    'الوظيفة': 'الصفة',
+    'الصفه': 'الصفة',
+    'الصفات': 'الصفة',
+    'نوع الطرف': 'الصفة',
+    'طبيعة الطرف': 'الصفة',
+    
+    'الاسم': 'الاسم الكامل',
+    'اسم': 'الاسم الكامل',
+    'الإسم الكامل': 'الاسم الكامل',
+    'الإسم': 'الاسم الكامل',
+    'الأسماء': 'الاسم الكامل',
+    'اسم الشخص': 'الاسم الكامل',
+    'اسم المدعى': 'الاسم الكامل',
+    'اسم المشتكي': 'الاسم الكامل',
+    
+    'الجنسيه': 'الجنسية',
+    'جنسية': 'الجنسية',
+    'الدولة': 'الجنسية',
+    'البلد': 'الجنسية',
+    
+    'رقم الهوية': 'الرقم الشخصي',
+    'الهوية': 'الرقم الشخصي',
+    'رقم شخصي': 'الرقم الشخصي',
+    'رقم البطاقة': 'الرقم الشخصي',
+    'الرقم الوطني': 'الرقم الشخصي',
+    'رقم هوية': 'الرقم الشخصي',
+    'رقم الإقامة': 'الرقم الشخصي',
+    
+    'رقم الهاتف': 'الهاتف',
+    'الموبايل': 'الهاتف',
+    'الجوال': 'الهاتف',
+    'التلفون': 'الهاتف',
+    'الهاتف المحمول': 'الهاتف',
+    'هاتف': 'الهاتف',
+    
+    'السكن': 'ملاحظات',
+    'العنوان': 'ملاحظات',
+    'ملاحظه': 'ملاحظات',
+    'تفاصيل': 'ملاحظات',
+    'معلومات': 'ملاحظات',
+    'الملاحظات': 'ملاحظات',
+    'ملاحظات إضافية': 'ملاحظات',
+    'موقع السكن': 'ملاحظات',
+    'مقر الإقامة': 'ملاحظات',
+    'الجهة': 'ملاحظات',
+    'الحالة الإدارية': 'ملاحظات',
+    
+    // ===== PHYSICAL ITEMS TABLE (الأشياء العينية) =====
+    'فرعي': 'الصنف',
+    'النوع': 'الصنف',
+    'نوع': 'الصنف',
+    'الصنف': 'الصنف',
+    'صنف': 'الصنف',
+    'فئة': 'الصنف',
+    'تصنيف': 'الصنف',
+    'الفئة': 'الصنف',
+    'نوع المضبوطات': 'الصنف',
+    
+    'الوصف': 'الوصف',
+    'وصف': 'الوصف',
+    'الوصف التفصيلي': 'الوصف',
+    'وصف تفصيلي': 'الوصف',
+    'الوصف الكامل': 'الوصف',
+    'تفصيل': 'الوصف',
+    'تفاصيل المضبوطة': 'الوصف',
+    'البيان': 'الوصف',
+    'المواصفات': 'الوصف',
+    'الوصف الموجز': 'الوصف',
+    
+    'الدور': 'الحالة',
+    'حالة': 'الحالة',
+    'حالة المضبوطة': 'الحالة',
+    'الوضع': 'الحالة',
+    'الحالة القانونية': 'الحالة',
+    'الحالة الجنائية': 'الحالة',
+    'مسروق/متلف/محجوز': 'الحالة',
+    'الصفة القانونية': 'الحالة',
+    
+    // ===== CONTRADICTIONS TABLE =====
+    'الشاهد': 'الشاهد',
+    'شاهد': 'الشاهد',
+    'اسم الشاهد': 'الشاهد',
+    'الشاهد الأول': 'الشاهد',
+    'الشهود': 'الشاهد',
+    'الشخص': 'الشاهد',
+    
+    'التناقض': 'التناقض',
+    'تناقض': 'التناقض',
+    'نوع التناقض': 'التناقض',
+    'الاختلاف': 'التناقض',
+    'الفرق': 'التناقض',
+    'البيان المتناقض': 'التناقض',
+    'الموضوع': 'التناقض',
+    
+    'التفاصيل': 'التفاصيل',
+    'التفصيل': 'التفاصيل',
+    'الشرح': 'التفاصيل',
+    'الإيضاح': 'التفاصيل',
+    'التوضيح': 'التفاصيل',
+    'الملاحظة': 'التفاصيل',
+    
+    // ===== GENERIC/COMMON COLUMNS =====
+    'الرقم': 'الرقم',
+    'رقم': 'الرقم',
+    'ت': 'الرقم',
+    'الترتيب': 'الرقم',
+    'الصفحة': 'الصفحة',
+    'صفحة': 'الصفحة',
+    'التاريخ': 'التاريخ',
+    'تاريخ': 'التاريخ',
+    'الوقت': 'الوقت',
+    'وقت': 'الوقت',
+    'ملخص': 'الملخص'
+  };
+
+  return headers.map(header => {
+    const trimmed = header.trim();
+    return headerMap[trimmed] || trimmed;
+  });
 }
 
 // Enhanced Markdown to HTML converter for headings, bold, hr, and accurate tables
@@ -36,6 +172,9 @@ function simpleMarkdownToHtml(md: string): string {
     });
     
     if (rows.length < 2) return block;
+    
+    // Normalize headers to standard format
+    rows[0] = normalizeTableHeaders(rows[0]);
     
     // Find max column count to normalize all rows
     const maxCols = Math.max(...rows.map(r => r.length));
@@ -140,7 +279,7 @@ function simpleMarkdownToHtml(md: string): string {
   return html;
 }
 
-const MarkdownPreview: React.FC<MarkdownPreviewProps> = ({ markdown }) => {
+const MarkdownPreview: React.FC<MarkdownPreviewProps> = ({ markdown, direction = "rtl" }) => {
   const html = simpleMarkdownToHtml(markdown);
   return (
     <div
@@ -158,8 +297,8 @@ const MarkdownPreview: React.FC<MarkdownPreviewProps> = ({ markdown }) => {
         fontWeight: 500,
         color: '#1a1a1a',
         lineHeight: 2.2,
-        direction: 'rtl',
-        textAlign: 'right',
+        direction,
+        textAlign: direction === 'rtl' ? 'right' : 'left',
         overflowX: 'auto',
         whiteSpace: 'pre-wrap',
         letterSpacing: '0.01em',
