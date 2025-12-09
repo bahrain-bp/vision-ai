@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import RealTimeView from "../RealTime/RealTimeView";
 import ProcessingView from "../Processing/ProcessingView";
-import SessionSummaryModal from "../RealTime/SessionSummaryModal";
+
 import { User, RecordingStatus } from "../../types/";
 import { useTranscription } from "../../hooks/useTranscription";
 import { useCaseContext } from "../../hooks/useCaseContext";
@@ -76,11 +76,12 @@ const SessionPage: React.FC<SessionPageProps> = ({
     updateSessionStatus,
     setCurrentSession,
     setCurrentPersonName,
+    setCurrentPersonType,
   } = useCaseContext();
 
   const [activeMainTab, setActiveMainTab] = useState<MainTab>("real-time");
   const [sessionState, setSessionState] = useState<RecordingStatus>("off");
-  const [showSummaryModal, setShowSummaryModal] = useState<boolean>(false);
+
   const { stopRecording, toggleRecordingPause, toggleReset } =
     useTranscription();
 
@@ -142,7 +143,7 @@ const SessionPage: React.FC<SessionPageProps> = ({
         status: currentSession.status,
       }
     : {
-        sessionId: "#2025-INV-0042",
+        sessionId: "No session",
         investigator: getInvestigatorName(),
         language: language === "en" ? "English" : "Arabic",
         duration: timerString,
@@ -169,23 +170,17 @@ const SessionPage: React.FC<SessionPageProps> = ({
       console.error("Failed to update session status:", error);
     }
   }
-  setCurrentSession(null);
+  //setCurrentSession(null);
   // Trigger switch to summarization tab
   setTriggerSummarization(true);
   };
-
-  const handleCloseSummary = () => {
-    setShowSummaryModal(false);
-    setSessionState("off");
-    if (onEndSession) {
-      onEndSession();
-    }
-  };
+  
 
   const handleBackToHome = () => {
     sessionCreationAttempted.current = false;
     setCurrentSession(null);
     setCurrentPersonName(null);
+    setCurrentPersonType(null);
     if (onEndSession) {
       onEndSession();
     } else {
@@ -231,10 +226,12 @@ const SessionPage: React.FC<SessionPageProps> = ({
       alert("Please enter witness full name.");
       return;
     }
+
     if (!setupData.identityData.referencePhoto) {
       alert("Please upload a reference photo.");
       return;
     }
+
     updateIdentityData("isVerified", true);
     alert("Identity verification completed successfully!");
   };
@@ -246,6 +243,7 @@ const SessionPage: React.FC<SessionPageProps> = ({
       if (sessionCreationAttempted.current) {
         return;
       }
+
       if (currentCase && !currentSession) {
         try {
           sessionCreationAttempted.current = true;
@@ -257,6 +255,7 @@ const SessionPage: React.FC<SessionPageProps> = ({
         }
       }
     };
+
     initializeSession();
   }, [currentCase, currentSession, createSession, user]);
 
@@ -435,16 +434,7 @@ const SessionPage: React.FC<SessionPageProps> = ({
         )}
       </div>
 
-      {showSummaryModal && (
-        <SessionSummaryModal
-          sessionData={currentSessionData}
-          onClose={handleCloseSummary}
-          onGenerateSummary={() => {
-            setShowSummaryModal(false);
-            setTriggerSummarization(true);
-          }}
-        />
-      )}
+
     </div>
   );
 };
