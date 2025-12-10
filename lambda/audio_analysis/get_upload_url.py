@@ -71,7 +71,7 @@ def handler(event, context):
     Input: {
         "fileName": "audio.mp3",
         "fileType": "audio/mpeg",
-        "fileSize": 12345678  # bytes (optional but recommended)
+        "fileSize": 12345678  # bytes
     }
     Output: { "uploadUrl": "...", "s3Key": "..." }
     """
