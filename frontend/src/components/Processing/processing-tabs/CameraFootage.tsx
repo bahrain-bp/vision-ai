@@ -330,12 +330,37 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
       "video/avi",
       "video/quicktime",
       "video/x-msvideo",
+      "video/x-matroska",
+      "video/webm",
+      "video/x-flv",
+      "video/x-ms-wmv",
     ];
     if (!validTypes.includes(file.type)) {
       console.log("[Debug] Invalid file type:", file.type);
       showBanner("error", {
-        en: "Please upload a valid video file (MP4, AVI, or MOV).",
-        ar: "يرجى تحميل ملف فيديو (MP4, AVI, أو MOV).",
+        en: "Please upload a valid video file (MP4, MOV, AVI, MKV, WEBM, FLV, WMV).",
+        ar: "يرجى تحميل ملف فيديو (MP4, MOV, AVI, MKV, WEBM, FLV, WMV).",
+      });
+      return;
+    }
+
+    const validExtensions = [
+      ".mp4",
+      ".mov",
+      ".avi",
+      ".mkv",
+      ".webm",
+      ".flv",
+      ".wmv",
+    ];
+    const fileExtension = file.name
+      .toLowerCase()
+      .slice(file.name.lastIndexOf("."));
+
+    if (!validExtensions.includes(fileExtension)) {
+      showBanner("error", {
+        en: `Invalid file extension: ${fileExtension}`,
+        ar: `نوع الملف غير صحيح: ${fileExtension}`,
       });
       return;
     }
@@ -385,6 +410,8 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
           body: JSON.stringify({
             sessionId,
             fileName: file.name,
+            fileType: file.type || "video/mp4",
+            fileSize: file.size,
           }),
         }
       );

@@ -153,6 +153,7 @@ const AudioAnalysis: React.FC<AudioAnalysisProps> = ({ sessionData }) => {
           body: JSON.stringify({
             fileName: file.name,
             fileType: file.type || "audio/mpeg",
+            fileSize: file.size,
           }),
         }
       );
