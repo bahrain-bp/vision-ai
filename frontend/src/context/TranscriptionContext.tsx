@@ -17,9 +17,12 @@ import { TranscriptionResult,TranscriptionStatus,FormattedTranscript } from "../
 import TranscribeService from "../services/LiveTranscription/TranscribeService";
 import StreamManager from "../services/LiveTranscription/StreamManager";
 import {useCaseContext} from "../hooks/useCaseContext"
+
+
 export interface TranscriptionContextType {
   audioStatus: boolean;
   recordingStatus: RecordingStatus;
+  setParticipantType: (personType: string) => void;
   startRecording: (
     setSessionState?: (state: RecordingStatus) => void,
     languagePreferences?: LanguagePreferences,
@@ -30,12 +33,8 @@ export interface TranscriptionContextType {
   getFullTranscript: string;
   getTranscriptSegments: () => FormattedTranscript[];
   toggleRecordingPause: (isPaused: boolean) => void;
-
   toggleReset: () => void;
-
-  //Used to change state if reset not to track it
   resetTrigger: boolean;
-
   transcriptStats: TranscriptionStats;
 }
 
@@ -56,6 +55,7 @@ export const TranscriptionProvider: React.FC<{ children: ReactNode }> = ({
   >([]); 
   const [transcriptStats, setTranscriptStats] = useState<TranscriptionStats>({
     avgWitnessConfidenceLevel: 0,
+    curWitnessConfidenceLevel: 0,
     witnessWordCount: 0,
     investigatorWordCount: 0,
     totalWordCount: 0,
@@ -97,6 +97,7 @@ export const TranscriptionProvider: React.FC<{ children: ReactNode }> = ({
         setFullTranscript("");
         setTranscriptStats({
           avgWitnessConfidenceLevel: 0,
+          curWitnessConfidenceLevel: 0,
           witnessWordCount: 0,
           investigatorWordCount: 0,
           totalWordCount: 0,
@@ -173,6 +174,7 @@ export const TranscriptionProvider: React.FC<{ children: ReactNode }> = ({
 
       return {
         avgWitnessConfidenceLevel: newAvgConfidence,
+        curWitnessConfidenceLevel: onTranscriptUpdate.avgWitnessConfidenceLevel > 0 ? onTranscriptUpdate.avgWitnessConfidenceLevel : (prev.curWitnessConfidenceLevel ?? 0),
         witnessWordCount: newWitnessWords,
         investigatorWordCount: newInvestigatorWords,
         totalWordCount: newTotalWords,
@@ -186,6 +188,10 @@ export const TranscriptionProvider: React.FC<{ children: ReactNode }> = ({
   const getTranscriptSegments = useCallback((): FormattedTranscript[] => {
     return transcriptSegments;
   }, [transcriptSegments]);
+
+ const setParticipantType = useCallback((personType: string) => {
+   TranscribeService.setPersonType(personType);
+ }, []);
 
   const stopRecording = useCallback(
     (setSessionState?: (state: RecordingStatus) => void) => {
@@ -226,6 +232,7 @@ export const TranscriptionProvider: React.FC<{ children: ReactNode }> = ({
     setIsResetTrigger((prev) => !prev);
     setTranscriptStats({
       avgWitnessConfidenceLevel: 0,
+      curWitnessConfidenceLevel:0,
       witnessWordCount: 0,
       investigatorWordCount: 0,
       totalWordCount: 0,
@@ -239,6 +246,7 @@ export const TranscriptionProvider: React.FC<{ children: ReactNode }> = ({
       value={{
         audioStatus,
         recordingStatus,
+        setParticipantType,
         startRecording,
         stopRecording,
         getFullTranscript: fullTranscript,

@@ -1,7 +1,7 @@
 import React from "react";
 import { FileText } from "lucide-react";
 import { useCaseContext } from "../../hooks/useCaseContext";
-import {useTranscription}from "../../hooks/useTranscription"
+import { useTranscription } from "../../hooks/useTranscription";
 interface SessionData {
   sessionId: string;
   participant: string;
@@ -15,21 +15,22 @@ interface SessionInfoProps {
 }
 
 const SessionInfo: React.FC<SessionInfoProps> = ({ sessionData }) => {
-  const { currentPersonName } = useCaseContext();
-  const {transcriptStats} = useTranscription();
-const getConfidenceClass = (confidence: number) => {
-  if (confidence >= 95) return "confidence-excellent";
-  if (confidence >= 85) return "confidence-high";
-  if (confidence >= 75) return "confidence-good";
-  if (confidence >= 65) return "confidence-medium";
-  if (confidence >= 55) return "confidence-fair";
-  if (confidence >= 45) return "confidence-low";
-  if (confidence >= 35) return "confidence-poor";
-  return "confidence-critical";
-};
+  const { currentPersonName, currentPersonType } = useCaseContext();
+  const { transcriptStats } = useTranscription();
+  const getConfidenceClass = (confidence: number) => {
+    if (confidence >= 95) return "confidence-excellent";
+    if (confidence >= 85) return "confidence-high";
+    if (confidence >= 75) return "confidence-good";
+    if (confidence >= 65) return "confidence-medium";
+    if (confidence >= 55) return "confidence-fair";
+    if (confidence >= 45) return "confidence-low";
+    if (confidence >= 35) return "confidence-poor";
+    return "confidence-critical";
+  };
 
   const participantName =
     currentPersonName || sessionData.participant || "Not verified yet";
+  const participantType = currentPersonType || "Not set";
   return (
     <div className="session-info-card">
       <div className="card-header">
@@ -41,6 +42,11 @@ const getConfidenceClass = (confidence: number) => {
         <div className="info-item">
           <p className="info-label">Participant Name:</p>
           <p className="info-value">{participantName}</p>
+        </div>
+
+        <div className="info-item">
+          <p className="info-label">Participant Type:</p>
+          <p className="info-value">{participantType}</p>
         </div>
 
         <div className="info-item">
@@ -82,7 +88,16 @@ const getConfidenceClass = (confidence: number) => {
                   <span className="stat-value">12</span>
                 </div>
               */}
-
+            <div className="stat-item">
+              <span className="stat-label">Current Witness Confidence:</span>
+              <span
+                className={`stat-value ${getConfidenceClass(
+                  transcriptStats.curWitnessConfidenceLevel * 100
+                )}`}
+              >
+                {(transcriptStats.curWitnessConfidenceLevel * 100).toFixed(1)}%
+              </span>
+            </div>
             <div className="stat-item">
               <span className="stat-label">Average Witness Confidence:</span>
               <span

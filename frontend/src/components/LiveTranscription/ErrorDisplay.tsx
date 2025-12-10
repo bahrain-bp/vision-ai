@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { AlertCircle, X, ChevronDown, ChevronUp } from "lucide-react";
+import React from "react";
+import { AlertCircle, X } from "lucide-react";
 import { ErrorType, ErrorTypeLabels } from "../../types"; // Import the types
 
 interface ErrorDisplayProps {
@@ -11,11 +11,9 @@ interface ErrorDisplayProps {
 
 const ErrorDisplay: React.FC<ErrorDisplayProps> = ({
   displayMessage,
-  rawMessage,
   displayTitle = "unknown", // Default to 'unknown' ErrorType
   onClose,
 }) => {
-  const [showDetails, setShowDetails] = useState(false);
   const handleClose = () => {
     if (onClose) onClose();
     window.location.reload();
@@ -52,32 +50,7 @@ const ErrorDisplay: React.FC<ErrorDisplayProps> = ({
             </p>
           </div>
 
-          {/* Technical Details */}
-          {rawMessage && (
-            <div className="session-details-card mt-4">
-              <button
-                onClick={() => setShowDetails(!showDetails)}
-                className="w-full flex items-center justify-between hover:bg-gray-50 transition-colors p-2 rounded-lg group"
-              >
-                <span className="details-title text-sm">Technical Details</span>
-                {showDetails ? (
-                  <ChevronUp className="w-4 h-4 text-gray-400" />
-                ) : (
-                  <ChevronDown className="w-4 h-4 text-gray-400" />
-                )}
-              </button>
 
-              {showDetails && (
-                <div className="mt-3">
-                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                    <pre className="text-xs text-gray-700 overflow-x-auto whitespace-pre-wrap break-words font-mono">
-                      {rawMessage}
-                    </pre>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
 
           {/* Actions */}
           <div className="modal-actions">

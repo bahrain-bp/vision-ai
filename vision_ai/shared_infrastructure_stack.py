@@ -3,6 +3,7 @@ from aws_cdk import (
     aws_s3 as s3,
     aws_apigateway as apigateway,
     RemovalPolicy,
+    aws_iam as iam, 
     CfnOutput,
 )
 from constructs import Construct
@@ -12,15 +13,16 @@ class SharedInfrastructureStack(Stack):
     Shared Infrastructure Stack - Contains ONLY shared resources
     """
     
-    def __init__(self, scope: Construct, construct_id: str, env, **kwargs) -> None: 
-        super().__init__(scope, construct_id, env=env, **kwargs) 
+    def __init__(self, scope: Construct, construct_id: str, bucket_name: str, **kwargs) -> None:
+        super().__init__(scope, construct_id, **kwargs)
         
         # ==========================================
         # S3 BUCKET - SHARED ACROSS ALL FEATURES
         # ==========================================
         self.investigation_bucket = s3.Bucket(
-            self, "InvestigationBucket",
-            bucket_name=f"vision-investigation-system-{self.account}",
+            self,
+            "InvestigationBucket",
+            bucket_name=bucket_name,
             versioned=True,
             encryption=s3.BucketEncryption.S3_MANAGED,
             removal_policy=RemovalPolicy.RETAIN,
@@ -39,7 +41,6 @@ class SharedInfrastructureStack(Stack):
                 max_age=3000
             )]
         )
-        
         # ==========================================
         # API GATEWAY - SHARED ACROSS ALL FEATURES
         # ==========================================
