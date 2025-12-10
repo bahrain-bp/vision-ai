@@ -19,6 +19,8 @@ yarn-debug.log*
 frontend/build/
 coverage/
 .eslintcache
+package-lock.json
+frontend/package-lock.json
 
 # Environment
 .env
