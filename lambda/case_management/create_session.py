@@ -117,28 +117,14 @@ def validate_id_format(value, field_name):
     """Validate that ID contains only safe characters"""
     if not value:
         return False
-    
-    # For case IDs: CASE-202512-A525ED1B format
-    if field_name == 'caseId':
-        if not re.match(r'^CASE-\d{6}-[A-F0-9]{8}$', value):
-            print(f"Invalid {field_name} format: {value}")
-            return False
-    
-    # For session IDs: session-20251207123456-a1b2c3d4 format
-    elif field_name == 'sessionId':
-        if not re.match(r'^session-\d{14}-[a-fA-F0-9]{8}$', value):
-            print(f"Invalid {field_name} format: {value}")
-            return False
-    else:
-        if not re.match(r'^[a-zA-Z0-9_-]+$', value):
-            print(f"Invalid {field_name} format: {value}")
-            return False
-    
-    # Always prevent path traversal
+    # Allow only alphanumeric, hyphens, and underscores
+    if not re.match(r'^[a-zA-Z0-9_-]+$', value):
+        print(f"Invalid {field_name} format: {value}")
+        return False
+    # Prevent path traversal
     if '..' in value or '/' in value or '\\' in value:
         print(f"Path traversal attempt in {field_name}: {value}")
         return False
-    
     return True
 
 def validate_input_string(value, field_name, max_length=200):
