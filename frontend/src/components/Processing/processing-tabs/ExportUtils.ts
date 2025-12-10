@@ -1,7 +1,6 @@
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 import { Document, Packer, Paragraph, HeadingLevel, TextRun } from 'docx';
-import html2pdf from 'html2pdf.js';
 
 // Arabic font support for jsPDF - using built-in fonts with Unicode support
 declare module 'jspdf' {
@@ -11,38 +10,12 @@ declare module 'jspdf' {
 }
 
 export async function exportMarkdownToPDF(markdownHtml: string, fileName: string = 'report.pdf') {
-  // Use html2pdf.js for better Arabic and styling support
-  const element = document.createElement('div');
-  element.innerHTML = markdownHtml;
-  element.style.fontFamily = '"IBM Plex Sans Arabic", "Cairo", "Noto Sans Arabic", Arial, sans-serif';
-  element.style.direction = 'rtl';
-  element.style.textAlign = 'right';
-  element.style.padding = '20px';
-  element.style.fontSize = '14px';
-  element.style.lineHeight = '1.6';
-  
-  const options = {
-    margin: 15,
-    filename: fileName,
-    image: { type: 'jpeg' as const, quality: 0.98 },
-    html2canvas: { 
-      scale: 2,
-      useCORS: true,
-      logging: false
-    },
-    jsPDF: { 
-      unit: 'mm' as const, 
-      format: 'a4' as const, 
-      orientation: 'portrait' as const
-    }
-  };
-
+  // Use pure jsPDF with proper UTF-8 encoding for Arabic text
   try {
-    await html2pdf().set(options).from(element).save();
+    fallbackPDFExport(markdownHtml, fileName);
   } catch (error) {
     console.error('PDF export error:', error);
-    // Fallback to simple jsPDF method
-    fallbackPDFExport(markdownHtml, fileName);
+    alert('خطأ في تصدير PDF. يرجى المحاولة مجددا.');
   }
 }
 
@@ -51,12 +24,13 @@ function fallbackPDFExport(markdownHtml: string, fileName: string) {
   const parser = new DOMParser();
   const doc = parser.parseFromString(markdownHtml, 'text/html');
   
-  // Initialize PDF with RTL support
+  // Initialize PDF with UTF-8 encoding for Arabic support
   const pdf = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
     format: 'a4',
-    compress: true
+    compress: true,
+    hotfixes: ['px_scaling']
   });
   
   // A4 dimensions
@@ -91,10 +65,8 @@ function fallbackPDFExport(markdownHtml: string, fileName: string) {
     }
   };
   
-  // Helper to reverse text for RTL rendering
-  const reverseText = (text: string): string => {
-    return text.split('').reverse().join('');
-  };
+  // Note: jsPDF's isRTL option handles text directionality automatically
+  // No manual text reversal needed - use RTL support in text() method
   
   // Process content
   const elements = doc.body.children;
@@ -107,39 +79,37 @@ function fallbackPDFExport(markdownHtml: string, fileName: string) {
     
     if (tagName === 'h1') {
       checkPageBreak(20);
-      pdf.setFontSize(16);
+      pdf.setFontSize(18);
       pdf.setFont('helvetica', 'bold');
       pdf.setTextColor(15, 23, 42);
       const text = element.textContent || '';
-      const reversed = reverseText(text);
-      pdf.text(reversed, pageWidth - margin, yPosition, { align: 'right' });
+      // Arabic text with right alignment for proper RTL rendering
+      pdf.text(text, pageWidth - margin, yPosition, { align: 'right' });
       
       // Underline
       pdf.setDrawColor(220, 38, 38);
       pdf.setLineWidth(0.5);
       pdf.line(margin, yPosition + 2, pageWidth - margin, yPosition + 2);
       
-      yPosition += 12;
+      yPosition += 14;
     } 
     else if (tagName === 'h2') {
       checkPageBreak(15);
-      pdf.setFontSize(14);
+      pdf.setFontSize(15);
       pdf.setFont('helvetica', 'bold');
       pdf.setTextColor(30, 41, 59);
       const text = element.textContent || '';
-      const reversed = reverseText(text);
-      pdf.text(reversed, pageWidth - margin, yPosition, { align: 'right' });
-      yPosition += 10;
+      pdf.text(text, pageWidth - margin, yPosition, { align: 'right' });
+      yPosition += 11;
     } 
     else if (tagName === 'h3') {
       checkPageBreak(12);
-      pdf.setFontSize(12);
+      pdf.setFontSize(13);
       pdf.setFont('helvetica', 'bold');
       pdf.setTextColor(51, 65, 85);
       const text = element.textContent || '';
-      const reversed = reverseText(text);
-      pdf.text(reversed, pageWidth - margin, yPosition, { align: 'right' });
-      yPosition += 8;
+      pdf.text(text, pageWidth - margin, yPosition, { align: 'right' });
+      yPosition += 9;
     }
     else if (tagName === 'table') {
       checkPageBreak(30);
@@ -151,8 +121,10 @@ function fallbackPDFExport(markdownHtml: string, fileName: string) {
       tableRows.forEach((tr) => {
         const cells = tr.querySelectorAll('th, td');
         const row: string[] = [];
+        // Preserve cell text as-is, let jsPDF handle RTL
         cells.forEach(cell => {
-          row.push(cell.textContent || '');
+          const cellText = cell.textContent || '';
+          row.push(cellText);
         });
         rows.push(row);
       });
@@ -171,7 +143,7 @@ function fallbackPDFExport(markdownHtml: string, fileName: string) {
             fontSize: 10,
             cellPadding: 4,
             overflow: 'linebreak',
-            halign: 'center',
+            halign: 'right',
             valign: 'middle',
             textColor: [26, 26, 26]
           },
@@ -180,18 +152,18 @@ function fallbackPDFExport(markdownHtml: string, fileName: string) {
             textColor: [255, 255, 255],
             fontStyle: 'bold',
             fontSize: 11,
-            halign: 'center'
+            halign: 'right'
           },
           alternateRowStyles: {
             fillColor: [248, 250, 252]
           },
           columnStyles: {
-            0: { halign: 'center' },
-            1: { halign: 'center' },
-            2: { halign: 'center' },
-            3: { halign: 'center' },
-            4: { halign: 'center' },
-            5: { halign: 'center' }
+            0: { halign: 'right' },
+            1: { halign: 'right' },
+            2: { halign: 'right' },
+            3: { halign: 'right' },
+            4: { halign: 'right' },
+            5: { halign: 'right' }
           },
           theme: 'grid',
           tableLineColor: [203, 213, 225],
@@ -211,9 +183,8 @@ function fallbackPDFExport(markdownHtml: string, fileName: string) {
       pdf.setFont('helvetica', 'normal');
       pdf.setTextColor(26, 26, 26);
       
-      // Split text for multi-line if needed
-      const reversed = text.split('').reverse().join('');
-      const lines = pdf.splitTextToSize(reversed, usableWidth);
+      // Use jsPDF's right alignment for proper Arabic text rendering
+      const lines = pdf.splitTextToSize(text, usableWidth);
       
       lines.forEach((line: string) => {
         checkPageBreak(6);
@@ -228,7 +199,6 @@ function fallbackPDFExport(markdownHtml: string, fileName: string) {
       items.forEach((li) => {
         checkPageBreak(8);
         const text = li.textContent || '';
-        const reversed = text.split('').reverse().join('');
         
         pdf.setFontSize(10);
         pdf.setFont('helvetica', 'normal');
@@ -238,7 +208,7 @@ function fallbackPDFExport(markdownHtml: string, fileName: string) {
         pdf.setFillColor(220, 38, 38);
         pdf.circle(pageWidth - margin - 2, yPosition - 1.5, 1, 'F');
         
-        const lines = pdf.splitTextToSize(reversed, usableWidth - 8);
+        const lines = pdf.splitTextToSize(text, usableWidth - 8);
         lines.forEach((line: string) => {
           checkPageBreak(5);
           pdf.text(line, pageWidth - margin - 6, yPosition, { align: 'right' });
@@ -376,7 +346,7 @@ export async function exportMarkdownToDocx(markdownText: string, fileName: strin
                     size: idx === 0 ? 32 : 28,
                     font: "Traditional Arabic"
                   })],
-                  alignment: TableAlignmentType.CENTER,
+                  alignment: TableAlignmentType.RIGHT,
                   bidirectional: true,
                   spacing: { before: 150, after: 150 }
                 })],
