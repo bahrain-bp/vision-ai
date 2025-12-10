@@ -7,6 +7,18 @@ interface ClassificationProps {
   sessionData: SessionData;
   language?: "en" | "ar";
   onExtractedKey?: (key: string) => void;
+  persistedData?: {
+    text?: string;
+    category?: string;
+    confidence?: number | null;
+    classificationReason?: string | null;
+  } | null;
+  onDataChange?: (data: {
+    text: string;
+    category: string;
+    confidence: number | null;
+    classificationReason: string | null;
+  }) => void;
 }
 
 type LoadingState = "idle" | "upload" | "extract" | "classify" | "save";
@@ -22,20 +34,58 @@ const ALLOWED_TYPES = [
 const Classification: React.FC<ClassificationProps> = ({
   sessionData,
   language = "en",
+  persistedData,
+  onDataChange,
   onExtractedKey,
 }) => {
   const [file, setFile] = useState<File | null>(null);
-  const [text, setText] = useState<string>("");
-  const [category, setCategory] = useState<string>("");
-  const [confidence, setConfidence] = useState<number | null>(null);
+  const [text, setText] = useState<string>(() => persistedData?.text || "");
+  const [category, setCategory] = useState<string>(() => persistedData?.category || "");
+  const [confidence, setConfidence] = useState<number | null>(() =>
+    typeof persistedData?.confidence === "number" ? persistedData.confidence : null
+  );
   const [loading, setLoading] = useState<LoadingState>("idle");
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
-  const [classificationReason, setClassificationReason] = useState<string | null>(null);
+  const [classificationReason, setClassificationReason] = useState<string | null>(
+    persistedData?.classificationReason || null
+  );
 
   const isArabic = language === "ar";
   const t = (en: string, ar: string) => (isArabic ? ar : en);
   const confidenceLabel = isArabic ? "نسبة الثقة:" : "Confidence:";
+  const hydrateFromPersisted =
+    persistedData &&
+    (persistedData.text ||
+      persistedData.category ||
+      persistedData.confidence !== undefined ||
+      persistedData.classificationReason);
+
+  // hydrate from parent when available
+  useEffect(() => {
+    if (!hydrateFromPersisted) return;
+    if (persistedData?.text !== undefined) setText(persistedData.text || "");
+    if (persistedData?.category !== undefined) setCategory(persistedData.category || "");
+    if (persistedData?.confidence !== undefined) {
+      setConfidence(
+        typeof persistedData.confidence === "number" ? persistedData.confidence : null
+      );
+    }
+    if (persistedData?.classificationReason !== undefined) {
+      setClassificationReason(persistedData.classificationReason || null);
+    }
+  }, [hydrateFromPersisted, persistedData]);
+
+  // persist to parent on change
+  useEffect(() => {
+    if (!onDataChange) return;
+    onDataChange({
+      text,
+      category,
+      confidence,
+      classificationReason,
+    });
+  }, [onDataChange, text, category, confidence, classificationReason]);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const apiBase = process.env.REACT_APP_API_ENDPOINT || "";
@@ -258,7 +308,7 @@ const Classification: React.FC<ClassificationProps> = ({
     >
       {/* title + description like other tabs */}
       <div className="classification-header">
-        <h2>{t("Document Classification", "تصنيف المستند")}</h2>
+        <h2>{t("Report Classification", "تصنيف التقرير")}</h2>
         <p>
           {t(
             "Upload an investigation document, extract the key text, and view the detected category for the case.",
@@ -283,7 +333,7 @@ const Classification: React.FC<ClassificationProps> = ({
           <p className="upload-sub">
             {t(
               `PDF, Word, or TXT — up to ${MAX_FILE_SIZE_MB} MB`,
-              ` MB ${MAX_FILE_SIZE_MB} أقصى حجم - TXT او word او PDF ملفات `
+              `ملف PDF او Word او TXT - أقصى حجم ${MAX_FILE_SIZE_MB}MB`,
 
             )}
           </p>
@@ -390,5 +440,3 @@ const Classification: React.FC<ClassificationProps> = ({
 };
 
 export default Classification;
-
-
