@@ -153,6 +153,30 @@ const translations = {
       "Are you sure you want to end this session? All verification data will be lost and you'll be redirected to the homepage. This action cannot be undone.",
     "popup.confirm": "Confirm",
     "popup.cancel": "Cancel",
+
+    // RealTimeTranslation translations
+    "translation.settingsTitle": "Translation Settings",
+    "translation.waiting": "Waiting for transcription...",
+    "translation.waitingForSpeech": "Translation will start automatically when speech is detected",
+    "translation.demoNote": "Real-time translation from live transcription",
+    "translation.witnessInstruction": "Click 'Witness View' to open translation for witness",
+    "translation.pdfTitle": "Investigation Transcript - Translation",
+    "translation.exportPDF": "Download PDF",
+    "translation.exportWord": "Download Word",
+    "translation.exportMarkdown": "Markdown",
+    "translation.generating": "Generating...",
+    
+    "session.witnessView": "Witness View",
+    "session.messages": "messages",
+    "session.clearAll": "Clear All", 
+    
+    // PDFExporter translations
+    "pdf.downloadPdf": "Download PDF",
+    "pdf.downloadWord": "Download Word",
+    "pdf.downloadMarkdown": "Markdown",
+    "pdf.exportAsPdf": "Export as PDF",
+    "pdf.exportAsWord": "Export as Word Document",
+    "pdf.exportAsMarkdown": "Export as Markdown",
   },
   ar: {
     // HomePage translations
@@ -202,7 +226,7 @@ const translations = {
     "session.resume": "استئناف",
     "session.reset": "إعادة تعيين",
     "session.endSession": "إنهاء الجلسة",
-    "session.realTime": "الجلسة المرئية ",
+    "session.realTime": "ترجمة الجلسة المرئية",
     "session.processing": "المعالجة",
 
     // SessionInfo translations
@@ -296,6 +320,30 @@ const translations = {
       "هل أنت متأكد من أنك تريد إنهاء هذه الجلسة؟ سيتم فقدان جميع بيانات التحقق وسيتم إعادة توجيهك إلى الصفحة الرئيسية. لا يمكن التراجع عن هذا الإجراء.",
     "popup.confirm": "تأكيد",
     "popup.cancel": "إلغاء",
+
+    // RealTimeTranslation translations
+    "translation.settingsTitle": "إعدادات الترجمة",
+    "translation.waiting": "بانتظار الترجمة...",
+    "translation.waitingForSpeech": "ستبدأ الترجمة تلقائيًا عند التحدث",
+    "translation.demoNote": "ترجمة فورية من النص المباشر",
+    "translation.witnessInstruction": "انقر على 'شاشة المشارك' لفتح الترجمة للمشارك",
+    "translation.pdfTitle": "نسخة التحقيق - الترجمة",
+    "translation.exportPDF": "PDF تحميل",
+    "translation.exportWord": "Word تحميل",
+    "translation.exportMarkdown": "Markdown تحميل",
+    "translation.generating": "جارٍ الترجمة...",
+
+    "session.witnessView": "شاشة المشارك",
+    "session.messages": "رسائل",
+    "session.clearAll": "مسح الكل",
+    
+    // PDFExporter translations
+    "pdf.downloadPdf": "PDF تحميل",
+    "pdf.downloadWord": "Word تحميل",
+    "pdf.downloadMarkdown": "Markdown تحميل",
+    "pdf.exportAsPdf": "تصدير كملف PDF",
+    "pdf.exportAsWord": "تصدير كملف Word",
+    "pdf.exportAsMarkdown": "تصدير كملف Markdown",
   },
 };
 
