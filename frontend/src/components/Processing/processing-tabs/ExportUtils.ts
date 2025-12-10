@@ -13,17 +13,40 @@ export async function exportMarkdownToPDF(markdownHtml: string, fileName: string
   element.style.lineHeight = '1.6';
   element.style.color = '#000';
   
+  // Add CSS classes for better page break control
+  element.style.pageBreakInside = 'auto';
+  
+  // Add page break prevention for headings and their following content
+  const headings = element.querySelectorAll('h1, h2, h3');
+  headings.forEach(heading => {
+    (heading as HTMLElement).style.pageBreakAfter = 'avoid';
+    (heading as HTMLElement).style.pageBreakInside = 'avoid';
+  });
+  
+  // Prevent tables from breaking
+  const tables = element.querySelectorAll('table');
+  tables.forEach(table => {
+    (table as HTMLElement).style.pageBreakInside = 'avoid';
+  });
+  
+  // Allow paragraphs to break naturally
+  const paragraphs = element.querySelectorAll('p');
+  paragraphs.forEach(p => {
+    (p as HTMLElement).style.pageBreakInside = 'auto';
+  });
+  
   const options: any = {
     margin: [15, 15, 15, 15],
     filename: fileName,
     image: { type: 'jpeg', quality: 0.98 },
     html2canvas: { 
-      scale: 3,
+      scale: 2.5,
       useCORS: true,
       logging: false,
       letterRendering: true,
       allowTaint: true,
-      backgroundColor: '#ffffff'
+      backgroundColor: '#ffffff',
+      windowHeight: 1200
     },
     jsPDF: { 
       unit: 'mm', 
@@ -31,7 +54,12 @@ export async function exportMarkdownToPDF(markdownHtml: string, fileName: string
       orientation: 'portrait',
       compress: true
     },
-    pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+    pagebreak: { 
+      mode: ['css', 'legacy'],
+      before: '.page-break-before',
+      after: '.page-break-after',
+      avoid: ['h1', 'h2', 'h3', 'table']
+    }
   };
 
   try {
