@@ -47,10 +47,7 @@ const VerificationActions: React.FC<VerificationActionsProps> = ({
               <AlertCircle size={18} /> Maximum Attempts Reached
             </>
           ) : (
-            <>
-              {t("identity.completeVerification")}
-              <ArrowRight size={18} />
-            </>
+            <>{t("identity.completeVerification")}</>
           )}
         </button>
       )}
