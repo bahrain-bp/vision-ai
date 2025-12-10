@@ -1,26 +1,8 @@
-// LanguageToggle.tsx
 import React from "react";
 import { useLanguage } from "../../context/LanguageContext";
 
-interface LanguageToggleProps {
-  onLanguageChange?: (language: "en" | "ar") => void;
-}
-
-const LanguageToggle: React.FC<LanguageToggleProps> = ({
-  onLanguageChange,
-}) => {
+const LanguageToggle: React.FC = () => {
   const { language, toggleLanguage } = useLanguage();
-
-  const handleLanguageChange = (newLanguage: "en" | "ar") => {
-    if (newLanguage !== language) {
-      toggleLanguage();
-
-      // Notify parent component about language change
-      if (onLanguageChange) {
-        onLanguageChange(newLanguage);
-      }
-    }
-  };
 
   return (
     <div className="language-controls">
@@ -28,13 +10,13 @@ const LanguageToggle: React.FC<LanguageToggleProps> = ({
         {language === "en" ? "Language:" : "اللغة:"}
       </span>
       <button
-        onClick={() => handleLanguageChange("en")}
+        onClick={toggleLanguage}
         className={`lang-btn ${language === "en" ? "active" : ""}`}
       >
         EN
       </button>
       <button
-        onClick={() => handleLanguageChange("ar")}
+        onClick={toggleLanguage}
         className={`lang-btn ${language === "ar" ? "active" : ""}`}
       >
         AR
