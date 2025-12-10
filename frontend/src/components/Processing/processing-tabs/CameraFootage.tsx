@@ -136,8 +136,8 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
     showBanner(
       "info",
       language === "ar"
-        ? "النظام جاهز لتحميل فيديو جديد"
-        : "Ready for new video upload."
+        ? "جارٍ التحضير لتحميل فيديو جديد. يُرجى الانتظار."
+        : "Preparing for new video upload. Please wait"
     );
   };
 
