@@ -51,6 +51,7 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
     setIsExporting,
     setBanner,
     setShowResetModal,
+    resetState,
   } = useCameraFootage();
 
   const caseContext = React.useContext(CaseContext);
@@ -122,25 +123,13 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
     }
   };
 
-  // reset function for new upload
+  // Reset for new upload
   const resetForNewUpload = () => {
-    setVideoFile(null);
-    setVideoUrl(null);
-    setAnalysisResult(null);
-    setEditedResults(null);
-    setExpandedChapter(null);
-    setPollingStatus("");
-    setVideoS3Key("");
-    setVideoDuration(null);
-    setShowResetModal(false);
-    showBanner(
-      "info",
-      {
-        en: "Preparing for new video upload. Please wait",
-        ar: "جارٍ التحضير لتحميل فيديو جديد. يُرجى الانتظار.",
-      },
-      0
-    );
+    resetState();
+    showBanner("info", {
+      en: "Preparing for new video upload. Please wait...",
+      ar: "جارٍ التحضير لتحميل فيديو جديد. يُرجى الانتظار...",
+    });
   };
 
   // Helper function to automatically export results with expanded chapters

@@ -419,8 +419,8 @@ const AudioAnalysis: React.FC<AudioAnalysisProps> = ({ sessionData }) => {
   const resetForNewUpload = () => {
     resetState();
     showBanner("info", {
-      en: "Ready for new audio upload.",
-      ar: "النظام جاهز لتحميل ملف صوتي جديد.",
+      en: "Preparing for new audio upload. Please wait...",
+      ar: "جارٍ التحضير لتحميل ملف صوتي جديد. يُرجى الانتظار...",
     });
   };
 
