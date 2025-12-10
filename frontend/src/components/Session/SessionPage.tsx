@@ -18,7 +18,6 @@ import { useLanguage } from "../../context/LanguageContext";
 import { getTimeString } from "../common/Timer/Timer";
 import { TranslationProvider } from "../../context/TranslationContext";
 import { CameraFootageProvider } from "../../context/CameraFootageContext";
-import LanguageToggle from "../common/LanguageToggle";
 import { AudioAnalysisProvider } from "../../context/AudioAnalysisContext";
 
 interface TranslationSettings {
@@ -93,7 +92,6 @@ const SessionPageContent: React.FC<SessionPageProps> = ({
     useTranscription();
   
   const { saveTranslationsToS3 } = useRealTimeTranslation();
-  const { language: contextLanguage } = useLanguage();
 
   const [language, setLanguage] = useState<"en" | "ar">("en");
 
