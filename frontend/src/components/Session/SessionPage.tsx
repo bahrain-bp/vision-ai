@@ -17,6 +17,8 @@ import { useCaseContext } from "../../hooks/useCaseContext";
 import { useLanguage } from "../../context/LanguageContext";
 import { getTimeString } from "../common/Timer/Timer";
 import { CameraFootageProvider } from "../../context/CameraFootageContext";
+import LanguageToggle from "../common/LanguageToggle";
+import { AudioAnalysisProvider } from "../../context/AudioAnalysisContext";
 
 interface TranslationSettings {
   sourceLanguage: string;
@@ -361,12 +363,14 @@ const SessionPage: React.FC<SessionPageProps> = ({
             triggerSummarization={triggerSummarization}
           />
         ) : (
-          <CameraFootageProvider>
-            <ProcessingView
-              sessionData={currentSessionData}
-              language={language}
-            />
-          </CameraFootageProvider>
+          <AudioAnalysisProvider>
+            <CameraFootageProvider>
+              <ProcessingView
+                sessionData={currentSessionData}
+                language={language}
+              />
+            </CameraFootageProvider>
+          </AudioAnalysisProvider>
         )}
       </div>
 
