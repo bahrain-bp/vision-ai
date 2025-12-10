@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import RealTimeView from "../RealTime/RealTimeView";
 import ProcessingView from "../Processing/ProcessingView";
-import SessionSummaryModal from "../RealTime/SessionSummaryModal";
+
 import { User, RecordingStatus } from "../../types/";
 import { useTranscription } from "../../hooks/useTranscription";
 import { useCaseContext } from "../../hooks/useCaseContext";
@@ -18,6 +18,7 @@ import { useLanguage } from "../../context/LanguageContext";
 import { getTimeString } from "../common/Timer/Timer";
 import { TranslationProvider } from "../../context/TranslationContext";
 import { CameraFootageProvider } from "../../context/CameraFootageContext";
+
 import { AudioAnalysisProvider } from "../../context/AudioAnalysisContext";
 import LanguageToggle from "../common/LanguageToggle";
 
@@ -88,13 +89,14 @@ const SessionPageContent: React.FC<SessionPageProps> = ({
 
   const [activeMainTab, setActiveMainTab] = useState<MainTab>("real-time");
   const [sessionState, setSessionState] = useState<RecordingStatus>("off");
-  const [showSummaryModal, setShowSummaryModal] = useState<boolean>(false);
+
   const { stopRecording, toggleRecordingPause, toggleReset } =
     useTranscription();
   
   const { saveTranslationsToS3 } = useRealTimeTranslation();
+  const { language: contextLanguage } = useLanguage();
 
-  const [language, setLanguage] = useState<"en" | "ar">("en");
+  const [language, setLanguage] = useState<"en" | "ar">(contextLanguage);
 
   const [triggerSummarization, setTriggerSummarization] =
     useState<boolean>(false);
@@ -142,7 +144,7 @@ const SessionPageContent: React.FC<SessionPageProps> = ({
         status: currentSession.status,
       }
     : {
-        sessionId: "#2025-INV-0042",
+        sessionId: "No session",
         investigator: getInvestigatorName(),
         language: language === "en" ? "English" : "Arabic",
         duration: timerString,
@@ -171,14 +173,7 @@ const SessionPageContent: React.FC<SessionPageProps> = ({
     // Trigger switch to summarization tab
     setTriggerSummarization(true);
   };
-
-  const handleCloseSummary = () => {
-    setShowSummaryModal(false);
-    setSessionState("off");
-    if (onEndSession) {
-      onEndSession();
-    }
-  };
+  
 
   const handleBackToHome = () => {
     sessionCreationAttempted.current = false;
@@ -212,6 +207,7 @@ const SessionPageContent: React.FC<SessionPageProps> = ({
       if (sessionCreationAttempted.current) {
         return;
       }
+
       if (currentCase && !currentSession) {
         try {
           sessionCreationAttempted.current = true;
@@ -223,12 +219,13 @@ const SessionPageContent: React.FC<SessionPageProps> = ({
         }
       }
     };
+
     initializeSession();
   }, [currentCase, currentSession, createSession, user]);
 
   return (
     <div className="session-page-container">
-      <nav className="session-nav" dir={language === "ar" ? "rtl" : "ltr"}>
+      <nav className="session-nav">
         <div className="nav-content">
           <div className="nav-items">
             <button onClick={handleBackToHome} className="back-button">
@@ -388,16 +385,7 @@ const SessionPageContent: React.FC<SessionPageProps> = ({
         )}
       </div>
 
-      {showSummaryModal && (
-        <SessionSummaryModal
-          sessionData={currentSessionData}
-          onClose={handleCloseSummary}
-          onGenerateSummary={() => {
-            setShowSummaryModal(false);
-            setTriggerSummarization(true);
-          }}
-        />
-      )}
+
     </div>
   );
 };
