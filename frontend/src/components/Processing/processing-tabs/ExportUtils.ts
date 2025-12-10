@@ -1,6 +1,7 @@
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 import { Document, Packer, Paragraph, HeadingLevel, TextRun } from 'docx';
+import html2pdf from 'html2pdf.js';
 
 // Arabic font support for jsPDF - using built-in fonts with Unicode support
 declare module 'jspdf' {
@@ -10,6 +11,42 @@ declare module 'jspdf' {
 }
 
 export async function exportMarkdownToPDF(markdownHtml: string, fileName: string = 'report.pdf') {
+  // Use html2pdf.js for better Arabic and styling support
+  const element = document.createElement('div');
+  element.innerHTML = markdownHtml;
+  element.style.fontFamily = '"IBM Plex Sans Arabic", "Cairo", "Noto Sans Arabic", Arial, sans-serif';
+  element.style.direction = 'rtl';
+  element.style.textAlign = 'right';
+  element.style.padding = '20px';
+  element.style.fontSize = '14px';
+  element.style.lineHeight = '1.6';
+  
+  const options = {
+    margin: 15,
+    filename: fileName,
+    image: { type: 'jpeg' as const, quality: 0.98 },
+    html2canvas: { 
+      scale: 2,
+      useCORS: true,
+      logging: false
+    },
+    jsPDF: { 
+      unit: 'mm' as const, 
+      format: 'a4' as const, 
+      orientation: 'portrait' as const
+    }
+  };
+
+  try {
+    await html2pdf().set(options).from(element).save();
+  } catch (error) {
+    console.error('PDF export error:', error);
+    // Fallback to simple jsPDF method
+    fallbackPDFExport(markdownHtml, fileName);
+  }
+}
+
+function fallbackPDFExport(markdownHtml: string, fileName: string) {
   // Parse the HTML to extract structured content
   const parser = new DOMParser();
   const doc = parser.parseFromString(markdownHtml, 'text/html');
