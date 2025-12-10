@@ -23,7 +23,7 @@ interface AudioAnalysisState {
   analysisResult: AnalysisResult | null;
   banner: {
     type: "success" | "error" | "warning" | "info";
-    message: string;
+    message: string | { en: string; ar: string };
   } | null;
   showResetModal: boolean;
 }
@@ -42,7 +42,7 @@ interface AudioAnalysisContextType {
   setBanner: (
     banner: {
       type: "success" | "error" | "warning" | "info";
-      message: string;
+      message: string | { en: string; ar: string };
     } | null
   ) => void;
   setShowResetModal: (show: boolean) => void;
@@ -111,7 +111,7 @@ export const AudioAnalysisProvider: React.FC<{ children: ReactNode }> = ({
   const setBanner = (
     banner: {
       type: "success" | "error" | "warning" | "info";
-      message: string;
+      message: string | { en: string; ar: string };
     } | null
   ) => {
     setState((prev) => ({ ...prev, banner: banner }));

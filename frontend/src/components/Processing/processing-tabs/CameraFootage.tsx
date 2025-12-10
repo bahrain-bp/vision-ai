@@ -113,7 +113,7 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
   // Helper function to show banner
   const showBanner = (
     type: "success" | "error" | "warning" | "info",
-    message: string,
+    message: string | { en: string; ar: string },
     duration: number = 5000
   ) => {
     setBanner({ type, message });
@@ -135,9 +135,11 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
     setShowResetModal(false);
     showBanner(
       "info",
-      language === "ar"
-        ? "جارٍ التحضير لتحميل فيديو جديد. يُرجى الانتظار."
-        : "Preparing for new video upload. Please wait"
+      {
+        en: "Preparing for new video upload. Please wait",
+        ar: "جارٍ التحضير لتحميل فيديو جديد. يُرجى الانتظار.",
+      },
+      0
     );
   };
 
@@ -146,9 +148,10 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
     setIsExporting(true);
     showBanner(
       "info",
-      language === "ar"
-        ? "جاري تحضير تصدير ملف PDF..."
-        : "Preparing PDF export...",
+      {
+        en: "Preparing PDF export...",
+        ar: "جاري تحضير تصدير ملف PDF...",
+      },
       0
     );
 
@@ -162,19 +165,15 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
         language,
         caseId
       );
-      showBanner(
-        "success",
-        language === "ar"
-          ? "تم تصدير ملف PDF بنجاح!"
-          : "PDF exported successfully!"
-      );
+      showBanner("success", {
+        en: "PDF exported successfully!",
+        ar: "تم تصدير ملف PDF بنجاح!",
+      });
     } catch (error) {
-      showBanner(
-        "error",
-        language === "ar"
-          ? "فشل تصدير ملف PDF. يرجى المحاولة مرة أخرى."
-          : "Failed to export PDF. Please try again."
-      );
+      showBanner("error", {
+        en: "Failed to export PDF. Please try again.",
+        ar: "فشل تصدير ملف PDF. يرجى المحاولة مرة أخرى.",
+      });
     }
 
     setTimeout(() => {
@@ -321,12 +320,10 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
     }
 
     setEditedResults(updatedResults);
-    showBanner(
-      "success",
-      language === "ar"
-        ? "تم حفظ التغييرات بنجاح!"
-        : "Changes saved successfully!"
-    );
+    showBanner("success", {
+      en: "Changes saved successfully!",
+      ar: "تم حفظ التغييرات بنجاح!",
+    });
     setEditingField(null);
     setEditValue("");
   };
@@ -347,12 +344,10 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
     ];
     if (!validTypes.includes(file.type)) {
       console.log("[Debug] Invalid file type:", file.type);
-      showBanner(
-        "error",
-        language === "ar"
-          ? "يرجى تحميل ملف فيديو (MP4, AVI, أو MOV)."
-          : "Please upload a valid video file (MP4, AVI, or MOV)."
-      );
+      showBanner("error", {
+        en: "Please upload a valid video file (MP4, AVI, or MOV).",
+        ar: "يرجى تحميل ملف فيديو (MP4, AVI, أو MOV).",
+      });
       return;
     }
 
@@ -360,12 +355,10 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
     const maxSize = 2 * 1024 * 1024 * 1024;
     if (file.size > maxSize) {
       console.log("[Debug] File too large:", file.size);
-      showBanner(
-        "error",
-        language === "ar"
-          ? "ملف الفيديو كبير جداً. الحد الأقصى 2 جيجابايت."
-          : "Video file is too large. Maximum size is 2GB."
-      );
+      showBanner("error", {
+        en: "Video file is too large. Maximum size is 2GB.",
+        ar: "ملف الفيديو كبير جداً. الحد الأقصى 2 جيجابايت.",
+      });
       return;
     }
 
@@ -373,12 +366,10 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
 
     if (!isValidSessionId(sessionId)) {
       console.error("[Debug] Invalid session ID:", sessionId);
-      showBanner(
-        "error",
-        language === "ar"
-          ? "انتهت صلاحية الجلسة. يرجى تحديث الصفحة."
-          : "Session expired. Please refresh the page."
-      );
+      showBanner("error", {
+        en: "Session expired. Please refresh the page.",
+        ar: "انتهت صلاحية الجلسة. يرجى تحديث الصفحة.",
+      });
       return;
     }
 
@@ -386,7 +377,10 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
     setUploadError(null);
     showBanner(
       "info",
-      language === "ar" ? "جاري تحميل الفيديو..." : "Uploading your video...",
+      {
+        en: "Uploading your video...",
+        ar: "جاري تحميل الفيديو...",
+      },
       0
     );
 
@@ -434,19 +428,15 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
       setVideoS3Key(uploadData.s3Key);
       const url = URL.createObjectURL(file);
       setVideoUrl(url);
-      showBanner(
-        "success",
-        language === "ar"
-          ? "تم تحميل الفيديو بنجاح! النظام جاهز للتحليل."
-          : "Video uploaded successfully! Ready to analyze."
-      );
+      showBanner("success", {
+        en: "Video uploaded successfully! Ready to analyze.",
+        ar: "تم تحميل الفيديو بنجاح! النظام جاهز للتحليل.",
+      });
     } catch (error: any) {
-      showBanner(
-        "error",
-        language === "ar"
-          ? "فشل التحميل. يرجى التحقق من اتصالك والمحاولة مرة أخرى."
-          : "Upload failed. Please check your connection and try again."
-      );
+      showBanner("error", {
+        en: "Upload failed. Please check your connection and try again.",
+        ar: "فشل التحميل. يرجى التحقق من اتصالك والمحاولة مرة أخرى.",
+      });
     } finally {
       setIsUploading(false);
     }
@@ -548,12 +538,10 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
             console.error("[Debug] Analysis timed out after max attempts");
             setIsAnalyzing(false);
             setPollingStatus("");
-            showBanner(
-              "warning",
-              language === "ar"
-                ? "التحليل يستغرق وقتاً أطول من المتوقع. يرجى الانتظار أو المحاولة لاحقاً."
-                : "Analysis is taking longer than expected. Please wait or try again later."
-            );
+            showBanner("warning", {
+              en: "Analysis is taking longer than expected. Please wait or try again later.",
+              ar: "التحليل يستغرق وقتاً أطول من المتوقع. يرجى الانتظار أو المحاولة لاحقاً.",
+            });
             setAnalysisResult({
               summary:
                 language === "ar"
@@ -587,14 +575,16 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
           showBanner(
             "success",
             chaptersCount > 0
-              ? language === "ar"
-                ? `اكتمل التحليل! تم العثور على ${chaptersCount} لحظة مهمة.`
-                : `Analysis complete! Found ${chaptersCount} key moment${
+              ? {
+                  en: `Analysis complete! Found ${chaptersCount} key moment${
                     chaptersCount > 1 ? "s" : ""
-                  }.`
-              : language === "ar"
-              ? "اكتمل التحليل!"
-              : "Analysis complete!"
+                  }.`,
+                  ar: `اكتمل التحليل! تم العثور على ${chaptersCount} لحظة مهمة.`,
+                }
+              : {
+                  en: "Analysis complete!",
+                  ar: "اكتمل التحليل!",
+                }
           );
           return;
         }
@@ -608,12 +598,10 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
         } else {
           setIsAnalyzing(false);
           setPollingStatus("");
-          showBanner(
-            "error",
-            language === "ar"
-              ? "حدث خطأ ما. يرجى المحاولة مرة أخرى."
-              : "Something went wrong. Please try again."
-          );
+          showBanner("error", {
+            en: "Something went wrong. Please try again.",
+            ar: "حدث خطأ ما. يرجى المحاولة مرة أخرى.",
+          });
           setAnalysisResult({
             summary:
               language === "ar"
@@ -638,9 +626,10 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
     );
     showBanner(
       "info",
-      language === "ar"
-        ? "جاري تحضير الفيديو للتحليل..."
-        : "Preparing your video for analysis...",
+      {
+        en: "Preparing your video for analysis...",
+        ar: "جاري تحضير الفيديو للتحليل...",
+      },
       0
     );
 
@@ -687,9 +676,10 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
       );
       showBanner(
         "info",
-        language === "ar"
-          ? "جاري تحليل محتوى الفيديو..."
-          : "Analyzing video content...",
+        {
+          en: "Analyzing video content...",
+          ar: "جاري تحليل محتوى الفيديو...",
+        },
         0
       );
 
@@ -698,12 +688,10 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
       console.error("[Debug] Analysis error:", error);
       setIsAnalyzing(false);
       setPollingStatus("");
-      showBanner(
-        "error",
-        language === "ar"
-          ? "فشل بدء التحليل. يرجى المحاولة مرة أخرى."
-          : "Failed to start analysis. Please try again."
-      );
+      showBanner("error", {
+        en: "Failed to start analysis. Please try again.",
+        ar: "فشل بدء التحليل. يرجى المحاولة مرة أخرى.",
+      });
       setAnalysisResult({
         summary:
           language === "ar"
@@ -761,7 +749,13 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
               <Loader2 size={18} className="audio-spinning" />
             )}
           </span>
-          <span className="banner-message">{banner.message}</span>
+          <span className="banner-message">
+            {typeof banner.message === "string"
+              ? banner.message
+              : language === "ar"
+              ? banner.message.ar
+              : banner.message.en}
+          </span>
         </div>
       )}
 
