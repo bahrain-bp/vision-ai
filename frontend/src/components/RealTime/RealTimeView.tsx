@@ -12,7 +12,7 @@ import {
   SessionType,
   LanguagePreferences,
 } from "../../types/";
-import SummarizationReport from "./SummarizationReport";
+import SummarizationReport from "./Summarization/SummarizationReport";
 import { useLanguage } from "../../context/LanguageContext";
 
 interface SessionData {
@@ -171,7 +171,7 @@ const RealTimeView: React.FC<RealTimeViewProps> = ({
             }`}
           >
             <FileText className="btn-icon" />
-            <span>Summarization</span>
+            <span>{t('session.summarization')}</span>
           </button>
         </div>
 

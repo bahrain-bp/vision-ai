@@ -94,7 +94,7 @@ def save_to_s3(summary, user_id, case_id, session_id):
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     summary_id = f"{case_id}_{timestamp}"
     bucket = os.environ.get('BUCKET_NAME')
-    key = f"summaries/{case_id}/{session_id}/{summary_id}.json"
+    key = f"cases/{case_id}/sessions/{session_id}/summaries/{summary_id}.json"
     
     s3.put_object(
         Bucket=bucket,
