@@ -1,5 +1,6 @@
 import json
 import boto3
+import re
 import os
 import uuid
 from datetime import datetime
@@ -23,6 +24,22 @@ def handler(event, context):
         if not all([case_title, created_by]):
             return build_response(400, {
                 'error': 'Missing required fields: caseTitle, createdBy'
+            })
+        
+        
+        if not validate_input_string(case_title, 'caseTitle', 200):
+            return build_response(400, {
+                'error': 'Invalid caseTitle format'
+            })
+        
+        if not validate_input_string(created_by, 'createdBy', 100):
+            return build_response(400, {
+                'error': 'Invalid createdBy format'
+            })
+        
+        if case_description and not validate_input_string(case_description, 'caseDescription', 1000):
+            return build_response(400, {
+                'error': 'Invalid caseDescription format'
             })
         
         # Generate unique case ID 
@@ -87,4 +104,20 @@ def build_response(status_code, body):
         'body': json.dumps(body)
     }
 
+def validate_input_string(value, field_name, max_length=500):
+    """Validate user input strings to prevent injection"""
+    if not value:
+        return False
+    
+    # Check length
+    if len(value) > max_length:
+        print(f"Invalid {field_name}: exceeds maximum length of {max_length}")
+        return False
+    
+    # Prevent null bytes and control characters
+    if '\x00' in value or any(ord(char) < 32 and char not in ['\n', '\r', '\t'] for char in value):
+        print(f"Invalid {field_name}: contains invalid characters")
+        return False
+    
+    return True
 

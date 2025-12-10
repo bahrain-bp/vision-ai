@@ -1,13 +1,13 @@
 import React, { useEffect, useRef } from 'react';
 import { useRealTimeTranslation } from '../../hooks/useRealTimeTranslation';
-import { Globe, Trash2, Eye } from 'lucide-react';
+import { Globe, Eye } from 'lucide-react'; 
 import TranslationSettings from './TranslationSettings';
-import PDFExporter from './TranslationPDFExporter'; 
+import PDFExporter from './TranslationPDFExporter';
+import { useLanguage } from '../../context/LanguageContext';
 
 const RealTimeTranslation: React.FC = () => {
   const {
     translations,
-    clearConversation,
     isTranslating,
     error,
     investigatorLanguage,
@@ -16,20 +16,18 @@ const RealTimeTranslation: React.FC = () => {
     setWitnessLanguage
   } = useRealTimeTranslation();
 
-  // Auto-scroll refs
+  const { t } = useLanguage();
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const translationContainerRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll to bottom when new translations arrive
   useEffect(() => {
     if (translationContainerRef.current) {
       const container = translationContainerRef.current;
-      // Directly set the scroll position to the bottom of the container
       container.scrollTop = container.scrollHeight;
     }
   }, [translations]);
 
-  // Generate transcript text for PDF export 
   const generateTranscriptText = () => {
     if (translations.length === 0) return '';
     
@@ -60,7 +58,7 @@ const RealTimeTranslation: React.FC = () => {
       <div className="card-header">
         <div className="header-left">
           <Globe className="header-icon" />
-          <h3 className="card-title">Real-Time Translation</h3>
+          <h3 className="card-title">{t("session.realTime")}</h3>
         </div>
       </div>
 
@@ -77,36 +75,26 @@ const RealTimeTranslation: React.FC = () => {
 
       <div className="translation-controls">
         <button
-          onClick={clearConversation}
-          disabled={translations.length === 0}
-          className="control-btn secondary"
-          title="Clear Conversation"
-        >
-          <Trash2 size={16} />
-          <span>Clear All</span>
-        </button>
-
-        <button
           onClick={openWitnessWindow}
           className="control-btn witness-btn"
-          title="Open Witness Window"
+          title={t("session.witnessView")}
         >
           <Eye size={16} />
-          <span>Witness View</span>
+          <span>{t("session.witnessView")}</span>
         </button>
 
         <div className="conversation-status">
           {isTranslating ? (
             <span className="status-active">
-              Translating...
+              {t("session.processing")}
             </span>
           ) : translations.length > 0 ? (
             <span className="status-active">
-              Live • {translations.length} messages
+              {t("session.live")} • {translations.length} {t("session.messages")}
             </span>
           ) : (
             <span className="status-waiting">
-              Waiting for transcription...
+              {t("translation.waiting")}
             </span>
           )}
         </div>
@@ -119,9 +107,9 @@ const RealTimeTranslation: React.FC = () => {
         {translations.length === 0 ? (
           <div className="empty-state">
             <Globe size={48} className="empty-icon" />
-            <p>Translation will start automatically when speech is detected</p>
-            <p className="demo-note">Real-time translation from live transcription</p>
-            <p className="demo-note">Click "Witness View" to open translation for witness</p>
+            <p>{t("translation.waitingForSpeech")}</p>
+            <p className="demo-note">{t("translation.demoNote")}</p>
+            <p className="demo-note">{t("translation.witnessInstruction")}</p>
           </div>
         ) : (
           <div className="translation-messages">
@@ -146,7 +134,7 @@ const RealTimeTranslation: React.FC = () => {
       <div className="action-buttons">
         <PDFExporter
           transcript={generateTranscriptText()}
-          title={"Investigation Transcript - Translation"}
+          title={t("translation.pdfTitle")}
           fileName={"translation-transcript"}
           sessionDate={new Date().toLocaleDateString()}
         />
@@ -155,17 +143,17 @@ const RealTimeTranslation: React.FC = () => {
       {translations.length > 0 && (
         <div className="translation-stats">
           <div className="stat-item">
-            <span className="stat-label">Total:</span>
+            <span className="stat-label">{t("sessionInfo.statistics")}:</span>
             <span className="stat-value">{translations.length}</span>
           </div>
           <div className="stat-item">
-            <span className="stat-label">Investigator:</span>
+            <span className="stat-label">{t("session.investigator")}:</span>
             <span className="stat-value">
               {translations.filter(t => t.speaker === 'Investigator').length}
             </span>
           </div>
           <div className="stat-item">
-            <span className="stat-label">Witness:</span>
+            <span className="stat-label">{t("identity.witness")}:</span>
             <span className="stat-value">
               {translations.filter(t => t.speaker === 'Witness').length}
             </span>

@@ -2,10 +2,10 @@ import React, { useEffect, useState } from "react";
 import { Loader } from "lucide-react";
 import "../../ProcessingView.css";
 
-// import processing tab components
 import Classification from "./processing-tabs/Classification";
 import Rewrite from "./processing-tabs/Rewrite";
 import CameraFootage from "./processing-tabs/CameraFootage";
+import AudioAnalysis from "./processing-tabs/AudioAnalysis";
 import AISuggestions from "./processing-tabs/AISuggestions/AISuggestions";
 import Contradictions from "./processing-tabs/Contradiction/Contradictions";
 import Outcome from "./processing-tabs/Outcome";
@@ -41,6 +41,12 @@ const ProcessingView: React.FC<ProcessingViewProps> = ({
     sessionData.extractedTextKey
   );
 
+  // State persistence for AI Suggestions
+  const [aiSuggestionsData, setAiSuggestionsData] = useState<any>(null);
+
+  // State persistence for Outcome
+  const [outcomeData, setOutcomeData] = useState<any>(null);
+
   useEffect(() => {
     setExtractedTextKey(sessionData.extractedTextKey);
   }, [sessionData.sessionId, sessionData.extractedTextKey]);
@@ -56,32 +62,51 @@ const ProcessingView: React.FC<ProcessingViewProps> = ({
 
   const tabs: Tab[] = [
     {
-       id: "Classification",
-       label: language === "en" ? "Classification" : "التصنيف",
-       render: () => (
-         <Classification
-           sessionData={sessionWithKey}
-           language={language}
-           onExtractedKey={handleExtractedKey}
-         />
-       ),
-       },
-    { 
-      id: "Rewrite",
-      label: language === "en" ? "Rewrite" : "إعادة صياغة التقرير",
-      render: () => <Rewrite sessionData={sessionWithKey} selectedLanguage={language} />,
-     },
-    { id: "AISuggestions",
-     label: language === "en" ? "AI Suggestions" : "اقتراحات الذكاء الاصطناعي",
-     render: () => <AISuggestions sessionData={sessionWithKey} />,
-    },
-    {
-      id: "CameraFootage",
-      label: language === "en" ? "Camera Footage" : "تحليل الفيديوهات ",
+      id: "Classification",
+      label: language === "en" ? "Classification" : "التصنيف",
       render: () => (
-        <CameraFootage sessionData={sessionData} language={language} />
+        <Classification
+          sessionData={sessionWithKey}
+          language={language}
+          onExtractedKey={handleExtractedKey}
+        />
       ),
     },
+    {
+      id: "Rewrite",
+      label: language === "en" ? "Rewrite" : "إعادة صياغة التقرير",
+      render: () => (
+        <Rewrite sessionData={sessionWithKey} selectedLanguage={language} />
+      ),
+    },
+    {
+      id: "CameraFootageAudioAnalysis",
+      label:
+        language === "en" ? "Video & Audio Analysis" : "تحليل مرئي و صوتي ",
+      render: () => (
+        <>
+          <div className="tab-content">
+            <CameraFootage sessionData={sessionData} />
+          </div>
+          <div className="tab-content">
+            <AudioAnalysis sessionData={sessionData} />
+          </div>
+        </>
+      ),
+    },
+    {
+      id: "AISuggestions",
+      label: language === "en" ? "AI Suggestions" : "اقتراحات الذكاء الاصطناعي",
+      render: () => (
+        <AISuggestions
+          sessionData={sessionWithKey}
+          language={language}
+          persistedData={aiSuggestionsData}
+          onDataChange={setAiSuggestionsData}
+        />
+      ),
+    },
+
     {
       id: "Contradictions",
       label: language === "en" ? "Contradictions" : "التناقضات",
@@ -89,8 +114,15 @@ const ProcessingView: React.FC<ProcessingViewProps> = ({
     },
     {
       id: "Outcome",
-      label: language === "en" ? "Outcome" : "الإدانة",
-      render: () => <Outcome />,
+      label: language === "en" ? "Outcome" : "النتيجة",
+      render: () => (
+        <Outcome
+          sessionData={sessionWithKey}
+          language={language}
+          persistedData={outcomeData}
+          onDataChange={setOutcomeData}
+        />
+      ),
     },
   ];
 
@@ -148,13 +180,17 @@ const ProcessingView: React.FC<ProcessingViewProps> = ({
         ))}
       </div>
 
-      <div
-        className={`tab-content ${
-          isAISuggestionsActive ? "ai-tab-content" : ""
-        }`}
-      >
-        {renderTabContent()}
-      </div>
+      {activeTab === "CameraFootageAudioAnalysis" ? (
+        renderTabContent()
+      ) : (
+        <div
+          className={`tab-content ${
+            isAISuggestionsActive ? "ai-tab-content" : ""
+          }`}
+        >
+          {renderTabContent()}
+        </div>
+      )}
     </div>
   );
 };

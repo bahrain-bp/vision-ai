@@ -13,23 +13,13 @@ import SessionSummaryModal from "../RealTime/SessionSummaryModal";
 import { User, RecordingStatus } from "../../types/";
 import { useTranscription } from "../../hooks/useTranscription";
 import { useCaseContext } from "../../hooks/useCaseContext";
-
+import { useRealTimeTranslation } from "../../hooks/useRealTimeTranslation";
 import { useLanguage } from "../../context/LanguageContext";
 import { getTimeString } from "../common/Timer/Timer";
-
+import { TranslationProvider } from "../../context/TranslationContext";
 import { CameraFootageProvider } from "../../context/CameraFootageContext";
-
-
-interface ParticipantData {
-  fullName: string;
-  idNumber: string;
-}
-interface IdentityData {
-  referencePhoto: File | null;
-  cpr: File | null;
-  passport: File | null;
-  isVerified: boolean;
-}
+import LanguageToggle from "../common/LanguageToggle";
+import { AudioAnalysisProvider } from "../../context/AudioAnalysisContext";
 
 interface TranslationSettings {
   sourceLanguage: string;
@@ -37,20 +27,16 @@ interface TranslationSettings {
 }
 
 interface SetupData {
-  witnessData: ParticipantData;
-  identityData: IdentityData;
   translationSettings: TranslationSettings;
 }
 
 interface SessionData {
   sessionId: string;
   investigator: string;
+  participant: string;
   language: string;
   duration: string;
-  participant: string;
   status: string;
-  participantData?: ParticipantData;
-  identityData?: IdentityData;
   translationSettings?: TranslationSettings;
 }
 
@@ -63,7 +49,27 @@ interface SessionPageProps {
 
 type MainTab = "real-time" | "processing";
 
+// OUTER COMPONENT - Only provides the context
 const SessionPage: React.FC<SessionPageProps> = ({
+  user,
+  onSignOut,
+  sessionData,
+  onEndSession,
+}) => {
+  return (
+    <TranslationProvider investigatorLanguage="en" witnessLanguage="ar">
+      <SessionPageContent
+        user={user}
+        onSignOut={onSignOut}
+        sessionData={sessionData}
+        onEndSession={onEndSession}
+      />
+    </TranslationProvider>
+  );
+};
+
+// INNER COMPONENT - Has all the logic and uses the hook
+const SessionPageContent: React.FC<SessionPageProps> = ({
   user,
   onSignOut,
   sessionData,
@@ -77,6 +83,7 @@ const SessionPage: React.FC<SessionPageProps> = ({
     updateSessionStatus,
     setCurrentSession,
     setCurrentPersonName,
+    setCurrentPersonType,
   } = useCaseContext();
 
   const [activeMainTab, setActiveMainTab] = useState<MainTab>("real-time");
@@ -84,6 +91,9 @@ const SessionPage: React.FC<SessionPageProps> = ({
   const [showSummaryModal, setShowSummaryModal] = useState<boolean>(false);
   const { stopRecording, toggleRecordingPause, toggleReset } =
     useTranscription();
+  
+  const { saveTranslationsToS3 } = useRealTimeTranslation();
+  const { language: contextLanguage } = useLanguage();
 
   const [language, setLanguage] = useState<"en" | "ar">("en");
 
@@ -95,16 +105,6 @@ const SessionPage: React.FC<SessionPageProps> = ({
   const [timerString, setTimerString] = useState("00:00:00");
 
   const [setupData, setSetupData] = useState<SetupData>({
-    witnessData: {
-      fullName: sessionData?.participantData?.fullName || "",
-      idNumber: sessionData?.participantData?.idNumber || "",
-    },
-    identityData: {
-      referencePhoto: sessionData?.identityData?.referencePhoto || null,
-      cpr: sessionData?.identityData?.cpr || null,
-      passport: sessionData?.identityData?.passport || null,
-      isVerified: sessionData?.identityData?.isVerified || false,
-    },
     translationSettings: {
       sourceLanguage: sessionData?.translationSettings?.sourceLanguage || "ar",
       targetLanguage: sessionData?.translationSettings?.targetLanguage || "en",
@@ -139,7 +139,7 @@ const SessionPage: React.FC<SessionPageProps> = ({
         investigator: currentSession.investigator || getInvestigatorName(),
         language: language === "en" ? "English" : "Arabic",
         duration: timerString,
-        participant: setupData.witnessData.fullName || "Not set",
+        participant: "",
         status: currentSession.status,
       }
     : {
@@ -147,21 +147,18 @@ const SessionPage: React.FC<SessionPageProps> = ({
         investigator: getInvestigatorName(),
         language: language === "en" ? "English" : "Arabic",
         duration: timerString,
-        participant: "Not set",
+        participant: "",
         status: "Active",
       };
-
-  useEffect(() => {
-    if (setupData.witnessData.fullName) {
-      currentSessionData.participant = setupData.witnessData.fullName;
-    }
-  }, [setupData.witnessData.fullName]);
-
+  
   const handleEndSession = async () => {
     stopRecording(setSessionState);
 
+    await saveTranslationsToS3();
+
     if (currentSession && currentCase) {
       try {
+        
         await updateSessionStatus(
           currentCase.caseId,
           currentSession.sessionId,
@@ -171,12 +168,9 @@ const SessionPage: React.FC<SessionPageProps> = ({
         console.error("Failed to update session status:", error);
       }
     }
-    setCurrentSession(null);
-    setCurrentPersonName(null);
 
     // Trigger switch to summarization tab
     setTriggerSummarization(true);
-    setShowSummaryModal(true);
   };
 
   const handleCloseSummary = () => {
@@ -191,31 +185,12 @@ const SessionPage: React.FC<SessionPageProps> = ({
     sessionCreationAttempted.current = false;
     setCurrentSession(null);
     setCurrentPersonName(null);
+    setCurrentPersonType(null);
     if (onEndSession) {
       onEndSession();
     } else {
       onSignOut();
     }
-  };
-
-  const updateWitnessData = (field: keyof ParticipantData, value: string) => {
-    setSetupData((prev) => ({
-      ...prev,
-      witnessData: {
-        ...prev.witnessData,
-        [field]: value,
-      },
-    }));
-  };
-
-  const updateIdentityData = (field: keyof IdentityData, value: any) => {
-    setSetupData((prev) => ({
-      ...prev,
-      identityData: {
-        ...prev.identityData,
-        [field]: value,
-      },
-    }));
   };
 
   const updateTranslationSettings = (
@@ -231,19 +206,6 @@ const SessionPage: React.FC<SessionPageProps> = ({
     }));
   };
 
-  const handleVerifyIdentity = () => {
-    if (!setupData.witnessData.fullName) {
-      alert("Please enter witness full name.");
-      return;
-    }
-    if (!setupData.identityData.referencePhoto) {
-      alert("Please upload a reference photo.");
-      return;
-    }
-    updateIdentityData("isVerified", true);
-    alert("Identity verification completed successfully!");
-  };
-
   const sessionCreationAttempted = React.useRef(false);
 
   useEffect(() => {
@@ -255,7 +217,7 @@ const SessionPage: React.FC<SessionPageProps> = ({
         try {
           sessionCreationAttempted.current = true;
           const investigator = getInvestigatorName();
-          await createSession(currentCase.caseId, investigator, "witness");
+          await createSession(currentCase.caseId, investigator);
         } catch (error) {
           console.error("Failed to create session:", error);
           sessionCreationAttempted.current = false;
@@ -423,20 +385,19 @@ const SessionPage: React.FC<SessionPageProps> = ({
             sessionState={sessionState}
             setSessionState={setSessionState}
             sessionData={currentSessionData}
-            setupData={setupData}
-            onWitnessDataChange={updateWitnessData}
-            onIdentityDataChange={updateIdentityData}
+            translationSettings={setupData.translationSettings}
             onTranslationSettingsChange={updateTranslationSettings}
-            onVerifyIdentity={handleVerifyIdentity}
             triggerSummarization={triggerSummarization}
           />
         ) : (
-          <CameraFootageProvider>
-            <ProcessingView
-              sessionData={currentSessionData}
-              language={language}
-            />
-          </CameraFootageProvider>
+          <AudioAnalysisProvider>
+            <CameraFootageProvider>
+              <ProcessingView
+                sessionData={currentSessionData}
+                language={language}
+              />
+            </CameraFootageProvider>
+          </AudioAnalysisProvider>
         )}
       </div>
 

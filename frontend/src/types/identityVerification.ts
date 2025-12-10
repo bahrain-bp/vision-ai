@@ -1,5 +1,5 @@
 // ==========================================
-// PERSON TYPES
+// Type Enumerations
 // ==========================================
 
 export type PersonType = "witness" | "accused" | "victim";
