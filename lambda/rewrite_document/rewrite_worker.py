@@ -221,6 +221,30 @@ def preprocess_input_text(text: str) -> str:
     text = re.sub(r'[ΓòΓöΓÇ]{3,}', '', text)  # Garbled encoding
     text = re.sub(r'[\x00-\x08\x0B-\x0C\x0E-\x1F]', '', text)  # Control characters
     
+    # Step 8: Fix common table formatting issues
+    # Remove table separators that OCR might duplicate
+    text = re.sub(r'(?m)^[\-\|=\s]+$', '', text)  # Lines with only separators
+    text = re.sub(r'(?m)^\s*\|\s*\|\s*\|\s*\|\s*$', '', text)  # Empty table rows
+    
+    # Step 9: Normalize person ID numbers (ensure they're digit-only)
+    # Keep the original format but warn if suspicious patterns found
+    id_matches = re.findall(r'\b\d{9,10}\b', text)
+    if id_matches:
+        logger.info(f"📋 Found {len(id_matches)} ID numbers in document")
+    
+    # Step 10: Fix common Arabic OCR issues
+    # Replace common misread characters
+    text = text.replace('آ', 'أ')  # Normalize alef variants in names
+    text = text.replace('إ', 'أ')
+    text = re.sub(r'ـ+', '', text)  # Remove Arabic tatweel (elongation)
+    
+    # Step 11: Detect and warn about mixed data (different case numbers)
+    case_numbers = re.findall(r'\b\d{4,6}/\d{4}\b', text)
+    unique_cases = set(case_numbers)
+    if len(unique_cases) > 1:
+        logger.warning(f"⚠️ WARNING: Multiple case numbers detected: {unique_cases}")
+        logger.warning(f"⚠️ Document may contain mixed data from different cases!")
+    
     logger.info(f"✅ Preprocessing complete. Cleaned text length: {len(text)}")
     return text.strip()
 
@@ -286,6 +310,11 @@ def build_rewrite_prompts(original_text: str) -> Tuple[str, str]:
         "- وجود تصوير أمني (نعم / لا / غير مذكور):\n"
         "- رغبة الأطراف في الصلح (نعم / لا / غير مذكور):\n\n"
         "## الأطراف\n\n"
+        "⚠️ **مهم جداً: التحقق من دقة بيانات الأطراف**\n"
+        "- قبل إضافة أي شخص في الجدول، تأكد من وجود اسمه **حرفياً** في النص الأصلي أعلاه.\n"
+        "- تحقق من أن كل رقم شخصي مذكور في الجدول **موجود بالفعل** في النص الأصلي.\n"
+        "- إذا وجدت شخصاً مذكوراً باسم مختلف في مكانين (مثل: علي محمد في صفحة، وعلي محمد علي في صفحة أخرى)، اختر الاسم الأكثر اكتمالاً.\n"
+        "- **لا تضف أي شخص من ذاكرتك أو من قضايا أخرى**.\n\n"
         "اكتب جدول Markdown واحد لكل الأطراف المذكورين في الملف، "
         "بغض النظر عن مكان ظهورهم في الجداول أو المحاضر. هذا هو **الجدول الوحيد المسموح** في التقرير:\n\n"
         "| الصفة | الاسم الكامل | الجنسية | الرقم الشخصي | الهاتف | ملاحظات |\n"
