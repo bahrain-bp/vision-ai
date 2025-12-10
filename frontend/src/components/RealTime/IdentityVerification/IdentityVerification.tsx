@@ -40,8 +40,14 @@ const IdentityVerification: React.FC<IdentityVerificationProps> = ({
   const handleStartInvestigation = useCallback(
     (extractedPersonName?: string) => {
       const investigationData: InvestigationData = {
-        participant: extractedPersonName || "Name to be extracted",
+        witness: extractedPersonName || "Name to be extracted",
+        idNumber: "To be extracted",
         identityData: identityData,
+        investigator: "M. AlZebari",
+        duration: "00:00",
+        status: "Ready",
+        caseId: currentCase?.caseId || "",
+        sessionId: currentSession?.sessionId || "",
       };
 
       console.log("Starting investigation with data:", investigationData);

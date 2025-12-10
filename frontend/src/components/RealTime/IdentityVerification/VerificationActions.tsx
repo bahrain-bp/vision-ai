@@ -20,8 +20,11 @@ const VerificationActions: React.FC<VerificationActionsProps> = ({
   isVerifying,
   verificationAttempts,
   maxAttempts,
+
   isVerificationDisabled,
+
   onCompleteVerification,
+
   onStartInvestigation,
   t,
 }) => {

@@ -12,7 +12,7 @@ import {
   SessionType,
   LanguagePreferences,
 } from "../../types/";
-import SummarizationReport from "./SummarizationReport";
+import SummarizationReport from "./Summarization/SummarizationReport";
 import { useLanguage } from "../../context/LanguageContext";
 
 interface SessionData {
@@ -156,7 +156,9 @@ const RealTimeView: React.FC<RealTimeViewProps> = ({
             onClick={() => setActiveTab("transcription")}
             className={`sidebar-btn ${
               activeTab === "transcription" ? "active" : ""
-            }`}
+            }${!isIdentityVerified ? "disabled" : ""}`}
+            
+            disabled={!isIdentityVerified}
           >
             <User className="btn-icon" />
             <span>Transcription & Translation</span>
@@ -169,7 +171,7 @@ const RealTimeView: React.FC<RealTimeViewProps> = ({
             }`}
           >
             <FileText className="btn-icon" />
-            <span>Summarization</span>
+            <span>{t('session.summarization')}</span>
           </button>
         </div>
 

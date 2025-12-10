@@ -1,5 +1,14 @@
 import React, { useRef } from "react";
-import { Pencil, Check, X, AlertTriangle } from "lucide-react";
+import {
+  Pencil,
+  Check,
+  X,
+  Video,
+  Loader2,
+  CheckCircle,
+  AlertCircle,
+  AlertTriangle,
+} from "lucide-react";
 import "../../../ProcessingView.css";
 import { SessionData } from "../ProcessingView";
 import { exportAnalysisResultsAsPDF } from "../../../services/CamFootageAnalysis/AnalysisPdfExportService";
@@ -8,10 +17,11 @@ import {
   ChapterData,
 } from "../../../context/CameraFootageContext";
 import { CaseContext } from "../../../context/CaseContext";
+import { useLanguage } from "../../../context/LanguageContext";
 
 interface CameraFootageProps {
   sessionData: SessionData;
-  language: "en" | "ar";
+  //language: "en" | "ar";
 }
 
 interface TranslatedText {
@@ -21,8 +31,9 @@ interface TranslatedText {
 
 const CameraFootage: React.FC<CameraFootageProps> = ({
   sessionData: _sessionData,
-  language,
+  //language,
 }) => {
+  const { language } = useLanguage();
   // Use context instead of local state
   const {
     state,
@@ -743,10 +754,12 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
       {banner && (
         <div className={`notification-banner banner-${banner.type}`}>
           <span className="banner-icon">
-            {banner.type === "success"}
-            {banner.type === "error"}
-            {banner.type === "warning"}
-            {banner.type === "info"}
+            {banner.type === "success" && <CheckCircle size={18} />}
+            {banner.type === "error" && <AlertCircle size={18} />}
+            {banner.type === "warning" && <AlertCircle size={18} />}
+            {banner.type === "info" && (
+              <Loader2 size={18} className="audio-spinning" />
+            )}
           </span>
           <span className="banner-message">{banner.message}</span>
         </div>
@@ -765,7 +778,7 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
             <p className="modal-message">
               {language === "ar"
                 ? "نتائج التحليل الحالية ستفقد. قم بتصديرها إذا كنت تود الاحتفاظ بها"
-                : "Your current analysis results will be lost. Export the report as PDF if you want to keep them."}
+                : "Your current analysis results will be lost. Export the report as PDF if you wish to keep them."}
             </p>
             <div className="modal-actions">
               <button
@@ -790,8 +803,8 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
       </div>
       <p className="camera-description" dir={language === "ar" ? "rtl" : "ltr"}>
         {language === "ar"
-          ? "*قم بتحميل وتحليل فيديوهات المراقبة لاستخراج الأدلة"
-          : "*Upload and analyze surveillance footage for evidence extraction"}
+          ? "* قم بتحميل وتحليل فيديوهات المراقبة لاستخراج الأدلة"
+          : "* Upload and analyze surveillance footage for evidence extraction"}
       </p>
 
       <div className="camera-footage-container">
@@ -816,7 +829,9 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
                 />
                 <label htmlFor="video-upload" className="upload-label">
                   <div className="upload-content">
-                    <div className="upload-icon-cam">📹</div>
+                    <div className="upload-icon-cam">
+                      <Video size={50} color="#22417b" />
+                    </div>
                     <div className="upload-text">
                       {language === "ar"
                         ? "تحميل ملف فيديو"
@@ -1589,8 +1604,8 @@ const CameraFootage: React.FC<CameraFootageProps> = ({
               <div className="no-results">
                 <p dir={language === "ar" ? "rtl" : "ltr"}>
                   {language === "ar"
-                    ? "قم بتحميل فيديو لبدء التحليل"
-                    : "Upload a video to start analysis"}
+                    ? "الرجاء قم بتحميل فيديو لبدء التحليل"
+                    : "Please upload a video to start analysis"}
                 </p>
               </div>
             )}
