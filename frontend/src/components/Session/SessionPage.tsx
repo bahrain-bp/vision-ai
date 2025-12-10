@@ -19,6 +19,7 @@ import { getTimeString } from "../common/Timer/Timer";
 import { TranslationProvider } from "../../context/TranslationContext";
 import { CameraFootageProvider } from "../../context/CameraFootageContext";
 import { AudioAnalysisProvider } from "../../context/AudioAnalysisContext";
+import LanguageToggle from "../common/LanguageToggle";
 
 interface TranslationSettings {
   sourceLanguage: string;
@@ -271,21 +272,9 @@ const SessionPageContent: React.FC<SessionPageProps> = ({
 
             <div className="nav-controls">
               <div className="language-controls">
-                <span className="language-label">
-                  {language === "ar" ? "اللغة:" : "Language:"}
-                </span>
-                <button
-                  className={`lang-btn ${language === "en" ? "active" : ""}`}
-                  onClick={() => setLanguage("en")}
-                >
-                  EN
-                </button>
-                <button
-                  className={`lang-btn ${language === "ar" ? "active" : ""}`}
-                  onClick={() => setLanguage("ar")}
-                >
-                  AR
-                </button>
+                <LanguageToggle
+                  onLanguageChange={(lang) => setLanguage(lang)}
+                />
               </div>
               <div className="time-display">
                 <Clock className="icon" />
