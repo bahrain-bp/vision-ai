@@ -191,7 +191,11 @@ class CaseManagementStack(Stack):
             apigateway.LambdaIntegration(create_session_lambda),
             authorization_type=apigateway.AuthorizationType.NONE
         )
-        
+
+        # Expose resources for other stacks to reference
+        self.cases_resource = cases_resource
+        self.case_by_id_resource = case_resource
+
         # ==========================================
         # OUTPUTS
         # ==========================================
