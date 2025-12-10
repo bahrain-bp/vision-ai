@@ -17,8 +17,9 @@ import { useCaseContext } from "../../hooks/useCaseContext";
 import { useLanguage } from "../../context/LanguageContext";
 import { getTimeString } from "../common/Timer/Timer";
 import { CameraFootageProvider } from "../../context/CameraFootageContext";
-import LanguageToggle from "../common/LanguageToggle";
+
 import { AudioAnalysisProvider } from "../../context/AudioAnalysisContext";
+import LanguageToggle from "../common/LanguageToggle";
 
 interface TranslationSettings {
   sourceLanguage: string;
@@ -70,8 +71,9 @@ const SessionPage: React.FC<SessionPageProps> = ({
   const [showSummaryModal, setShowSummaryModal] = useState<boolean>(false);
   const { stopRecording, toggleRecordingPause, toggleReset } =
     useTranscription();
+  const { language: contextLanguage } = useLanguage();
 
-  const [language, setLanguage] = useState<"en" | "ar">("en");
+  const [language, setLanguage] = useState<"en" | "ar">(contextLanguage);
 
   const [triggerSummarization, setTriggerSummarization] =
     useState<boolean>(false);
@@ -202,7 +204,7 @@ const SessionPage: React.FC<SessionPageProps> = ({
 
   return (
     <div className="session-page-container">
-      <nav className="session-nav" dir={language === "ar" ? "rtl" : "ltr"}>
+      <nav className="session-nav">
         <div className="nav-content">
           <div className="nav-items">
             <button onClick={handleBackToHome} className="back-button">
@@ -246,21 +248,9 @@ const SessionPage: React.FC<SessionPageProps> = ({
 
             <div className="nav-controls">
               <div className="language-controls">
-                <span className="language-label">
-                  {language === "ar" ? "اللغة:" : "Language:"}
-                </span>
-                <button
-                  className={`lang-btn ${language === "en" ? "active" : ""}`}
-                  onClick={() => setLanguage("en")}
-                >
-                  EN
-                </button>
-                <button
-                  className={`lang-btn ${language === "ar" ? "active" : ""}`}
-                  onClick={() => setLanguage("ar")}
-                >
-                  AR
-                </button>
+                <LanguageToggle
+                  onLanguageChange={(lang) => setLanguage(lang)}
+                />
               </div>
               <div className="time-display">
                 <Clock className="icon" />
