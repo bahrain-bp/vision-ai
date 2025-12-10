@@ -27,6 +27,7 @@ app = cdk.App()
 required_vars = {
     "AWS_ACCOUNT_ID": os.getenv("AWS_ACCOUNT_ID"),
     "AWS_REGION": os.getenv("AWS_REGION"),
+    "INVESTIGATION_BUCKET_NAME": os.getenv("INVESTIGATION_BUCKET_NAME"),
 }
 
 missing_vars = [var for var, value in required_vars.items() if not value]
@@ -61,6 +62,7 @@ shared_stack = SharedInfrastructureStack(
     app,
     f"{app_name}-shared-infrastructure-stack",
     env=env,
+    bucket_name=required_vars["INVESTIGATION_BUCKET_NAME"],
     description="Shared resources: S3 bucket and API Gateway for all features",
 )
 
