@@ -13,10 +13,10 @@ import SessionSummaryModal from "../RealTime/SessionSummaryModal";
 import { User, RecordingStatus } from "../../types/";
 import { useTranscription } from "../../hooks/useTranscription";
 import { useCaseContext } from "../../hooks/useCaseContext";
-
+import { useRealTimeTranslation } from "../../hooks/useRealTimeTranslation";
 import { useLanguage } from "../../context/LanguageContext";
 import { getTimeString } from "../common/Timer/Timer";
-
+import { TranslationProvider } from "../../context/TranslationContext";
 import { CameraFootageProvider } from "../../context/CameraFootageContext";
 
 interface TranslationSettings {
@@ -47,7 +47,27 @@ interface SessionPageProps {
 
 type MainTab = "real-time" | "processing";
 
+// OUTER COMPONENT - Only provides the context
 const SessionPage: React.FC<SessionPageProps> = ({
+  user,
+  onSignOut,
+  sessionData,
+  onEndSession,
+}) => {
+  return (
+    <TranslationProvider investigatorLanguage="en" witnessLanguage="ar">
+      <SessionPageContent
+        user={user}
+        onSignOut={onSignOut}
+        sessionData={sessionData}
+        onEndSession={onEndSession}
+      />
+    </TranslationProvider>
+  );
+};
+
+// INNER COMPONENT - Has all the logic and uses the hook
+const SessionPageContent: React.FC<SessionPageProps> = ({
   user,
   onSignOut,
   sessionData,
@@ -67,6 +87,8 @@ const SessionPage: React.FC<SessionPageProps> = ({
   const [showSummaryModal, setShowSummaryModal] = useState<boolean>(false);
   const { stopRecording, toggleRecordingPause, toggleReset } =
     useTranscription();
+  
+  const { saveTranslationsToS3 } = useRealTimeTranslation();
 
   const [language, setLanguage] = useState<"en" | "ar">("en");
 
@@ -123,12 +145,15 @@ const SessionPage: React.FC<SessionPageProps> = ({
         participant: "",
         status: "Active",
       };
-
+  
   const handleEndSession = async () => {
     stopRecording(setSessionState);
 
+    await saveTranslationsToS3();
+
     if (currentSession && currentCase) {
       try {
+        
         await updateSessionStatus(
           currentCase.caseId,
           currentSession.sessionId,

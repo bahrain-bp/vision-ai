@@ -6,12 +6,22 @@ export interface TranslationResult {
   originalText: string;
   originalLanguage: string;        // Language the speaker actually spoke in
   speaker: string;                 // "Investigator" or "Witness"
-  
   // What each person sees
   investigatorDisplay: string;     // What investigator sees (translated if witness spoke)
   witnessDisplay: string;          // What witness sees (translated if investigator spoke)
-  
   timestamp: Date;
+}
+
+export interface SaveTranslationRequest {
+  caseId: string;
+  sessionId: string;
+  translations: TranslationResult[];
+  metadata?: {
+    investigatorLanguage: string;
+    witnessLanguage: string;
+    sessionDuration?: string;
+    totalMessages?: number;
+  };
 }
 
 class TranslationService {
@@ -24,9 +34,9 @@ class TranslationService {
         region: process.env.REACT_APP_AWS_REGION || 'us-east-1',
         credentials: session.credentials
       });
-      console.log(' Translate client initialized');
+      console.log('✓ Translate client initialized');
     } catch (error) {
-      console.error(' Failed to initialize Translate client:', error);
+      console.error('✗ Failed to initialize Translate client:', error);
     }
   }
 
@@ -39,18 +49,16 @@ class TranslationService {
     if (sourceLang === targetLang || !text.trim()) return text;
 
     try {
-      console.log(` Translating: "${text}" from ${sourceLang} to ${targetLang}`);
-      
+      console.log(`🔄 Translating: "${text}" from ${sourceLang} to ${targetLang}`);
       const command = new TranslateTextCommand({
         Text: text,
         SourceLanguageCode: sourceLang,
         TargetLanguageCode: targetLang,
       });
-      
       const response = await this.translateClient!.send(command);
       return response.TranslatedText || text;
     } catch (error) {
-      console.error(' Translation error:', error);
+      console.error('✗ Translation error:', error);
       return text;
     }
   }
@@ -66,8 +74,8 @@ class TranslationService {
     witnessDisplay: string;
     originalLanguage: string;
   }> {
-    console.log(` Processing: "${speaker}" says: "${originalText}"`);
-    console.log(` Translation setup - Investigator lang: ${investigatorLanguage}, Witness lang: ${witnessLanguage}`);
+    console.log(`🗣️ Processing: "${speaker}" says: "${originalText}"`);
+    console.log(`🌐 Translation setup - Investigator lang: ${investigatorLanguage}, Witness lang: ${witnessLanguage}`);
 
     let investigatorDisplay = originalText;
     let witnessDisplay = originalText;
@@ -77,13 +85,12 @@ class TranslationService {
       // Investigator speaks, Witness sees translation to witness language
       // Let AWS detect the source language automatically
       witnessDisplay = await this.translateText(originalText, 'auto', witnessLanguage);
-      console.log(`    Witness sees (${witnessLanguage}): "${witnessDisplay}"`);
-      
+      console.log(`   Witness sees (${witnessLanguage}): "${witnessDisplay}"`);
     } else if (speaker === "Witness") {
       // Witness speaks, Investigator sees translation to investigator language
       // Let AWS detect the source language automatically  
       investigatorDisplay = await this.translateText(originalText, 'auto', investigatorLanguage);
-      console.log(`    Investigator sees (${investigatorLanguage}): "${investigatorDisplay}"`);
+      console.log(`    👮 Investigator sees (${investigatorLanguage}): "${investigatorDisplay}"`);
     }
 
     return {
@@ -95,6 +102,53 @@ class TranslationService {
 
   generateId(): string {
     return `trans_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  // NEW: Save translations to S3
+  async saveTranslations(data: SaveTranslationRequest): Promise<any> {
+    try {
+      const endpoint = process.env.REACT_APP_API_ENDPOINT + "/translation/save";
+
+      console.log(' Saving translations to S3...', {
+        caseId: data.caseId,
+        sessionId: data.sessionId,
+        translationCount: data.translations.length,
+        metadata: data.metadata
+      });
+
+      // Convert Date objects to ISO strings for JSON serialization
+      const translationsWithStringDates = data.translations.map(trans => ({
+        ...trans,
+        timestamp: trans.timestamp.toISOString()
+      }));
+
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          caseId: data.caseId,
+          sessionId: data.sessionId,
+          translations: translationsWithStringDates,
+          metadata: data.metadata
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(
+          `Failed to save translations: ${response.status} - ${errorData.error || response.statusText}`
+        );
+      }
+
+      const result = await response.json();
+      console.log("Translations saved successfully:", result);
+      return result;
+    } catch (error) {
+      console.error(" Error saving translations:", error);
+      throw error;
+    }
   }
 }
 

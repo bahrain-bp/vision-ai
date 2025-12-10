@@ -31,11 +31,11 @@ class TranslationStack(Stack):
             root_resource_id=shared_api_root_resource_id
         )
         
-        # Lambda: Save Translation
+        # Lambda: Save Translation 
         save_lambda = _lambda.Function(
             self, "SaveTranslationFunction",
             runtime=_lambda.Runtime.PYTHON_3_12,
-            handler="save_translation.handler",
+            handler="save_translation.handler",  
             code=_lambda.Code.from_asset("lambda/translation"),
             timeout=Duration.seconds(30),
             memory_size=256,

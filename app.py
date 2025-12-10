@@ -13,6 +13,7 @@ from vision_ai.summarization_stack import SummarizationStack
 from vision_ai.api_deployment_stack import APIDeploymentStack
 from vision_ai.classification_stack import classificationStack
 from vision_ai.transcription_stack import TranscriptionStack
+from vision_ai.translation_stack import TranslationStack
 from vision_ai.frontend_stack import FrontendStack
 from vision_ai.detect_contradiction_stack import ContradictionStack
 from vision_ai.camera_footage_stack import CameraFootageAnalysisStack
@@ -164,7 +165,23 @@ transcription_stack = TranscriptionStack(
 transcription_stack.add_dependency(shared_stack)
 
 # ==========================================
-# 9. SUMMARIZATION STACK
+# 9. TRANSLATION STACK
+# Save real-time translations to S3
+# ==========================================
+translation_stack = TranslationStack(
+    app,
+    f"{app_name}-translation-stack",
+    env=env,
+    investigation_bucket=shared_stack.investigation_bucket,
+    shared_api_id=shared_stack.shared_api.rest_api_id,
+    shared_api_root_resource_id=shared_stack.shared_api.rest_api_root_resource_id,
+    description="Translation Stack: Save real-time translations to S3",
+)
+translation_stack.add_dependency(shared_stack)
+
+
+# ==========================================
+# 10. SUMMARIZATION STACK
 # AI Report Summarization with Bedrock
 # ==========================================
 summarization_stack = SummarizationStack(
@@ -181,7 +198,7 @@ summarization_stack = SummarizationStack(
 summarization_stack.add_dependency(shared_stack)
 
 # ==========================================
-# 10. CAMERA FOOTAGE ANALYSIS STACK
+# 11. CAMERA FOOTAGE ANALYSIS STACK
 # Uses shared API by ID
 # ==========================================
 camera_footage_stack = CameraFootageAnalysisStack(
@@ -199,7 +216,7 @@ camera_footage_stack.add_dependency(shared_stack)
 
 
 # ==========================================
-# 11. Detect Contradiction STACK
+# 12. Detect Contradiction STACK
 # ==========================================
 detect_contradiction_stack = ContradictionStack(
     app,
@@ -213,7 +230,7 @@ detect_contradiction_stack = ContradictionStack(
 detect_contradiction_stack.add_dependency(shared_stack)
 
 # ==========================================
-# 12. API DEPLOYMENT STACK
+# 13. API DEPLOYMENT STACK
 # Deploys API after all routes are added
 # ==========================================
 deployment_stack = APIDeploymentStack(
@@ -235,11 +252,12 @@ deployment_stack.add_dependency(rewrite_stack)
 deployment_stack.add_dependency(classification_stack)
 deployment_stack.add_dependency(detect_contradiction_stack)
 deployment_stack.add_dependency(transcription_stack)
+deployment_stack.add_dependency(translation_stack)
 deployment_stack.add_dependency(summarization_stack)
 deployment_stack.add_dependency(camera_footage_stack)
 
 # ==========================================
-# 13. FRONTEND STACK
+# 14. FRONTEND STACK
 # CloudFront + S3 for React Frontend
 # ==========================================
 frontend_stack = FrontendStack(
