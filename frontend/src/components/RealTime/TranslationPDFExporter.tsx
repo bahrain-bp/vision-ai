@@ -1,8 +1,7 @@
 import React, { useState } from "react";
-import { jsPDF } from "jspdf";
-import html2canvas from "html2canvas";
-import { Download, FileText, Loader } from "lucide-react";
+import { Download, FileText, Printer } from "lucide-react";
 import "./TranslationPDFExporter.css";
+import { useLanguage } from "../../context/LanguageContext";
 
 interface TranslationPDFExporterProps {
   transcript: string;
@@ -20,11 +19,11 @@ const TranslationPDFExporter: React.FC<TranslationPDFExporterProps> = ({
   contentType = 'transcript', 
 }) => {
   const [isGenerating, setIsGenerating] = useState(false);
+  const { t, language } = useLanguage();
 
   // Convert transcript to Markdown format
   const generateMarkdownContent = (): string => {
     if (contentType === 'report') {
-      // Simple format for report/summary
       const markdown = `# ${title}
 
 **Date:** ${sessionDate}
@@ -35,19 +34,18 @@ ${transcript}
 
 ---
 
-*Generated on ${new Date().toLocaleString()}*
+*${language === 'ar' ? 'تم الإنشاء في' : 'Generated on'} ${new Date().toLocaleString()}*
 `;
       return markdown;
     }
 
-    // Original transcript format
     const markdown = `# ${title}
 
-**Date:** ${sessionDate}
+**${language === 'ar' ? 'التاريخ:' : 'Date:'}** ${sessionDate}
 
 ---
 
-## Transcript
+${language === 'ar' ? '## النسخ' : '## Transcript'}
 
 ${transcript.split('\n').map(line => {
   if (line.trim()) {
@@ -63,7 +61,7 @@ ${transcript.split('\n').map(line => {
 
 ---
 
-*Generated on ${new Date().toLocaleString()}*
+*${language === 'ar' ? 'تم الإنشاء في' : 'Generated on'} ${new Date().toLocaleString()}*
 `;
 
     return markdown;
@@ -81,212 +79,204 @@ ${transcript.split('\n').map(line => {
     URL.revokeObjectURL(url);
   };
 
-  // Convert Markdown to HTML
-  const markdownToHTML = (markdown: string): string => {
-    let html = markdown;
-
-    html = html.replace(/^### (.*$)/gim, '<h3>$1</h3>');
-    html = html.replace(/^## (.*$)/gim, '<h2>$1</h2>');
-    html = html.replace(/^# (.*$)/gim, '<h1>$1</h1>');
-    html = html.replace(/\*\*(.*?)\*\*/gim, '<strong>$1</strong>');
-    html = html.replace(/\*(.*?)\*/gim, '<em>$1</em>');
-    html = html.replace(/^&gt; (.*$)/gim, '<blockquote>$1</blockquote>');
-    html = html.replace(/^> (.*$)/gim, '<blockquote>$1</blockquote>');
-    html = html.replace(/^---$/gim, '<hr>');
-    html = html.replace(/\n\n/g, '</p><p>');
-    html = html.replace(/\n/g, '<br>');
-    html = '<p>' + html + '</p>';
-
-    return html;
-  };
-
-  // Generate PDF using html2canvas with proper page breaks
-  const generatePDF = async () => {
+  // Generate PDF using browser print
+  const generatePDF = () => {
     if (!transcript) return;
     
     setIsGenerating(true);
     
     try {
-      // Create a temporary container for rendering
-      const container = document.createElement('div');
-      container.style.position = 'fixed';
-      container.style.left = '-10000px';
-      container.style.top = '0';
-      container.style.zIndex = '9999';
-      document.body.appendChild(container);
-
-      // A4 dimensions at 96 DPI
-      const pageWidth = 794; // pixels
-      const pageHeight = 1123; // pixels
-      const padding = 40;
-      const contentHeight = pageHeight - (padding * 2);
-
-      // Format the content based on type
       const lines = transcript.split('\n').filter(line => line.trim());
       
-      // Create header content
       const headerHTML = `
-        <div class="pdf-header">
+        <div class="pdf-header" dir="${language === 'ar' ? 'rtl' : 'ltr'}">
           <h1>${title}</h1>
-          <p>Date: ${sessionDate}</p>
+          <p>${language === 'ar' ? 'التاريخ:' : 'Date:'} ${sessionDate}</p>
         </div>
-        ${contentType === 'transcript' ? '<div class="pdf-section-title"><h2>Transcript</h2></div>' : ''}
+        ${contentType === 'transcript' ? 
+          `<div class="pdf-section-title" dir="${language === 'ar' ? 'rtl' : 'ltr'}">
+            <h2>${language === 'ar' ? 'النسخ' : 'Transcript'}</h2>
+          </div>` : ''}
       `;
 
-      // Split content into entries based on content type
-      let entries: string[];
+      let contentHTML = '';
       
       if (contentType === 'report') {
-        // For report/summary: plain text paragraphs without blue boxes
-        entries = lines.map(line => {
+        contentHTML = lines.map(line => {
           return `
-            <div class="report-paragraph">
+            <div class="report-paragraph" dir="${language === 'ar' ? 'rtl' : 'ltr'}">
               <p>${line}</p>
             </div>
           `;
-        });
+        }).join('');
       } else {
-        // For transcript: original format with blue boxes
-        entries = lines.map(line => {
+        contentHTML = lines.map(line => {
           const match = line.match(/\[(.*?)\]\s*\[(.*?)\]:\s*(.*)/);
           if (match) {
             const [, time, speaker, text] = match;
             return `
-              <div class="transcript-entry">
+              <div class="transcript-entry" dir="${language === 'ar' ? 'rtl' : 'ltr'}">
                 <strong>[${time}] ${speaker}:</strong>
                 <div class="transcript-text-box">${text}</div>
               </div>
             `;
           }
           return `
-            <div class="transcript-entry">
+            <div class="transcript-entry" dir="${language === 'ar' ? 'rtl' : 'ltr'}">
               <div class="transcript-text-box">${line}</div>
             </div>
           `;
-        });
+        }).join('');
       }
 
-      // Function to create a page element
-      const createPageElement = (content: string, isFirstPage: boolean) => {
-        const pageDiv = document.createElement('div');
-        pageDiv.className = 'pdf-page';
-        pageDiv.style.width = `${pageWidth}px`;
-        pageDiv.style.height = `${pageHeight}px`;
-        pageDiv.style.padding = `${padding}px`;
-        
-        pageDiv.innerHTML = (isFirstPage ? headerHTML : '') + content;
-        return pageDiv;
-      };
-
-      // Function to measure content height
-      const measureHeight = (htmlContent: string): number => {
-        const tempDiv = document.createElement('div');
-        tempDiv.className = 'measure-helper';
-        tempDiv.style.width = `${pageWidth - (padding * 2)}px`;
-        tempDiv.innerHTML = htmlContent;
-        document.body.appendChild(tempDiv);
-        const height = tempDiv.offsetHeight;
-        document.body.removeChild(tempDiv);
-        return height;
-      };
-
-      // Split entries into pages
-      const pages: string[] = [];
-      let currentPageContent = '';
-      let currentPageHeight = 0;
-      let isFirstPage = true;
-
-      // Account for header height on first page
-      if (isFirstPage) {
-        currentPageHeight = measureHeight(headerHTML);
-      }
-
-      for (const entry of entries) {
-        const entryHeight = measureHeight(entry);
-
-        // Check if adding this entry would exceed page height
-        if (currentPageHeight + entryHeight > contentHeight && currentPageContent !== '') {
-          // Save current page and start a new one
-          pages.push(currentPageContent);
-          currentPageContent = entry;
-          currentPageHeight = entryHeight;
-          isFirstPage = false;
-        } else {
-          // Add entry to current page
-          currentPageContent += entry;
-          currentPageHeight += entryHeight;
-        }
-      }
-
-      // Add the last page
-      if (currentPageContent) {
-        pages.push(currentPageContent);
-      }
-
-      // Add footer to last page
       const footerHTML = `
-        <div class="pdf-footer" style="bottom: ${padding}px; left: ${padding}px; right: ${padding}px;">
-          <p>Generated on ${new Date().toLocaleString()}</p>
+        <div class="pdf-footer" dir="${language === 'ar' ? 'rtl' : 'ltr'}">
+          <p>${language === 'ar' ? 'تم الإنشاء في' : 'Generated on'} ${new Date().toLocaleString()}</p>
         </div>
       `;
 
-      // Create PDF
-      const pdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4',
-        compress: true
-      });
-
-      const imgWidth = 210; // A4 width in mm
-      const imgHeight = 297; // A4 height in mm
-
-      // Render each page
-      for (let i = 0; i < pages.length; i++) {
-        const isFirst = i === 0;
-        const isLast = i === pages.length - 1;
-        
-        const pageContent = pages[i] + (isLast ? footerHTML : '');
-        const pageElement = createPageElement(pageContent, isFirst);
-        container.appendChild(pageElement);
-
-        // Wait for fonts and rendering
-        await new Promise(resolve => setTimeout(resolve, 300));
-
-        // Capture page as image
-        const canvas = await html2canvas(pageElement, {
-          scale: 2,
-          useCORS: true,
-          logging: false,
-          backgroundColor: '#ffffff',
-          width: pageWidth,
-          height: pageHeight,
-          windowWidth: pageWidth,
-          windowHeight: pageHeight,
-        });
-
-        const imgData = canvas.toDataURL('image/jpeg', 0.95);
-
-        // Add page to PDF
-        if (i > 0) {
-          pdf.addPage();
-        }
-        pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight);
-
-        // Clean up
-        container.removeChild(pageElement);
+      const printWindow = window.open('', '_blank');
+      if (!printWindow) {
+        alert(language === 'ar' ? 'الرجاء السماح بالنوافذ المنبثقة لإنشاء ملف PDF' : 'Please allow pop-ups to generate PDF');
+        setIsGenerating(false);
+        return;
       }
 
-      // Clean up container
-      document.body.removeChild(container);
+      printWindow.document.write(`
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>${title}</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 40px;
+    }
+    
+    @media print {
+      body {
+        margin: 0;
+        padding: 0;
+      }
+    }
+    
+    body {
+      font-family: Arial, "Segoe UI", "Noto Sans", "Noto Sans Arabic", "Noto Sans Devanagari", sans-serif;
+      font-size: 12px;
+      line-height: 1.4;
+      color: #000000;
+      background-color: white;
+      direction: ${language === 'ar' ? 'rtl' : 'ltr'};
+      text-align: ${language === 'ar' ? 'right' : 'left'};
+    }
+    
+    .pdf-header {
+      text-align: center;
+      margin-bottom: 30px;
+      border-bottom: 2px solid #333;
+      padding-bottom: 20px;
+    }
+    
+    .pdf-header h1 {
+      font-size: 22px;
+      margin: 0 0 8px 0;
+      color: #333;
+      font-weight: bold;
+    }
+    
+    .pdf-header p {
+      font-size: 11px;
+      color: #666;
+      margin: 0;
+    }
+    
+    .pdf-section-title {
+      margin-bottom: 20px;
+    }
+    
+    .pdf-section-title h2 {
+      font-size: 16px;
+      margin: 0 0 12px 0;
+      color: #444;
+      font-weight: bold;
+    }
+    
+    .transcript-entry {
+      margin-bottom: 12px;
+      page-break-inside: avoid;
+    }
+    
+    .transcript-entry strong {
+      font-size: 11px;
+      color: #000;
+      display: block;
+      margin-bottom: 4px;
+    }
+    
+    .transcript-text-box {
+      margin: 0;
+      padding: 8px 15px;
+      background: #f5f5f5;
+      border-${language === 'ar' ? 'right' : 'left'}: 4px solid #4A90E2;
+      font-size: 12px;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+      white-space: pre-wrap;
+    }
+    
+    .report-paragraph {
+      margin-bottom: 12px;
+      page-break-inside: avoid;
+    }
+    
+    .report-paragraph p {
+      margin: 0;
+      padding: 8px 0;
+      font-size: 12px;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+    }
+    
+    .pdf-footer {
+      margin-top: 40px;
+      padding-top: 20px;
+      border-top: 1px solid #ccc;
+      text-align: center;
+    }
+    
+    .pdf-footer p {
+      font-size: 10px;
+      color: #999;
+      margin: 0;
+    }
+  </style>
+</head>
+<body>
+  ${headerHTML}
+  ${contentHTML}
+  ${footerHTML}
+</body>
+</html>
+      `);
 
-      // Save PDF
-      pdf.save(`${fileName}-${sessionDate.replace(/\//g, "-")}.pdf`);
+      printWindow.document.close();
+      
+      // Wait for content to load then trigger print
+      printWindow.onload = () => {
+        setTimeout(() => {
+          printWindow.print();
+          // Close the window after printing
+          printWindow.onafterprint = () => {
+            printWindow.close();
+          };
+          setIsGenerating(false);
+        }, 250);
+      };
       
     } catch (error) {
       console.error('PDF generation failed:', error);
-      alert('PDF generation failed. Please try Word or Markdown export instead.');
-    } finally {
+      alert(language === 'ar' ? 'فشل إنشاء ملف PDF. الرجاء محاولة تصدير Word أو Markdown بدلاً من ذلك.' : 'PDF generation failed. Please try Word or Markdown export instead.');
       setIsGenerating(false);
     }
   };
@@ -295,8 +285,25 @@ ${transcript.split('\n').map(line => {
   const generateWordFromMarkdown = () => {
     if (!transcript) return;
 
-    const markdown = generateMarkdownContent();
-    const htmlContent = markdownToHTML(markdown);
+    const lines = transcript.split('\n').filter(line => line.trim());
+    
+    let contentHTML = '';
+    
+    if (contentType === 'report') {
+      contentHTML = lines.map(line => `<p>${line}</p>`).join('');
+    } else {
+      contentHTML = lines.map(line => {
+        const match = line.match(/\[(.*?)\]\s*\[(.*?)\]:\s*(.*)/);
+        if (match) {
+          const [, time, speaker, text] = match;
+          return `
+            <p><strong>[${time}] ${speaker}:</strong></p>
+            <blockquote>${text}</blockquote>
+          `;
+        }
+        return `<blockquote>${line}</blockquote>`;
+      }).join('');
+    }
 
     const wordHTML = `
 <!DOCTYPE html>
@@ -318,11 +325,12 @@ ${transcript.split('\n').map(line => {
       margin: 2cm;
     }
     body {
-      font-family: 'Calibri', 'Segoe UI', 'Noto Sans', 'Noto Sans Arabic', 'Noto Sans Devanagari', Arial, sans-serif;
+      font-family: ${language === 'ar' ? "'Noto Sans Arabic', 'Segoe UI', Arial, sans-serif" : "'Calibri', 'Segoe UI', Arial, sans-serif"};
       font-size: 11pt;
       line-height: 1.4;
       color: #000;
-      direction: auto;
+      direction: ${language === 'ar' ? 'rtl' : 'ltr'};
+      text-align: ${language === 'ar' ? 'right' : 'left'};
     }
     h1 {
       font-size: 24pt;
@@ -346,11 +354,13 @@ ${transcript.split('\n').map(line => {
       margin: 0;
       padding: 8pt 15pt;
       background-color: ${contentType === 'report' ? 'transparent' : '#f5f5f5'};
-      border-left: ${contentType === 'report' ? 'none' : '4pt solid #4A90E2'};
+      border-${language === 'ar' ? 'right' : 'left'}: ${contentType === 'report' ? 'none' : '4pt solid #4A90E2'};
       font-family: inherit;
       page-break-inside: avoid;
       word-wrap: break-word;
       overflow-wrap: break-word;
+      direction: ${language === 'ar' ? 'rtl' : 'ltr'};
+      text-align: ${language === 'ar' ? 'right' : 'left'};
     }
     hr {
       border: none;
@@ -360,12 +370,20 @@ ${transcript.split('\n').map(line => {
     p {
       margin: 0 0 10pt 0;
       page-break-inside: avoid;
-      text-align: justify;
+      text-align: ${language === 'ar' ? 'right' : 'justify'};
     }
   </style>
 </head>
 <body>
-  ${htmlContent}
+  <h1>${title}</h1>
+  <p><strong>${language === 'ar' ? 'التاريخ:' : 'Date:'}</strong> ${sessionDate}</p>
+  <hr>
+  ${contentType === 'transcript' ? `<h2>${language === 'ar' ? 'النسخ' : 'Transcript'}</h2>` : ''}
+  ${contentHTML}
+  <hr>
+  <p style="text-align: center; font-size: 9pt; color: #999;">
+    <em>${language === 'ar' ? 'تم الإنشاء في' : 'Generated on'} ${new Date().toLocaleString()}</em>
+  </p>
 </body>
 </html>`;
 
@@ -387,34 +405,30 @@ ${transcript.split('\n').map(line => {
         onClick={generatePDF}
         disabled={isGenerating || !transcript}
         className="action-btn"
-        title="Export as PDF"
+        title={t("pdf.exportAsPdf")}
       >
-        {isGenerating ? (
-          <Loader className="btn-icon animate-spin" />
-        ) : (
-          <Download className="btn-icon" />
-        )}
-        <span>{isGenerating ? "Generating..." : "Download PDF"}</span>
+        <Printer className="btn-icon" />
+        <span>{t("pdf.downloadPdf")}</span>
       </button>
 
       <button 
         onClick={generateWordFromMarkdown}
         disabled={!transcript}
         className="action-btn"
-        title="Export as Word Document"
+        title={t("pdf.exportAsWord")}
       >
         <Download className="btn-icon" />
-        <span>Download Word</span>
+        <span>{t("pdf.downloadWord")}</span>
       </button>
 
       <button 
         onClick={downloadMarkdown}
         disabled={!transcript}
         className="action-btn"
-        title="Export as Markdown"
+        title={t("pdf.exportAsMarkdown")}
       >
         <FileText className="btn-icon" />
-        <span>Markdown</span>
+        <span>{t("pdf.downloadMarkdown")}</span>
       </button>
     </div>
   );

@@ -1,6 +1,7 @@
 import React, { createContext, useState, useCallback, ReactNode, useEffect } from "react";
 import { translationService, TranslationResult } from "../services/LiveTranslation/TranslationService";
 import { useTranscription } from "../hooks/useTranscription";
+import { useCaseContext } from "../hooks/useCaseContext";
 
 export interface TranslationContextType {
   translations: TranslationResult[];
@@ -14,6 +15,7 @@ export interface TranslationContextType {
   witnessLanguage: string;
   setInvestigatorLanguage: (language: string) => void;
   setWitnessLanguage: (language: string) => void;
+  saveTranslationsToS3: () => Promise<void>; 
 }
 
 export const TranslationContext = createContext<TranslationContextType | undefined>(undefined);
@@ -38,6 +40,9 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({
   // Get transcription data
   const { getFullTranscript, recordingStatus } = useTranscription();
   
+  // NEW: Get case and session from context (same as transcription does)
+  const { currentCase, currentSession } = useCaseContext();
+  
   // Track processed content to avoid duplicates
   const [lastProcessedContent, setLastProcessedContent] = useState("");
 
@@ -52,7 +57,7 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({
       };
       localStorage.setItem('vision-ai-translations', JSON.stringify(syncData));
     } catch (err) {
-      console.error('Failed to sync to localStorage:', err);
+      console.error(' Failed to sync to localStorage:', err);
     }
   }, [investigatorLanguage, witnessLanguage]);
 
@@ -126,7 +131,7 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({
         }
 
         console.log(` Processing - Speaker: ${speaker}, Text: "${actualText}"`);
-        console.log(`Translation settings - Investigator: ${investigatorLanguage}, Witness: ${witnessLanguage}`);
+        console.log(` Translation settings - Investigator: ${investigatorLanguage}, Witness: ${witnessLanguage}`);
 
         // Convert language codes for AWS Translate
         const investigatorLangCode = investigatorLanguage.split('-')[0];
@@ -158,7 +163,7 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({
 
         setLastProcessedContent(getFullTranscript);
         
-        console.log(' Translation completed:', {
+        console.log('Translation completed:', {
           speaker,
           originalText: actualText,
           investigatorSees: investigatorDisplay,
@@ -176,19 +181,56 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({
     if (recordingStatus === "on") {
       processNewTranscription();
     }
-  }, [getFullTranscript, recordingStatus, lastProcessedContent, investigatorLanguage, witnessLanguage, syncToLocalStorage]);
+  }, [getFullTranscript, recordingStatus, lastProcessedContent, investigatorLanguage, witnessLanguage, syncToLocalStorage, translations]);
 
   // Keep for backward compatibility
   const addConversationTurn = useCallback(async () => {
-    console.log('Translation is now automatic with real transcription');
+    console.log('ℹ️ Translation is now automatic with real transcription');
   }, []);
 
   const clearConversation = useCallback(() => {
     setTranslations([]);
     setLastProcessedContent("");
     syncToLocalStorage([]);
-    console.log(' Conversation cleared');
+    console.log('🧹 Conversation cleared');
   }, [syncToLocalStorage]);
+
+  // UPDATED: Save translations to S3 (same pattern as transcription)
+  const saveTranslationsToS3 = useCallback(async () => {
+    try {
+      if (translations.length === 0) {
+        console.log('⚠️ No translations to save');
+        return;
+      }
+
+      // Get case and session from context (same as transcription does)
+      const caseId = currentCase?.caseId || "";
+      const sessionId = currentSession?.sessionId || currentCase?.caseId + "_" + crypto.randomUUID();
+
+      console.log('📤 Saving translations to S3...', {
+        caseId,
+        sessionId,
+        count: translations.length,
+        investigatorLanguage,
+        witnessLanguage
+      });
+
+      await translationService.saveTranslations({
+        caseId,
+        sessionId,
+        translations,
+        metadata: {
+          investigatorLanguage,
+          witnessLanguage,
+          totalMessages: translations.length,
+        }
+      });
+
+      console.log(' Translations saved successfully to S3');
+    } catch (error) {
+      console.error(' Failed to save translations to S3:', error);
+    }
+  }, [translations, investigatorLanguage, witnessLanguage, currentCase, currentSession]);
 
   const value: TranslationContextType = {
     translations,
@@ -201,7 +243,8 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({
     investigatorLanguage,
     witnessLanguage,
     setInvestigatorLanguage,
-    setWitnessLanguage
+    setWitnessLanguage,
+    saveTranslationsToS3,
   };
 
   return (

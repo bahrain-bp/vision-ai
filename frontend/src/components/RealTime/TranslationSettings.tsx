@@ -1,6 +1,7 @@
 import React from "react";
 import { LanguageCode } from "@aws-sdk/client-transcribe-streaming";
 import "./TranslationSettings.css";
+import { useLanguage } from "../../context/LanguageContext";
 
 interface TranslationSettings {
   sourceLanguage: string;
@@ -19,17 +20,19 @@ const TranslationSettings: React.FC<TranslationSettingsProps> = ({
   translationSettings,
   onTranslationSettingsChange,
 }) => {
+  const { t, language } = useLanguage();
+
   // Function to get language name from code
   const getLanguageName = (code: string): string => {
     const languageCode = code.split("-")[0];
-    const displayName = new Intl.DisplayNames(["en"], { type: "language" }).of(languageCode);
+    const displayName = new Intl.DisplayNames([language], { type: "language" }).of(languageCode);
     return displayName || code;
   };
 
   // Generate language options from AWS Transcribe LanguageCode
   const languageOptions = Object.entries(LanguageCode).map(([code, name]) => {
     const formattedCode = code.split("_")[0].toLowerCase() + "-" + code.split("_")[1].toUpperCase();
-    const displayName = new Intl.DisplayNames(["en"], { type: "language" }).of(
+    const displayName = new Intl.DisplayNames([language], { type: "language" }).of(
       formattedCode.split("-")[0]
     ) || name;
     const region = formattedCode.split("-")[1];
@@ -46,11 +49,11 @@ const TranslationSettings: React.FC<TranslationSettingsProps> = ({
 
   return (
     <div className="session-card">
-      <h2 className="card-title">Translation Settings</h2>
+      <h2 className="card-title">{t("translation.settingsTitle")}</h2>
 
       <div className="translation-settings-row">
         <div className="language-selector-compact">
-          <label className="form-label">Investigator Language</label>
+          <label className="form-label">{t("session.investigator")} {t("session.language")}</label>
           <select
             value={translationSettings.sourceLanguage}
             onChange={(e) =>
@@ -67,7 +70,7 @@ const TranslationSettings: React.FC<TranslationSettingsProps> = ({
         </div>
 
         <div className="language-selector-compact">
-          <label className="form-label">Witness Language</label>
+          <label className="form-label">{t("identity.witness")} {t("session.language")}</label>
           <select
             value={translationSettings.targetLanguage}
             onChange={(e) =>
@@ -85,7 +88,8 @@ const TranslationSettings: React.FC<TranslationSettingsProps> = ({
 
         <div className="translation-display">
           <span className="translation-direction">
-            Investigator: <strong>{investigatorLangName}</strong> | Witness: <strong>{witnessLangName}</strong>
+            {t("session.investigator")}: <strong>{investigatorLangName}</strong> | 
+            {t("identity.witness")}: <strong>{witnessLangName}</strong>
           </span>
         </div>
       </div>

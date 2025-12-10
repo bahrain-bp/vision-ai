@@ -9,16 +9,18 @@ import {
 } from "lucide-react";
 import RealTimeView from "../RealTime/RealTimeView";
 import ProcessingView from "../Processing/ProcessingView";
-import SessionSummaryModal from "../RealTime/SessionSummaryModal";
+
 import { User, RecordingStatus } from "../../types/";
 import { useTranscription } from "../../hooks/useTranscription";
 import { useCaseContext } from "../../hooks/useCaseContext";
-
+import { useRealTimeTranslation } from "../../hooks/useRealTimeTranslation";
 import { useLanguage } from "../../context/LanguageContext";
 import { getTimeString } from "../common/Timer/Timer";
+import { TranslationProvider } from "../../context/TranslationContext";
 import { CameraFootageProvider } from "../../context/CameraFootageContext";
-import LanguageToggle from "../common/LanguageToggle";
+
 import { AudioAnalysisProvider } from "../../context/AudioAnalysisContext";
+import LanguageToggle from "../common/LanguageToggle";
 
 interface TranslationSettings {
   sourceLanguage: string;
@@ -48,7 +50,27 @@ interface SessionPageProps {
 
 type MainTab = "real-time" | "processing";
 
+// OUTER COMPONENT - Only provides the context
 const SessionPage: React.FC<SessionPageProps> = ({
+  user,
+  onSignOut,
+  sessionData,
+  onEndSession,
+}) => {
+  return (
+    <TranslationProvider investigatorLanguage="en" witnessLanguage="ar">
+      <SessionPageContent
+        user={user}
+        onSignOut={onSignOut}
+        sessionData={sessionData}
+        onEndSession={onEndSession}
+      />
+    </TranslationProvider>
+  );
+};
+
+// INNER COMPONENT - Has all the logic and uses the hook
+const SessionPageContent: React.FC<SessionPageProps> = ({
   user,
   onSignOut,
   sessionData,
@@ -67,11 +89,14 @@ const SessionPage: React.FC<SessionPageProps> = ({
 
   const [activeMainTab, setActiveMainTab] = useState<MainTab>("real-time");
   const [sessionState, setSessionState] = useState<RecordingStatus>("off");
-  const [showSummaryModal, setShowSummaryModal] = useState<boolean>(false);
+
   const { stopRecording, toggleRecordingPause, toggleReset } =
     useTranscription();
+  
+  const { saveTranslationsToS3 } = useRealTimeTranslation();
+  const { language: contextLanguage } = useLanguage();
 
-  const [language, setLanguage] = useState<"en" | "ar">("en");
+  const [language, setLanguage] = useState<"en" | "ar">(contextLanguage);
 
   const [triggerSummarization, setTriggerSummarization] =
     useState<boolean>(false);
@@ -119,19 +144,22 @@ const SessionPage: React.FC<SessionPageProps> = ({
         status: currentSession.status,
       }
     : {
-        sessionId: "#2025-INV-0042",
+        sessionId: "No session",
         investigator: getInvestigatorName(),
         language: language === "en" ? "English" : "Arabic",
         duration: timerString,
         participant: "",
         status: "Active",
       };
-
+  
   const handleEndSession = async () => {
     stopRecording(setSessionState);
 
+    await saveTranslationsToS3();
+
     if (currentSession && currentCase) {
       try {
+        
         await updateSessionStatus(
           currentCase.caseId,
           currentSession.sessionId,
@@ -145,14 +173,7 @@ const SessionPage: React.FC<SessionPageProps> = ({
     // Trigger switch to summarization tab
     setTriggerSummarization(true);
   };
-
-  const handleCloseSummary = () => {
-    setShowSummaryModal(false);
-    setSessionState("off");
-    if (onEndSession) {
-      onEndSession();
-    }
-  };
+  
 
   const handleBackToHome = () => {
     sessionCreationAttempted.current = false;
@@ -186,6 +207,7 @@ const SessionPage: React.FC<SessionPageProps> = ({
       if (sessionCreationAttempted.current) {
         return;
       }
+
       if (currentCase && !currentSession) {
         try {
           sessionCreationAttempted.current = true;
@@ -197,12 +219,13 @@ const SessionPage: React.FC<SessionPageProps> = ({
         }
       }
     };
+
     initializeSession();
   }, [currentCase, currentSession, createSession, user]);
 
   return (
     <div className="session-page-container">
-      <nav className="session-nav" dir={language === "ar" ? "rtl" : "ltr"}>
+      <nav className="session-nav">
         <div className="nav-content">
           <div className="nav-items">
             <button onClick={handleBackToHome} className="back-button">
@@ -246,21 +269,9 @@ const SessionPage: React.FC<SessionPageProps> = ({
 
             <div className="nav-controls">
               <div className="language-controls">
-                <span className="language-label">
-                  {language === "ar" ? "اللغة:" : "Language:"}
-                </span>
-                <button
-                  className={`lang-btn ${language === "en" ? "active" : ""}`}
-                  onClick={() => setLanguage("en")}
-                >
-                  EN
-                </button>
-                <button
-                  className={`lang-btn ${language === "ar" ? "active" : ""}`}
-                  onClick={() => setLanguage("ar")}
-                >
-                  AR
-                </button>
+                <LanguageToggle
+                  onLanguageChange={(lang) => setLanguage(lang)}
+                />
               </div>
               <div className="time-display">
                 <Clock className="icon" />
@@ -374,16 +385,7 @@ const SessionPage: React.FC<SessionPageProps> = ({
         )}
       </div>
 
-      {showSummaryModal && (
-        <SessionSummaryModal
-          sessionData={currentSessionData}
-          onClose={handleCloseSummary}
-          onGenerateSummary={() => {
-            setShowSummaryModal(false);
-            setTriggerSummarization(true);
-          }}
-        />
-      )}
+
     </div>
   );
 };
