@@ -1,12 +1,5 @@
 import React, { useState, useEffect } from "react";
-import {
-  ArrowLeft,
-  Clock,
-  Pause,
-  Play,
-  RotateCcw,
-  ArrowRight,
-} from "lucide-react";
+import { ArrowLeft, Clock, Pause, Play, RotateCcw } from "lucide-react";
 import RealTimeView from "../RealTime/RealTimeView";
 import ProcessingView from "../Processing/ProcessingView";
 import SessionSummaryModal from "../RealTime/SessionSummaryModal";
@@ -18,6 +11,8 @@ import { useLanguage } from "../../context/LanguageContext";
 import { getTimeString } from "../common/Timer/Timer";
 import { TranslationProvider } from "../../context/TranslationContext";
 import { CameraFootageProvider } from "../../context/CameraFootageContext";
+import LanguageToggle from "../common/LanguageToggle";
+import { AudioAnalysisProvider } from "../../context/AudioAnalysisContext";
 
 interface TranslationSettings {
   sourceLanguage: string;
@@ -80,6 +75,8 @@ const SessionPageContent: React.FC<SessionPageProps> = ({
     createSession,
     updateSessionStatus,
     setCurrentSession,
+    setCurrentPersonName,
+    setCurrentPersonType,
   } = useCaseContext();
 
   const [activeMainTab, setActiveMainTab] = useState<MainTab>("real-time");
@@ -89,8 +86,9 @@ const SessionPageContent: React.FC<SessionPageProps> = ({
     useTranscription();
   
   const { saveTranslationsToS3 } = useRealTimeTranslation();
+  const { language: contextLanguage } = useLanguage();
 
-  const [language, setLanguage] = useState<"en" | "ar">("en");
+  const [language, setLanguage] = useState<"en" | "ar">(contextLanguage);
 
   const [triggerSummarization, setTriggerSummarization] =
     useState<boolean>(false);
@@ -163,7 +161,6 @@ const SessionPageContent: React.FC<SessionPageProps> = ({
         console.error("Failed to update session status:", error);
       }
     }
-    setCurrentSession(null);
 
     // Trigger switch to summarization tab
     setTriggerSummarization(true);
@@ -180,7 +177,8 @@ const SessionPageContent: React.FC<SessionPageProps> = ({
   const handleBackToHome = () => {
     sessionCreationAttempted.current = false;
     setCurrentSession(null);
-
+    setCurrentPersonName(null);
+    setCurrentPersonType(null);
     if (onEndSession) {
       onEndSession();
     } else {
@@ -224,20 +222,12 @@ const SessionPageContent: React.FC<SessionPageProps> = ({
 
   return (
     <div className="session-page-container">
-      <nav className="session-nav" dir={language === "ar" ? "rtl" : "ltr"}>
+      <nav className="session-nav">
         <div className="nav-content">
           <div className="nav-items">
             <button onClick={handleBackToHome} className="back-button">
-              {language === "ar" ? (
-                <ArrowRight className="icon" />
-              ) : (
-                <ArrowLeft className="icon" />
-              )}
-              <span>
-                {language === "ar"
-                  ? "العودة إلى الصفحة الرئيسية"
-                  : "Back to Home"}
-              </span>
+              <ArrowLeft className="icon" />
+              <span>{t("session.backToHome")}</span>
             </button>
 
             <div className="nav-center">
@@ -268,21 +258,9 @@ const SessionPageContent: React.FC<SessionPageProps> = ({
 
             <div className="nav-controls">
               <div className="language-controls">
-                <span className="language-label">
-                  {language === "ar" ? "اللغة:" : "Language:"}
-                </span>
-                <button
-                  className={`lang-btn ${language === "en" ? "active" : ""}`}
-                  onClick={() => setLanguage("en")}
-                >
-                  EN
-                </button>
-                <button
-                  className={`lang-btn ${language === "ar" ? "active" : ""}`}
-                  onClick={() => setLanguage("ar")}
-                >
-                  AR
-                </button>
+                <LanguageToggle
+                  onLanguageChange={(lang) => setLanguage(lang)}
+                />
               </div>
               <div className="time-display">
                 <Clock className="icon" />
@@ -385,12 +363,14 @@ const SessionPageContent: React.FC<SessionPageProps> = ({
             triggerSummarization={triggerSummarization}
           />
         ) : (
-          <CameraFootageProvider>
-            <ProcessingView
-              sessionData={currentSessionData}
-              language={language}
-            />
-          </CameraFootageProvider>
+          <AudioAnalysisProvider>
+            <CameraFootageProvider>
+              <ProcessingView
+                sessionData={currentSessionData}
+                language={language}
+              />
+            </CameraFootageProvider>
+          </AudioAnalysisProvider>
         )}
       </div>
 

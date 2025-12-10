@@ -47,9 +47,9 @@ const CreateCaseModal: React.FC<CreateCaseModalProps> = ({
               placeholder={t("modal.enterTitle")}
               className="form-input"
               required
-              maxLength={100}
+              maxLength={60}
             />
-            <div className="char-count">{title.length}/100</div>
+            <div className="char-count">{title.length}/60</div>
           </div>
 
           <div className="form-group">
@@ -64,9 +64,9 @@ const CreateCaseModal: React.FC<CreateCaseModalProps> = ({
               className="form-textarea"
               rows={4}
               required
-              maxLength={500}
+              maxLength={120}
             />
-            <div className="char-count">{description.length}/500</div>
+            <div className="char-count">{description.length}/120</div>
           </div>
 
           <div className="modal-actions">

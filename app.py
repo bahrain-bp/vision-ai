@@ -17,6 +17,8 @@ from vision_ai.translation_stack import TranslationStack
 from vision_ai.frontend_stack import FrontendStack
 from vision_ai.detect_contradiction_stack import ContradictionStack
 from vision_ai.camera_footage_stack import CameraFootageAnalysisStack
+from vision_ai.audio_analysis_stack import AudioAnalysisStack
+from vision_ai.outcome_stack import OutcomeStack
 
 
 load_dotenv()
@@ -98,10 +100,8 @@ case_management_stack = CaseManagementStack(
 case_management_stack.add_dependency(shared_stack)
 case_management_stack.add_dependency(identity_stack)
 
-
-
 # ==========================================
-# 6. ADVANCED ANALYSIS STACK
+# 5. ADVANCED ANALYSIS STACK
 # AI Suggested Questions feature
 # ==========================================
 advanced_analysis_stack = AdvancedAnalysisStack(
@@ -113,9 +113,22 @@ advanced_analysis_stack = AdvancedAnalysisStack(
     shared_api_root_resource_id=shared_stack.shared_api.rest_api_root_resource_id,
     description="Advanced Analysis: AI suggested questions and analysis",
 )
-
-# Ensure advanced analysis stack depends on shared stack
 advanced_analysis_stack.add_dependency(shared_stack)
+
+# ==========================================
+# 6. CLASSIFICATION STACK
+# extract text from document and classify the case
+# ==========================================
+classification_stack = classificationStack(
+    app,
+    f"{app_name}-classification-stack",
+    env=env,
+    investigation_bucket=shared_stack.investigation_bucket,
+    shared_api_id=shared_stack.shared_api.rest_api_id,
+    shared_api_root_resource_id=shared_stack.shared_api.rest_api_root_resource_id,
+    description="Classification Stack: Document upload to extract text and classify",
+)
+classification_stack.add_dependency(shared_stack)
 
 # ==========================================
 # 7. REWRITE STACK
@@ -130,27 +143,9 @@ rewrite_stack = RewriteStack(
     shared_api_root_resource_id=shared_stack.shared_api.rest_api_root_resource_id,
     description="Rewrite Stack: Document rewriting using AWS Bedrock Nova Lite",
 )
-
-# Ensure rewrite stack depends on shared stack
 rewrite_stack.add_dependency(shared_stack)
 
-
 # ==========================================
-# 6. Classification STACK
-# extract text from document and classify the case
-# ==========================================
-classification_stack = classificationStack(
-    app, f"{app_name}-classification-stack", env=env,
-    investigation_bucket=shared_stack.investigation_bucket,
-    shared_api_id=shared_stack.shared_api.rest_api_id,
-    shared_api_root_resource_id=shared_stack.shared_api.rest_api_root_resource_id,
-    description="Classification Stack: Document upload to extract text and classify"
-)
-# Ensure classification stack depends on shared stack
-classification_stack.add_dependency(shared_stack)
-
-# ==========================================
-# 7. API DEPLOYMENT STACK
 # 8. TRANSCRIPTION STACK
 # ==========================================
 transcription_stack = TranscriptionStack(
@@ -197,6 +192,21 @@ summarization_stack = SummarizationStack(
 # Ensure summarization stack depends on shared stack
 summarization_stack.add_dependency(shared_stack)
 
+
+# ==========================================
+# 10. Detect Contradiction STACK
+# ==========================================
+detect_contradiction_stack = ContradictionStack(
+    app,
+    f"{app_name}-detect-contradiction-stack",
+    investigation_bucket=shared_stack.investigation_bucket,
+    shared_api_id=shared_stack.shared_api.rest_api_id,
+    shared_api_root_resource_id=shared_stack.shared_api.rest_api_root_resource_id,
+    env=env,
+    description="Detect Contradiction using 2 Lambda and AWS Bedrock Nova Lite",
+)
+detect_contradiction_stack.add_dependency(shared_stack)
+
 # ==========================================
 # 11. CAMERA FOOTAGE ANALYSIS STACK
 # Uses shared API by ID
@@ -214,23 +224,36 @@ camera_footage_stack = CameraFootageAnalysisStack(
 # Ensure camera footage stack depends on shared stack
 camera_footage_stack.add_dependency(shared_stack)
 
-
 # ==========================================
-# 12. Detect Contradiction STACK
+# 12. AUDIO ANALYSIS STACK
 # ==========================================
-detect_contradiction_stack = ContradictionStack(
+audio_analysis_stack = AudioAnalysisStack(
     app,
-    f"{app_name}-detect-contradiction-stack",
+    f"{app_name}-audio-analysis-stack",
+    env=env,
     investigation_bucket=shared_stack.investigation_bucket,
     shared_api_id=shared_stack.shared_api.rest_api_id,
     shared_api_root_resource_id=shared_stack.shared_api.rest_api_root_resource_id,
-    env=env,
-    description="Detect Contradiction using 2 Lambda and AWS Bedrock Nova Lite",
+    description="Audio Analysis: Transcribe and translate audio to Arabic",
 )
-detect_contradiction_stack.add_dependency(shared_stack)
+audio_analysis_stack.add_dependency(shared_stack)
 
 # ==========================================
-# 13. API DEPLOYMENT STACK
+# 13. OUTCOME STACK
+# ==========================================
+outcome_stack = OutcomeStack(
+    app,
+    f"{app_name}-outcome-stack",
+    env=env,
+    investigation_bucket=shared_stack.investigation_bucket,
+    shared_api_id=shared_stack.shared_api.rest_api_id,
+    shared_api_root_resource_id=shared_stack.shared_api.rest_api_root_resource_id,
+    description="Outcome: Generate confidence score and verdict with rationale",
+)
+outcome_stack.add_dependency(shared_stack)
+
+# ==========================================
+# 14. API DEPLOYMENT STACK
 # Deploys API after all routes are added
 # ==========================================
 deployment_stack = APIDeploymentStack(
@@ -255,9 +278,11 @@ deployment_stack.add_dependency(transcription_stack)
 deployment_stack.add_dependency(translation_stack)
 deployment_stack.add_dependency(summarization_stack)
 deployment_stack.add_dependency(camera_footage_stack)
+deployment_stack.add_dependency(audio_analysis_stack)
+deployment_stack.add_dependency(outcome_stack)
 
 # ==========================================
-# 14. FRONTEND STACK
+# 15. FRONTEND STACK
 # CloudFront + S3 for React Frontend
 # ==========================================
 frontend_stack = FrontendStack(
