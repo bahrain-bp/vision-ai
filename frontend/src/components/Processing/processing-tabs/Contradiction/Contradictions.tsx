@@ -16,31 +16,33 @@ interface AnalysisResponse {
   storedAt: string;
 }
 
-const severityIcons: Record<string, string> = {
-  red: "❌",
-  yellow: "⚠️",
-  green: "✅",
+const priorityTags: Record<string, any> = {
+  red: { en: "High Contradiction", ar: "تناقض عالي" },
+  yellow: { en: "Medium Contradiction", ar: "تناقض متوسط" },
+  green: { en: "No Contradiction", ar: "لا يوجد تناقض" },
 };
 
 const translations = {
   en: {
     title: "Contradiction Analysis",
+    caption: "Automated analysis of contradictions based on witness statements.",
     selectWitness: "Select Witness:",
     loadingWitnesses: "Loading witnesses...",
     selectOption: "-- Select Witness --",
     analyzeBtn: "Analyze Contradictions",
     analyzing: "Analyzing...",
-    results: "Results – "
+    results: "Results – ",
   },
   ar: {
     title: "تحليل التناقضات",
+    caption: "تحليل آلي للتناقضات بناءًا على الشهادات.",
     selectWitness: "اختر الشاهد:",
     loadingWitnesses: "جاري تحميل الشهود...",
     selectOption: "-- اختر الشاهد --",
     analyzeBtn: "تحليل التناقضات",
     analyzing: "جاري التحليل...",
-    results: "النتائج – "
-  }
+    results: "النتائج – ",
+  },
 };
 
 const API_BASE_URL = process.env.REACT_APP_API_ENDPOINT;
@@ -84,9 +86,10 @@ const Contradictions: React.FC<ContradictionsProps> = ({ language }) => {
 
       const raw = await res.json();
       let parsed: AnalysisResponse;
+
       if (typeof raw.body === "string") {
         parsed = JSON.parse(raw.body);
-      } else if (typeof raw.body === "object") {
+      } else if (typeof raw.body === "object") { 
         parsed = raw.body;
       } else {
         parsed = raw;
@@ -99,67 +102,73 @@ const Contradictions: React.FC<ContradictionsProps> = ({ language }) => {
   };
 
   return (
-    <div className="contradictions-container">
-      <h2>{translations[language].title}</h2>
+  <div
+    className={`Contradictions-class ${language === "ar" ? "rtl" : ""}`}
+    dir={language === "ar" ? "rtl" : "ltr"}
+  >
+    <h2 className="title">{translations[language].title}</h2>
+    <p className="caption">{translations[language].caption}</p>
 
-      {/* WITNESS DROPDOWN */}
-      <div className="dropdown-container">
-        <label>{translations[language].selectWitness}</label>
-        {loadingWitnesses ? (
-          <p>{translations[language].loadingWitnesses}</p>
-        ) : (
-          <select
-            value={selectedWitness}
-            onChange={(e) => setSelectedWitness(e.target.value)}
-            disabled={loadingWitnesses}
-          >
-            <option value="">
-              {loadingWitnesses
-                ? translations[language].loadingWitnesses
-                : translations[language].selectOption}
-            </option>
-            {witnesses.map((w) => (
-              <option key={w} value={w}>
-                {w}
-              </option>
-            ))}
-          </select>
-        )}
-      </div>
+    {/* WITNESS DROPDOWN */}
+    <div className="dropdown-container">
+      <label>{translations[language].selectWitness}</label>
 
-      {/* BUTTON */}
-      <div className="analyze-button-container">
-        <button
-          className="analyze-btn"
-          onClick={handleAnalyzeClick}
-          disabled={loading || !selectedWitness}
+      {loadingWitnesses ? (
+        <p>{translations[language].loadingWitnesses}</p>
+      ) : (
+        <select
+          value={selectedWitness}
+          onChange={(e) => setSelectedWitness(e.target.value)}
+          disabled={loadingWitnesses}
         >
-          {loading
-            ? translations[language].analyzing
-            : translations[language].analyzeBtn}
-        </button>
-      </div>
+          <option value="">
+            {translations[language].selectOption}
+          </option>
 
-      {/* RESULTS */}
-      {analysis && (
-        <div className="results-container">
-          <h3 className="results-heading">
-            {translations[language].results}{analysis.witnessId}
-          </h3>
-          <div className="contradiction-cards">
-            {analysis.results.map((item, index) => (
-              <div key={index} className={`contradiction-card ${item.severity}`}>
-                <span className="severity-icon">
-                  {severityIcons[item.severity]}
-                </span>
-                <span>{item.text}</span>
-              </div>
-            ))}
-          </div>
-        </div>
+          {witnesses.map((w) => (
+            <option key={w} value={w}>
+              {w}
+            </option>
+          ))}
+        </select>
       )}
     </div>
-  );
+
+    {/* ANALYZE BUTTON */}
+    <div className="analyze-button-container">
+      <button
+        className="analyze-btn"
+        onClick={handleAnalyzeClick}
+        disabled={loading || !selectedWitness}
+      >
+        {loading
+          ? translations[language].analyzing
+          : translations[language].analyzeBtn}
+      </button>
+    </div>
+
+    {/* RESULTS */}
+    {analysis && (
+      <div className="results-container">
+        <h3 className="results-heading">
+          {translations[language].results}
+          {analysis.witnessId}
+        </h3>
+
+        <div className="contradiction-cards">
+          {analysis.results.map((item, index) => (
+            <div key={index} className={`contradiction-card ${item.severity}`}>
+              <span className={`priority-tag ${item.severity}`}>
+                {priorityTags[item.severity][language]}
+              </span>
+              <span>{item.text}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    )}
+  </div>
+);
 };
 
 export default Contradictions;
