@@ -1,34 +1,73 @@
-import html2pdf from 'html2pdf.js';
 import { Document, Packer, Paragraph, HeadingLevel, TextRun } from 'docx';
+import html2pdf from 'html2pdf.js';
 
 export async function exportMarkdownToPDF(markdownHtml: string, fileName: string = 'report.pdf') {
-  const container = document.createElement('div');
-  container.innerHTML = markdownHtml;
-  container.style.fontFamily = 'Amiri, "Noto Naskh Arabic", "Traditional Arabic", Arial, sans-serif';
-
-  const opt = {
-    margin:       [0.5, 0.5, 0.5, 0.5],
-    filename:     fileName,
-    image:        { type: 'jpeg', quality: 0.98 },
-    html2canvas:  { 
-      scale: 3,
+  // Use html2pdf.js for proper Arabic rendering
+  const element = document.createElement('div');
+  element.innerHTML = markdownHtml;
+  element.style.fontFamily = '"Traditional Arabic", "IBM Plex Sans Arabic", "Cairo", "Noto Sans Arabic", Arial, sans-serif';
+  element.style.direction = 'rtl';
+  element.style.textAlign = 'right';
+  element.style.padding = '20px';
+  element.style.fontSize = '14px';
+  element.style.lineHeight = '1.6';
+  element.style.color = '#000';
+  
+  // Add CSS classes for better page break control
+  element.style.pageBreakInside = 'auto';
+  
+  // Add page break prevention for headings and their following content
+  const headings = element.querySelectorAll('h1, h2, h3');
+  headings.forEach(heading => {
+    (heading as HTMLElement).style.pageBreakAfter = 'avoid';
+    (heading as HTMLElement).style.pageBreakInside = 'avoid';
+  });
+  
+  // Prevent tables from breaking
+  const tables = element.querySelectorAll('table');
+  tables.forEach(table => {
+    (table as HTMLElement).style.pageBreakInside = 'avoid';
+  });
+  
+  // Allow paragraphs to break naturally
+  const paragraphs = element.querySelectorAll('p');
+  paragraphs.forEach(p => {
+    (p as HTMLElement).style.pageBreakInside = 'auto';
+  });
+  
+  const options: any = {
+    margin: [15, 15, 15, 15],
+    filename: fileName,
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { 
+      scale: 2.5,
       useCORS: true,
+      logging: false,
       letterRendering: true,
       allowTaint: true,
-      logging: false,
-      windowWidth: 1200
+      backgroundColor: '#ffffff',
+      windowHeight: 1200
     },
-    jsPDF:        { 
-      unit: 'in', 
+    jsPDF: { 
+      unit: 'mm', 
       format: 'a4', 
       orientation: 'portrait',
-      compress: true,
-      putOnlyUsedFonts: true
+      compress: true
     },
-    pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
-  } as any;
+    pagebreak: { 
+      mode: ['css', 'legacy'],
+      before: '.page-break-before',
+      after: '.page-break-after',
+      avoid: ['h1', 'h2', 'h3', 'table']
+    }
+  };
 
-  await html2pdf().set(opt).from(container).save();
+  try {
+    await html2pdf().set(options).from(element).save();
+  } catch (error) {
+    console.error('PDF export error:', error);
+    alert('خطأ في تصدير PDF. يرجى المحاولة مجددا.');
+  }
 }
 
 export async function exportMarkdownToDocx(markdownText: string, fileName: string = 'report.docx') {
@@ -139,7 +178,7 @@ export async function exportMarkdownToDocx(markdownText: string, fileName: strin
                     size: idx === 0 ? 32 : 28,
                     font: "Traditional Arabic"
                   })],
-                  alignment: TableAlignmentType.CENTER,
+                  alignment: TableAlignmentType.RIGHT,
                   bidirectional: true,
                   spacing: { before: 150, after: 150 }
                 })],

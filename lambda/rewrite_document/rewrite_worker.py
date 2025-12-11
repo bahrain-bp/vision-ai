@@ -142,11 +142,123 @@ def read_text_from_s3(bucket: str, key: str) -> str:
         raise
 
 
+def preprocess_input_text(text: str) -> str:
+    """
+    Preprocess the raw extracted text BEFORE sending to Bedrock.
+    This cleans up OCR artifacts, removes duplicates, and structures the data properly.
+    """
+    logger.info("🔧 Preprocessing input text...")
+    
+    # Step 1: Remove OCR artifacts and normalize whitespace
+    text = re.sub(r'\r\n', '\n', text)  # Normalize line breaks
+    text = re.sub(r'\r', '\n', text)
+    text = re.sub(r'\t+', ' ', text)  # Tabs to spaces
+    text = re.sub(r' {3,}', '  ', text)  # Collapse excessive spaces
+    
+    # Step 2: Remove page numbers and headers that repeat on every page
+    text = re.sub(r'(?m)^.*?صفحة\s*:?\s*\d+.*?$', '', text)
+    text = re.sub(r'(?m)^.*?رقم الصفحة\s*:?\s*\d+.*?$', '', text)
+    text = re.sub(r'(?m)^\d+\s*/\s*\d+\s*$', '', text)  # Page numbers like "1 / 5"
+    
+    # Step 3: Remove duplicate header blocks (مملكة البحرين / النيابة العامة)
+    # Find all occurrences
+    header_pattern = r'(?:مملكة البحرين|Kingdom of Bahrain)[\s\S]{0,400}?(?:النيابة العامة|Capital Prosecution|نيابة العاصمة)'
+    headers = list(re.finditer(header_pattern, text, re.IGNORECASE))
+    
+    if len(headers) > 1:
+        # Keep only the first, remove the rest
+        for match in reversed(headers[1:]):
+            text = text[:match.start()] + text[match.end():]
+        logger.info(f"✂️ Removed {len(headers) - 1} duplicate header blocks")
+    
+    # Step 4: Remove duplicate "قضية نيابة / جنائي" lines that repeat
+    case_header_pattern = r'(?m)^.*?قضية نيابة\s*/\s*جنائي\s*/\s*جنائي عام.*?رقم البلاغ.*?$'
+    case_headers = list(re.finditer(case_header_pattern, text))
+    
+    if len(case_headers) > 1:
+        seen_text = set()
+        for match in reversed(case_headers):
+            match_text = match.group(0).strip()
+            if match_text in seen_text:
+                # Remove duplicate
+                text = text[:match.start()] + text[match.end():]
+            else:
+                seen_text.add(match_text)
+        logger.info(f"✂️ Removed {len(case_headers) - len(seen_text)} duplicate case header lines")
+    
+    # Step 5: Deduplicate identical paragraphs (OCR often repeats entire blocks)
+    paragraphs = text.split('\n\n')
+    seen_paragraphs = {}
+    unique_paragraphs = []
+    
+    for para in paragraphs:
+        para_clean = para.strip()
+        if not para_clean or len(para_clean) < 10:
+            unique_paragraphs.append(para)
+            continue
+        
+        # Create a signature for comparison (first 100 chars)
+        signature = para_clean[:100]
+        
+        if signature not in seen_paragraphs:
+            seen_paragraphs[signature] = para_clean
+            unique_paragraphs.append(para)
+        else:
+            # Check if it's truly identical or just similar
+            if para_clean == seen_paragraphs[signature]:
+                logger.info(f"✂️ Removed duplicate paragraph starting with: {signature[:50]}...")
+                continue
+            else:
+                unique_paragraphs.append(para)
+    
+    text = '\n\n'.join(unique_paragraphs)
+    
+    # Step 6: Clean up excessive newlines
+    text = re.sub(r'\n{4,}', '\n\n\n', text)
+    text = re.sub(r'\n{3,}', '\n\n', text)
+    
+    # Step 7: Remove common OCR garbage patterns
+    text = re.sub(r'[ΓòΓöΓÇ]{3,}', '', text)  # Garbled encoding
+    text = re.sub(r'[\x00-\x08\x0B-\x0C\x0E-\x1F]', '', text)  # Control characters
+    
+    # Step 8: Fix common table formatting issues
+    # Remove table separators that OCR might duplicate
+    text = re.sub(r'(?m)^[\-\|=\s]+$', '', text)  # Lines with only separators
+    text = re.sub(r'(?m)^\s*\|\s*\|\s*\|\s*\|\s*$', '', text)  # Empty table rows
+    
+    # Step 9: Normalize person ID numbers (ensure they're digit-only)
+    # Keep the original format but warn if suspicious patterns found
+    id_matches = re.findall(r'\b\d{9,10}\b', text)
+    if id_matches:
+        logger.info(f"📋 Found {len(id_matches)} ID numbers in document")
+    
+    # Step 10: Fix common Arabic OCR issues
+    # Replace common misread characters
+    text = text.replace('آ', 'أ')  # Normalize alef variants in names
+    text = text.replace('إ', 'أ')
+    text = re.sub(r'ـ+', '', text)  # Remove Arabic tatweel (elongation)
+    
+    # Step 11: Detect and warn about mixed data (different case numbers)
+    case_numbers = re.findall(r'\b\d{4,6}/\d{4}\b', text)
+    unique_cases = set(case_numbers)
+    if len(unique_cases) > 1:
+        logger.warning(f"⚠️ WARNING: Multiple case numbers detected: {unique_cases}")
+        logger.warning(f"⚠️ Document may contain mixed data from different cases!")
+    
+    logger.info(f"✅ Preprocessing complete. Cleaned text length: {len(text)}")
+    return text.strip()
+
+
 def build_rewrite_prompts(original_text: str) -> Tuple[str, str]:
     system = (
-        "أنت محرِّر تقارير جنائية يعمل لصالح النيابة العامة في مملكة البحرين.\n"
+        "أنت محرِّر تقارير جنائية يعمل لصالح النيابة العامة في مملكة البحرين.\n"
         "مصدر البيانات هو ملف بلاغ شرطي/قضية نيابة يحتوي على جداول مطبوعة "
         "ومجموعة محاضر بعنوان (فتح المحضر بالتاريخ والوقت المذكورين أعلاه...).\n\n"
+        "⚠️ **تحذير حرج: دقة البيانات**\n"
+        "- يجب استخراج **جميع البيانات** (الأسماء، الأرقام الشخصية، الجنسيات، التواريخ، الأوقات، الأماكن) **فقط وحصرياً** من النص المُعطى أدناه.\n"
+        "- **ممنوع منعاً باتاً** إضافة أو تخمين أو جلب أي بيانات من قضايا أخرى أو من ذاكرتك.\n"
+        "- إذا لم تجد معلومة محددة في النص (مثل رقم هاتف أو جنسية شخص)، اكتب: 'غير مذكور'. **لا تخترع بيانات**.\n"
+        "- تحقق من كل اسم ورقم شخصي: يجب أن يكون موجوداً **حرفياً** في النص الأصلي المُعطى.\n\n"
         "مهمتك:\n"
         "- إنتاج تقرير واحد منظم وواضح فقط، باللغة العربية الرسمية، بدون أي زخرفة.\n"
         "- لا تضف أي معلومة جديدة غير موجودة في النص الأصلي.\n"
@@ -173,7 +285,12 @@ def build_rewrite_prompts(original_text: str) -> Tuple[str, str]:
         "- ممنوع تغيير حالة المتهم (موقوف/مطلوب/مخلى سبيل) إلا كما ورد في النص.\n"
         "- ممنوع اختراع قرار نيابة أو حكم محكمة غير مذكور.\n"
         "- إذا لم تجد معلومة مطلوبة في الهيكل، اكتب بدلاً منها: 'غير مذكور في المستند'.\n"
-        "- إذا كان هناك أكثر من بلاغ أو أكثر من رقم قضية مذكور، دوِّنها كلها في قسم بيانات القضية أو التواريخ المهمة مع توضيح علاقتها قدر الإمكان من النص نفسه فقط.\n"
+        "- إذا كان هناك أكثر من بلاغ أو أكثر من رقم قضية مذكور، دوِّنها كلها في قسم بيانات القضية أو التواريخ المهمة مع توضيح علاقتها قدر الإمكان من النص نفسه فقط.\n"
+        "- إذا تعارضت معلومتان (مثل جنسيتان مختلفتان للشخص الواحد، أو أرقام شخصية مختلفة)، اذكر **كلتيهما** مع توضيح الاختلاف واذكر أين ورد كل واحد منهما في المستند.\n"
+        "- استخرج جميع المبالغ المالية المذكورة (الأموال المسروقة، قيمة المضبوطات، التعويضات) وحدِّد وحدة العملة (دينار بحريني، إلخ).\n"
+        "- استخرج جميع الأضرار المذكورة بالتفصيل (الأقفال المتكسرة، الصناديق المسروقة، تلف الأثاث، إلخ) وإن أمكن قيمة كل ضرر.\n"
+        "- في قسم التواريخ المهمة: اكتب خط زمني **كامل** يتضمن: تاريخ وقوع الجريمة، تاريخ تلقي البلاغ، تاريخ فتح المحضر، تاريخ انتقال الموقع، تاريخ القبض، تاريخ الاستجواب، تاريخ كل قرار نيابة، وأي تواريخ أخرى مذكورة، **مرتبة زمنياً من الأقدم إلى الأحدث**.\n"
+        "- إذا وردت معلومات متناقضة أو متغيرة عن شخص واحد (مثل جنسية مختلفة في صفحات مختلفة)، لا تحاول التوفيق بينها - اذكرهما معاً في الجدول أو النص مع إشارة إلى الاختلاف.\n"
     )
 
     user = (
@@ -193,6 +310,11 @@ def build_rewrite_prompts(original_text: str) -> Tuple[str, str]:
         "- وجود تصوير أمني (نعم / لا / غير مذكور):\n"
         "- رغبة الأطراف في الصلح (نعم / لا / غير مذكور):\n\n"
         "## الأطراف\n\n"
+        "⚠️ **مهم جداً: التحقق من دقة بيانات الأطراف**\n"
+        "- قبل إضافة أي شخص في الجدول، تأكد من وجود اسمه **حرفياً** في النص الأصلي أعلاه.\n"
+        "- تحقق من أن كل رقم شخصي مذكور في الجدول **موجود بالفعل** في النص الأصلي.\n"
+        "- إذا وجدت شخصاً مذكوراً باسم مختلف في مكانين (مثل: علي محمد في صفحة، وعلي محمد علي في صفحة أخرى)، اختر الاسم الأكثر اكتمالاً.\n"
+        "- **لا تضف أي شخص من ذاكرتك أو من قضايا أخرى**.\n\n"
         "اكتب جدول Markdown واحد لكل الأطراف المذكورين في الملف، "
         "بغض النظر عن مكان ظهورهم في الجداول أو المحاضر. هذا هو **الجدول الوحيد المسموح** في التقرير:\n\n"
         "| الصفة | الاسم الكامل | الجنسية | الرقم الشخصي | الهاتف | ملاحظات |\n"
@@ -243,9 +365,12 @@ def build_rewrite_prompts(original_text: str) -> Tuple[str, str]:
         "- إذا تم تسليم أي مضبوطات أو مبالغ لشخص أو جهة، اذكر من استلم، متى، وما هي الأشياء المسلَّمة في نقاط.\n"
         "- إذا لم يُذكر تسليم مضبوطات، اكتب: 'غير مذكور في المستند'.\n\n"
         "## التواريخ المهمة والخط الزمني\n\n"
-        "- لا تستخدم جدول هنا؛ اكتفِ بقائمة مرتبة زمنياً.\n"
-        "- اكتب قائمة منسقة بالتواريخ والأحداث مثل:\n"
-        "  - التاريخ والوقت – الحدث – الجهة/الشخص (مثال: 2025-07-22 14:02 – تلقي البلاغ في مركز شرطة جنوب العاصمة – مركز الشرطة).\n\n"
+        "- لا تستخدم جدول هنا؛ اكتفِ بقائمة مرتبة زمنياً من الأقدم إلى الأحدث.\n"
+        "- اكتب قائمة **شاملة** بجميع التواريخ والأحداث مثل:\n"
+        "  - التاريخ والوقت – الحدث – الجهة/الشخص (مثال: 2025-07-19 15:28 – وقوع الجريمة (السرقة من حصالة التبرعات) – محل برين فريز).\n"
+        "  - تضمن القائمة: تاريخ الجريمة، تاريخ تلقي البلاغ، تواريخ فتح المحاضر، تاريخ انتقال الموقع، تاريخ القبض على المتهم، تواريخ الاستجوابات، تواريخ قرارات النيابة، تاريخ الإحالة للمحكمة، أي تواريخ أخرى مذكورة.\n"
+        "- إذا كانت هناك ساعات محددة، اكتبها أيضاً (مثال: 2025-07-22 14:33).\n"
+        "- الترتيب **إلزامي**: من الأقدم إلى الأحدث.\n\n"
         "## التوقيعات والمحررين\n\n"
         "- اذكر أسماء ورتب محرري المحاضر (مساعد ملازم، عريف، رقيب أول...)\n"
         "- اذكر أسماء الضباط المشرفين (مثال: الرائد/ علي فاضل، النقيب/ حسين شاكر).\n"
@@ -350,12 +475,30 @@ def call_bedrock_for_chunk(chunk_text: str, chunk_num: int, total_chunks: int) -
     """Call Bedrock to rewrite a single chunk."""
     system_prompt, _ = build_rewrite_prompts("")
 
-    user_prompt = (
-        f"أعد كتابة الجزء التالي من تقرير التحقيق (الجزء {chunk_num} من {total_chunks}). "
-        "حافظ على جميع الحقائق والأسماء والتواريخ كما هي.\n\n"
-        f"{chunk_text}\n\n"
-        "اكتب النسخة المعاد صياغتها بالعربية الفصحى فقط."
-    )
+    if total_chunks == 1:
+        user_prompt = (
+            "أعد كتابة التقرير التالي. حافظ على جميع الحقائق والأسماء والتواريخ كما هي.\n\n"
+            f"{chunk_text}\n\n"
+            "اكتب النسخة المعاد صياغتها بالعربية الفصحى فقط."
+        )
+    else:
+        # Multi-chunk: Tell Bedrock this is a continuation
+        if chunk_num == 1:
+            user_prompt = (
+                f"أعد كتابة الجزء الأول من تقرير التحقيق (جزء {chunk_num} من {total_chunks}). "
+                "حافظ على جميع الحقائق والأسماء والتواريخ كما هي. "
+                "لا تكرر عنوان 'مملكة البحرين' أو 'النيابة العامة' أو 'بيانات القضية' في الأجزاء اللاحقة.\n\n"
+                f"{chunk_text}\n\n"
+                "اكتب النسخة المعاد صياغتها بالعربية الفصحى فقط."
+            )
+        else:
+            user_prompt = (
+                f"أعد كتابة الجزء التالي من تقرير التحقيق (جزء {chunk_num} من {total_chunks}). "
+                "هذا جزء متصل بما سبق، فلا تكرر العناوين الرئيسية أو بيانات القضية مرة أخرى. "
+                "حافظ على جميع الحقائق والأسماء والتواريخ كما هي.\n\n"
+                f"{chunk_text}\n\n"
+                "اكتب النسخة المعاد صياغتها بالعربية الفصحى فقط، دون تكرار الرؤوس."
+            )
 
     request_body = {
         "system": [{"text": system_prompt}],
@@ -395,6 +538,60 @@ def call_bedrock_for_chunk(chunk_text: str, chunk_num: int, total_chunks: int) -
         raise
 
 
+def remove_duplicate_sections(text: str) -> str:
+    """Remove duplicate header sections and content blocks from merged chunks."""
+    
+    # Remove duplicate "مملكة البحرين" / "النيابة العامة" header blocks
+    # Keep only the first occurrence
+    header_pattern = r'(?:#+\s*)?(?:مملكة البحرين|Kingdom of Bahrain)[\s\S]{0,300}?(?:النيابة العامة|Capital Prosecution)'
+    headers = list(re.finditer(header_pattern, text, re.IGNORECASE))
+    
+    if len(headers) > 1:
+        # Remove all but the first
+        for match in reversed(headers[1:]):
+            text = text[:match.start()] + text[match.end():]
+        logger.info(f"Removed {len(headers) - 1} duplicate header blocks")
+    
+    # Remove duplicate "بيانات القضية" sections
+    case_data_pattern = r'##\s*بيانات القضية\s*\n[\s\S]{0,800}?(?=\n##|\Z)'
+    case_sections = list(re.finditer(case_data_pattern, text))
+    
+    if len(case_sections) > 1:
+        # Keep the most complete one (longest)
+        longest = max(case_sections, key=lambda m: len(m.group(0)))
+        for match in case_sections:
+            if match != longest:
+                text = text[:match.start()] + text[match.end():]
+        logger.info(f"Removed {len(case_sections) - 1} duplicate case data sections")
+    
+    # Remove duplicate section headers (## Title appearing multiple times)
+    section_pattern = r'(##\s+[^\n]+)'
+    seen_headers = set()
+    lines = text.split('\n')
+    clean_lines = []
+    
+    for line in lines:
+        if re.match(section_pattern, line):
+            header_text = line.strip()
+            if header_text in seen_headers:
+                # Skip duplicate header
+                continue
+            seen_headers.add(header_text)
+        clean_lines.append(line)
+    
+    text = '\n'.join(clean_lines)
+    
+    # Remove chunk markers like "الجزء 1 من 2"
+    text = re.sub(r'الجزء\s*\d+\s*من\s*\d+', '', text)
+    text = re.sub(r'\(الجزء\s+\d+\)', '', text)
+    
+    # Clean up excessive newlines
+    text = re.sub(r'\n{4,}', '\n\n\n', text)
+    text = re.sub(r'\n{3,}', '\n\n', text)
+    
+    return text
+
+
 def call_bedrock_for_rewrite(original_text: str) -> str:
     """Rewrite document by processing in chunks if needed."""
     chunks = split_text_into_chunks(original_text)
@@ -411,11 +608,13 @@ def call_bedrock_for_rewrite(original_text: str) -> str:
         rewritten = call_bedrock_for_chunk(chunk, i, len(chunks))
         rewritten_chunks.append(rewritten)
 
-    # Merge chunks, removing overlap duplicates
+    # Merge chunks with smart deduplication
     result = rewritten_chunks[0]
     for chunk in rewritten_chunks[1:]:
-        # Simple merge - append with newline
-        result += "\n" + chunk
+        result += "\n\n" + chunk
+    
+    # Remove duplicates created during merge
+    result = remove_duplicate_sections(result)
 
     logger.info(f"Merged {len(chunks)} chunks. Final length: {len(result)}")
     return result
@@ -717,22 +916,27 @@ def lambda_handler(event: Dict, context: Any) -> None:
                 })
                 return
         
+        # Preprocess the input text BEFORE sending to Bedrock
+        logger.info(f"📝 Original text length: {len(text)} chars")
+        preprocessed_text = preprocess_input_text(text)
+        logger.info(f"✅ Preprocessed text length: {len(preprocessed_text)} chars")
+        
         # Validate text size
-        if len(text) > MAX_TOTAL_CHARS:
-            logger.warning(f"Job {job_id}: Text too long ({len(text)} chars)")
+        if len(preprocessed_text) > MAX_TOTAL_CHARS:
+            logger.warning(f"Job {job_id}: Text too long ({len(preprocessed_text)} chars)")
             update_job_status(job_id, "FAILED", {
                 "error": f"Text too long. Max {MAX_TOTAL_CHARS} chars allowed",
-                "currentChars": len(text),
+                "currentChars": len(preprocessed_text),
                 "sessionId": session_id
             })
             return
         
         # Perform rewrite
         logger.info(f"Starting Bedrock processing for job {job_id}")
-        bedrock_output = call_bedrock_for_rewrite(text)
+        bedrock_output = call_bedrock_for_rewrite(preprocessed_text)
         
         # Validate and sanitize
-        is_valid, sanitized, violations = validate_and_sanitize(text, bedrock_output)
+        is_valid, sanitized, violations = validate_and_sanitize(preprocessed_text, bedrock_output)
         
         if not is_valid:
             logger.warning(f"Job {job_id}: Validation violations: {violations}")
@@ -741,13 +945,13 @@ def lambda_handler(event: Dict, context: Any) -> None:
             rewritten_text = bedrock_output
         
         # Save result to S3
-        result_key = save_rewritten_result(job_id, session_id, rewritten_text, len(text))
+        result_key = save_rewritten_result(job_id, session_id, rewritten_text, len(preprocessed_text))
         
         # Update status to COMPLETED
         update_job_status(job_id, "COMPLETED", {
             "resultKey": result_key,
             "resultLength": len(rewritten_text),
-            "originalLength": len(text),
+            "originalLength": len(preprocessed_text),
             "model": MODEL_ID,
             "sessionId": session_id,
             "validationPassed": is_valid,
