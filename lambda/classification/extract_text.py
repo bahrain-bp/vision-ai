@@ -4,6 +4,7 @@ import logging
 import os
 import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import unicodedata
 from urllib.parse import unquote_plus
 
 import boto3
@@ -87,11 +88,7 @@ VISION_USER_PROMPT = """
    - اجعل كل فقرة في سطر مستقل.
    - ضع سطرًا فارغًا واحدًا بين الفقرة والتي تليها.
 6. **الجداول**:
-   - إذا كان هناك جدول، اكتبه نصياً:
-     - كل صف في سطر.
-     - الأعمدة مفصولة بعلامة | (بايب).
-     - مثال:
-       الاسم | الرقم الشخصي | رقم الهاتف
+   - ضع كل صف في سطر واحد
 7. مربعات النص أو الملاحظات الجانبية:
    - استخرج محتواها وأدرجه في المكان المنطقي حسب سياق النص وترتيب القراءة.
 8. لا تُلخّص ولا تترجم ولا تغيّر المعنى:
@@ -371,7 +368,9 @@ def normalize_docx_text(raw_text):
 def merge_lines(text):
     if not text:
         return ""
-    return re.sub(r"([^\n])\n(?=[^\n])", r"\1 ", text.strip())
+    merged = re.sub(r"([^\n])\n(?=[^\n])", r"\1 ", text.strip())
+    # Normalize presentation forms (common in Arabic PDFs) back to base codepoints.
+    return unicodedata.normalize("NFKC", merged)
 
 
 def format_page_output(page_index, body):
