@@ -4,7 +4,7 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { Sparkles, AlertCircle, ChevronDown, Plus } from "lucide-react";
+import { AlertCircle, ChevronDown, Plus } from "lucide-react";
 import { createPortal } from "react-dom";
 import { SessionData } from "../../ProcessingView";
 
@@ -506,20 +506,18 @@ const AISuggestions: React.FC<AISuggestionsProps> = ({
         </div>
       )}
 
-      <div className={`ai-suggestions-card ${language === "ar" ? "rtl" : ""}`}>
-        <div className="ai-suggestions-header">
-          <div>
-            
-            <h3 className="ai-main-title">{language === "en" ? "AI Suggestions" : "اقتراحات الذكاء الاصطناعي"}</h3>
-            <p className="ai-main-subtitle">
-              {language === "en" 
-                ? "Generate AI targeted follow-up questions derived from the rewritten report analysis to help clarify, confirm, or expand on critical details."
-                : "إنشاء أسئلة متابعة مستهدفة بالذكاء الاصطناعي مستمدة من تحليل التقرير المعاد صياغته للمساعدة في توضيح أو تأكيد أو توسيع التفاصيل الحرجة."}
-            </p>
-          </div>
+      <div className="ai-suggestions-header">
+        <div>
+          <h3 className="ai-main-title">{language === "en" ? "AI Suggestions" : "اقتراحات الذكاء الاصطناعي"}</h3>
+          <p className="ai-main-subtitle">
+            {language === "en" 
+              ? "Generate AI targeted follow-up questions derived from the rewritten report analysis to help clarify, confirm, or expand on critical details."
+              : "إنشاء أسئلة متابعة مستهدفة بالذكاء الاصطناعي مستمدة من تحليل التقرير المعاد صياغته للمساعدة في توضيح أو تأكيد أو توسيع التفاصيل الحرجة."}
+          </p>
         </div>
+      </div>
 
-        <div className="ai-suggestions-grid">
+      <div className="ai-suggestions-grid">
           <section className="ai-suggestions-panel">
             <div className="ai-panel-header">
               <h4 className="ai-panel-title">{language === "en" ? "Suggested Questions" : "الأسئلة المقترحة"}</h4>
@@ -529,7 +527,6 @@ const AISuggestions: React.FC<AISuggestionsProps> = ({
                 onClick={() => handleGenerateQuestions()}
                 disabled={isLoading || isQuestionGenerating}
               >
-                <Sparkles size={16} />
                 {isQuestionGenerating ? (language === "en" ? "Generating..." : "جاري الإنشاء...") : (language === "en" ? "Generate" : "إنشاء")}
               </button>
             </div>
@@ -682,7 +679,6 @@ const AISuggestions: React.FC<AISuggestionsProps> = ({
                 onClick={handleGenerateFocusAreas}
                 disabled={isLoading || isFocusGenerating}
               >
-                <Sparkles size={16} />
                 {isFocusGenerating ? (language === "en" ? "Generating..." : "جاري الإنشاء...") : (language === "en" ? "Generate" : "إنشاء")}
               </button>
             </div>
@@ -775,7 +771,6 @@ const AISuggestions: React.FC<AISuggestionsProps> = ({
               )}
             </div>
           </section>
-        </div>
       </div>
     </div>
   );

@@ -1,5 +1,4 @@
 import React, { useMemo, useState } from "react";
-import { Sparkles } from "lucide-react";
 import { SessionData } from "../ProcessingView";
 
 type VerdictType = "guilty" | "not-guilty";
@@ -118,37 +117,35 @@ const Outcome: React.FC<OutcomeProps> = ({ sessionData, language, persistedData 
           <span>{statusMessage}</span>
         </div>
       )}
-      <div className="outcome-integrated-card">
-            <div className="outcome-integrated-header">
-          <div>
-            
-            <h3 className="ai-main-title">
-              {resolvedLanguage === "en" ? "Confidence & Verdict" : "الثقة والحكم"}
-            </h3>
-            <p className="ai-main-subtitle">
-              {resolvedLanguage === "en"
-                ? "Deliver a comprehensive case assessment with confidence scoring and a clear verdict explanation."
-                : "تقديم تقييم شامل للقضية مع درجة الثقة وتفسير واضح للحكم."}
-            </p>
-          </div>
-          <button
-            type="button"
-            className={`ai-cta ai-cta-compact ${isGenerating ? "loading" : ""}`}
-            onClick={handleGenerate}
-            disabled={isGenerating}
-          >
-            <Sparkles size={16} />
-            {isGenerating
-              ? resolvedLanguage === "en"
-                ? "Generating..."
-                : "جاري الإنشاء..."
-              : resolvedLanguage === "en"
-              ? "Generate"
-              : "إنشاء"}
-          </button>
+      
+      <div className="outcome-integrated-header">
+        <div>
+          <h3 className="ai-main-title">
+            {resolvedLanguage === "en" ? "Confidence & Verdict" : "الثقة والحكم"}
+          </h3>
+          <p className="ai-main-subtitle">
+            {resolvedLanguage === "en"
+              ? "Deliver a comprehensive case assessment with confidence scoring and a clear verdict explanation."
+              : "تقديم تقييم شامل للقضية مع درجة الثقة وتفسير واضح للحكم."}
+          </p>
         </div>
+        <button
+          type="button"
+          className={`ai-cta ai-cta-compact ${isGenerating ? "loading" : ""}`}
+          onClick={handleGenerate}
+          disabled={isGenerating}
+        >
+          {isGenerating
+            ? resolvedLanguage === "en"
+              ? "Generating..."
+              : "جاري الإنشاء..."
+            : resolvedLanguage === "en"
+            ? "Generate"
+            : "إنشاء"}
+        </button>
+      </div>
 
-        <div className="outcome-dual-grid">
+      <div className="outcome-dual-grid">
           <section className="outcome-panel">
             <div className="outcome-panel-heading">
               <h4>{resolvedLanguage === "en" ? "Confidence score" : "درجة الثقة"}</h4>
@@ -256,7 +253,6 @@ const Outcome: React.FC<OutcomeProps> = ({ sessionData, language, persistedData 
               )}
             </div>
           </section>
-        </div>
       </div>
     </div>
   );
