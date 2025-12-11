@@ -949,14 +949,24 @@
 .skeleton {
   position: relative;
   overflow: hidden;
-  background: linear-gradient(90deg, rgba(226, 232, 240, 0.35), rgba(226, 232, 240, 0.6), rgba(226, 232, 240, 0.35));
+  background: linear-gradient(
+    90deg,
+    rgba(226, 232, 240, 0.35),
+    rgba(226, 232, 240, 0.6),
+    rgba(226, 232, 240, 0.35)
+  );
 }
 
 .skeleton::after {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.55),
+    transparent
+  );
   animation: aiSkeleton 1.4s ease-in-out infinite;
 }
 
@@ -981,7 +991,12 @@
   width: 120px;
   height: 120px;
   border-radius: 50%;
-  background: linear-gradient(90deg, rgba(226, 232, 240, 0.4), rgba(226, 232, 240, 0.7), rgba(226, 232, 240, 0.4));
+  background: linear-gradient(
+    90deg,
+    rgba(226, 232, 240, 0.4),
+    rgba(226, 232, 240, 0.7),
+    rgba(226, 232, 240, 0.4)
+  );
   position: relative;
   overflow: hidden;
 }
@@ -990,7 +1005,12 @@
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.65), transparent);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.65),
+    transparent
+  );
   animation: aiSkeleton 1.4s ease-in-out infinite;
 }
 
@@ -1250,10 +1270,10 @@
 }
 
 .camera-title {
-  font-size: 1.5rem;
-  font-weight: 700;
+  margin: 0.35rem 0;
+  font-size: 1.8rem;
+  font-weight: 600;
   color: var(--text-dark);
-  margin-bottom: 0.5rem;
 }
 
 .camera-description {
@@ -2133,10 +2153,10 @@
 }
 
 .audio-main-title {
-  font-size: 1.5rem;
-  font-weight: 700;
+  margin: 0.35rem 0;
+  font-size: 1.8rem;
+  font-weight: 600;
   color: var(--text-dark);
-  margin-bottom: 0.5rem;
 }
 
 .audio-main-description {
@@ -2916,7 +2936,6 @@
 .outcome-integrated-card[dir="rtl"] .verdict-header {
   flex-direction: row;
 }
-
 
 /* RTL Support for AI Suggestions */
 .ai-suggestions-view.rtl,

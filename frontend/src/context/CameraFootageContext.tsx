@@ -100,7 +100,7 @@ interface CameraFootageState {
   isExporting: boolean;
   banner: {
     type: "success" | "error" | "warning" | "info";
-    message: string;
+    message: string | { en: string; ar: string };
   } | null;
   showResetModal: boolean;
 }
@@ -122,7 +122,7 @@ interface CameraFootageContextType {
   setBanner: (
     banner: {
       type: "success" | "error" | "warning" | "info";
-      message: string;
+      message: string | { en: string; ar: string };
     } | null
   ) => void;
   setShowResetModal: (show: boolean) => void;
@@ -206,7 +206,7 @@ export const CameraFootageProvider: React.FC<{ children: ReactNode }> = ({
   const setBanner = (
     banner: {
       type: "success" | "error" | "warning" | "info";
-      message: string;
+      message: string | { en: string; ar: string };
     } | null
   ) => {
     setState((prev) => ({ ...prev, banner: banner }));

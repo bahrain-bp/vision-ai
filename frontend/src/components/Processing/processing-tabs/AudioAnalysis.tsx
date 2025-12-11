@@ -84,7 +84,7 @@ const AudioAnalysis: React.FC<AudioAnalysisProps> = ({ sessionData }) => {
   // Helper function to show banner
   const showBanner = (
     type: "success" | "error" | "warning" | "info",
-    message: string,
+    message: string | { en: string; ar: string },
     duration: number = 5000
   ) => {
     setBanner({ type, message });
@@ -116,33 +116,30 @@ const AudioAnalysis: React.FC<AudioAnalysisProps> = ({ sessionData }) => {
       !validTypes.includes(file.type) &&
       !file.name.match(/\.(mp3|wav|flac|ogg|m4a|mp4)$/i)
     ) {
-      showBanner(
-        "error",
-        language === "ar"
-          ? "يرجى تحميل ملف صوتي صالح (MP3, WAV, FLAC, OGG, M4A)."
-          : "Please upload a valid audio file (MP3, WAV, FLAC, OGG, M4A)."
-      );
+      showBanner("error", {
+        en: "Please upload a valid audio file (MP3, WAV, FLAC, OGG, M4A).",
+        ar: "يرجى تحميل ملف صوتي صالح (MP3, WAV, FLAC, OGG, M4A).",
+      });
       return;
     }
 
     // Validate file size (500MB max)
     const maxSize = 500 * 1024 * 1024;
     if (file.size > maxSize) {
-      showBanner(
-        "error",
-        language === "ar"
-          ? "ملف الصوت كبير جداً. الحد الأقصى 500 ميجابايت."
-          : "Audio file is too large. Maximum size is 500MB."
-      );
+      showBanner("error", {
+        en: "Audio file is too large. Maximum size is 500MB.",
+        ar: "ملف الصوت كبير جداً. الحد الأقصى 500 ميجابايت.",
+      });
       return;
     }
 
     setIsUploading(true);
     showBanner(
       "info",
-      language === "ar"
-        ? "جاري تحميل الملف الصوتي..."
-        : "Uploading audio file...",
+      {
+        en: "Uploading audio file...",
+        ar: "جاري تحميل الملف الصوتي...",
+      },
       0
     );
 
@@ -156,6 +153,7 @@ const AudioAnalysis: React.FC<AudioAnalysisProps> = ({ sessionData }) => {
           body: JSON.stringify({
             fileName: file.name,
             fileType: file.type || "audio/mpeg",
+            fileSize: file.size,
           }),
         }
       );
@@ -192,20 +190,16 @@ const AudioAnalysis: React.FC<AudioAnalysisProps> = ({ sessionData }) => {
       setTranscriptionResult(null);
       setAnalysisResult(null);
 
-      showBanner(
-        "success",
-        language === "ar"
-          ? "تم تحميل الملف الصوتي بنجاح! جاهز للنسخ."
-          : "Audio file uploaded successfully! Ready for transcription."
-      );
+      showBanner("success", {
+        en: "Audio file uploaded successfully! Ready for transcription.",
+        ar: "تم تحميل الملف الصوتي بنجاح! جاهز للنسخ.",
+      });
     } catch (error: any) {
       console.error("[AudioAnalysis] Upload error:", error);
-      showBanner(
-        "error",
-        language === "ar"
-          ? "فشل التحميل. يرجى المحاولة مرة أخرى."
-          : "Upload failed. Please try again."
-      );
+      showBanner("error", {
+        en: "Upload failed. Please try again.",
+        ar: "فشل التحميل. يرجى المحاولة مرة أخرى.",
+      });
     } finally {
       setIsUploading(false);
     }
@@ -214,12 +208,10 @@ const AudioAnalysis: React.FC<AudioAnalysisProps> = ({ sessionData }) => {
   // Start transcription
   const startTranscription = async () => {
     if (!uploadedS3Key) {
-      showBanner(
-        "error",
-        language === "ar"
-          ? "يرجى تحميل ملف صوتي أولاً."
-          : "Please upload an audio file first."
-      );
+      showBanner("error", {
+        en: "Please upload an audio file first.",
+        ar: "يرجى تحميل ملف صوتي أولاً.",
+      });
       return;
     }
 
@@ -227,9 +219,10 @@ const AudioAnalysis: React.FC<AudioAnalysisProps> = ({ sessionData }) => {
     setTranscriptionResult(null);
     showBanner(
       "info",
-      language === "ar"
-        ? "جاري بدء النسخ والترجمة..."
-        : "Starting transcription and translation...",
+      {
+        en: "Starting transcription and translation...",
+        ar: "جاري بدء النسخ والترجمة...",
+      },
       0
     );
 
@@ -258,12 +251,10 @@ const AudioAnalysis: React.FC<AudioAnalysisProps> = ({ sessionData }) => {
     } catch (error: any) {
       console.error("[AudioAnalysis] Transcription error:", error);
       setIsTranscribing(false);
-      showBanner(
-        "error",
-        language === "ar"
-          ? "فشل بدء النسخ. يرجى المحاولة مرة أخرى."
-          : "Failed to start transcription. Please try again."
-      );
+      showBanner("error", {
+        en: "Failed to start transcription. Please try again.",
+        ar: "فشل بدء النسخ. يرجى المحاولة مرة أخرى.",
+      });
     }
   };
 
@@ -273,22 +264,28 @@ const AudioAnalysis: React.FC<AudioAnalysisProps> = ({ sessionData }) => {
     const pollInterval = 5000;
     let attempts = 0;
 
-    const progressMessages =
-      language === "ar"
-        ? [
-            "جاري نسخ الصوت...",
-            "جاري اكتشاف اللغة...",
-            "جاري معالجة الكلام...",
-            "جاري الترجمة إلى العربية...",
-            "على وشك الانتهاء...",
-          ]
-        : [
-            "Transcribing audio...",
-            "Detecting language...",
-            "Processing speech...",
-            "Translating to Arabic...",
-            "Almost done...",
-          ];
+    const progressMessages = [
+      {
+        en: "Transcribing audio...",
+        ar: "جاري نسخ الصوت...",
+      },
+      {
+        en: "Detecting language...",
+        ar: "جاري اكتشاف اللغة...",
+      },
+      {
+        en: "Processing speech...",
+        ar: "جاري معالجة الكلام...",
+      },
+      {
+        en: "Translating to Arabic...",
+        ar: "جاري الترجمة إلى العربية...",
+      },
+      {
+        en: "Almost done...",
+        ar: "على وشك الانتهاء...",
+      },
+    ];
 
     const poll = async () => {
       attempts++;
@@ -319,12 +316,10 @@ const AudioAnalysis: React.FC<AudioAnalysisProps> = ({ sessionData }) => {
             setTimeout(poll, pollInterval);
           } else {
             setIsTranscribing(false);
-            showBanner(
-              "warning",
-              language === "ar"
-                ? "النسخ يستغرق وقتاً أطول من المتوقع. يرجى المحاولة لاحقاً."
-                : "Transcription is taking longer than expected. Please try again later."
-            );
+            showBanner("warning", {
+              en: "Transcription is taking longer than expected. Please try again later.",
+              ar: "النسخ يستغرق وقتاً أطول من المتوقع. يرجى المحاولة لاحقاً.",
+            });
           }
           return;
         }
@@ -332,23 +327,19 @@ const AudioAnalysis: React.FC<AudioAnalysisProps> = ({ sessionData }) => {
         if (data.status === "COMPLETED") {
           setTranscriptionResult(data);
           setIsTranscribing(false);
-          showBanner(
-            "success",
-            language === "ar"
-              ? "تم النسخ والترجمة بنجاح!"
-              : "Transcription and translation completed!"
-          );
+          showBanner("success", {
+            en: "Transcription and translation completed!",
+            ar: "تم النسخ والترجمة بنجاح!",
+          });
           return;
         }
 
         if (data.status === "FAILED") {
           setIsTranscribing(false);
-          showBanner(
-            "error",
-            language === "ar"
-              ? `فشل النسخ: ${data.error || "خطأ غير معروف"}`
-              : `Transcription failed: ${data.error || "Unknown error"}`
-          );
+          showBanner("error", {
+            en: `Transcription failed: ${data.error || "Unknown error"}`,
+            ar: `فشل النسخ: ${data.error || "خطأ غير معروف"}`,
+          });
           return;
         }
       } catch (error: any) {
@@ -357,12 +348,10 @@ const AudioAnalysis: React.FC<AudioAnalysisProps> = ({ sessionData }) => {
           setTimeout(poll, pollInterval);
         } else {
           setIsTranscribing(false);
-          showBanner(
-            "error",
-            language === "ar"
-              ? "حدث خطأ أثناء النسخ. يرجى المحاولة مرة أخرى."
-              : "An error occurred during transcription. Please try again."
-          );
+          showBanner("error", {
+            en: "An error occurred during transcription. Please try again.",
+            ar: "حدث خطأ أثناء النسخ. يرجى المحاولة مرة أخرى.",
+          });
         }
       }
     };
@@ -373,12 +362,10 @@ const AudioAnalysis: React.FC<AudioAnalysisProps> = ({ sessionData }) => {
   // Start analysis
   const startAnalysis = async () => {
     if (!transcriptionResult?.transcription) {
-      showBanner(
-        "error",
-        language === "ar"
-          ? "يرجى إكمال النسخ أولاً."
-          : "Please complete transcription first."
-      );
+      showBanner("error", {
+        en: "Please complete transcription first.",
+        ar: "يرجى إكمال النسخ أولاً.",
+      });
       return;
     }
 
@@ -386,7 +373,10 @@ const AudioAnalysis: React.FC<AudioAnalysisProps> = ({ sessionData }) => {
     setAnalysisResult(null);
     showBanner(
       "info",
-      language === "ar" ? "جاري تحليل النص..." : "Analyzing transcription...",
+      {
+        en: "Analyzing transcription...",
+        ar: "جاري تحليل النص...",
+      },
       0
     );
 
@@ -411,18 +401,16 @@ const AudioAnalysis: React.FC<AudioAnalysisProps> = ({ sessionData }) => {
       console.log("[AudioAnalysis] Analysis result:", data);
 
       setAnalysisResult(data);
-      showBanner(
-        "success",
-        language === "ar" ? "تم التحليل بنجاح!" : "Analysis completed!"
-      );
+      showBanner("success", {
+        en: "Analysis completed!",
+        ar: "تم التحليل بنجاح!",
+      });
     } catch (error: any) {
       console.error("[AudioAnalysis] Analysis error:", error);
-      showBanner(
-        "error",
-        language === "ar"
-          ? "فشل التحليل. يرجى المحاولة مرة أخرى."
-          : "Analysis failed. Please try again."
-      );
+      showBanner("error", {
+        en: "Analysis failed. Please try again.",
+        ar: "فشل التحليل. يرجى المحاولة مرة أخرى.",
+      });
     } finally {
       setIsAnalyzing(false);
     }
@@ -431,12 +419,10 @@ const AudioAnalysis: React.FC<AudioAnalysisProps> = ({ sessionData }) => {
   // Reset for new upload
   const resetForNewUpload = () => {
     resetState();
-    showBanner(
-      "info",
-      language === "ar"
-        ? "النظام جاهز لتحميل ملف صوتي جديد."
-        : "Ready for new audio upload."
-    );
+    showBanner("info", {
+      en: "Preparing for new audio upload. Please wait...",
+      ar: "جارٍ التحضير لتحميل ملف صوتي جديد. يُرجى الانتظار...",
+    });
   };
 
   // Format file size
@@ -459,7 +445,13 @@ const AudioAnalysis: React.FC<AudioAnalysisProps> = ({ sessionData }) => {
               <Loader2 size={18} className="audio-spinning" />
             )}
           </span>
-          <span className="audio-banner-message">{banner.message}</span>
+          <span className="audio-banner-message">
+            {typeof banner.message === "string"
+              ? banner.message
+              : language === "ar"
+              ? banner.message.ar
+              : banner.message.en}
+          </span>
         </div>
       )}
 
