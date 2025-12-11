@@ -41,12 +41,10 @@ PDF_RENDER_DPI = int(os.environ.get("PDF_RENDER_DPI", "220"))
 VISION_MAX_TOKENS = int(os.environ.get("VISION_MAX_TOKENS", "4000"))
 VISION_TEMPERATURE = float(os.environ.get("VISION_TEMPERATURE", "0.2"))
 VISION_TOP_P = float(os.environ.get("VISION_TOP_P", "0.9"))
-TEXT_MAX_TOKENS = int(os.environ.get("TEXT_MAX_TOKENS", "4000"))
-TEXT_TEMPERATURE = float(os.environ.get("TEXT_TEMPERATURE", "0.2"))
-TEXT_TOP_P = float(os.environ.get("TEXT_TOP_P", "0.9"))
 PDF_MIN_TEXT_CHARS = int(os.environ.get("PDF_MIN_TEXT_CHARS", "40"))
 PDF_OCR_LANGS = os.environ.get("PDF_OCR_LANGS", "ara+eng")
 PDF_THREAD_WORKERS = int(os.environ.get("PDF_THREAD_WORKERS", "4"))
+DOCX_PARA_BREAK = "__DOCX_PARA_BREAK__"
 
 NORMALIZATION_SYSTEM_PROMPT = """
 أنت محرّك لتطبيع/تنظيم نصوص المستندات القانونية.
@@ -108,36 +106,6 @@ VISION_USER_PROMPT = """
 
 \"\"\"
 {RAW_TEXT}
-\"\"\"
-""".strip()
-
-DOCX_USER_PROMPT = """
-You are given raw text extracted from a DOCX legal report.
-
-The text may contain:
-- Paragraphs with broken line breaks.
-- Inline representations of tables.
-- Key-value or form-like sections.
-
-Your task:
-- Reconstruct ALL text from this DOCX document in natural reading order.
-- Do NOT summarize or delete any information.
-- Fix line breaks inside paragraphs so that each paragraph becomes continuous text.
-- When you detect a table, output it in the following format:
-  Row 1: ColumnName1=Value1, ColumnName2=Value2, ...
-  Row 2: ...
-- Use the headers you see as ColumnName keys.
-- Do not drop any rows or columns.
-
-Output:
-- Return ONLY plain continuous text (with paragraph breaks and table rows as described).
-- Do not use JSON or code fences.
-- Do not add comments, explanations, notes, or prefaces (e.g., do NOT write "Here is...").
-- Start directly with the document text.
-
-Here is the raw extracted text:
-\"\"\"
-{DOCX_RAW_TEXT}
 \"\"\"
 """.strip()
 
@@ -290,13 +258,10 @@ def extract_docx(s3_key):
     data = obj["Body"].read()
 
     raw_text = extract_docx_raw_text(data)
-    normalized = normalize_docx_text(raw_text) if raw_text else ""
-    final_text = normalized or raw_text
-
-    if not final_text:
+    if not raw_text:
         return error_response("failed to extract the text", status=500)
 
-    return api_response(format_page_output(1, final_text))
+    return api_response(format_page_output(1, raw_text))
 
 
 def extract_docx_raw_text(docx_bytes):
@@ -312,57 +277,37 @@ def extract_docx_raw_text(docx_bytes):
     lines = []
     for block in iter_block_items(document):
         if isinstance(block, Paragraph):
-            text = block.text.strip()
+            text = normalize_docx_line(block.text)
             if text:
                 lines.append(text)
+                lines.append(DOCX_PARA_BREAK)  # mark paragraph boundary
         elif isinstance(block, Table):
-            lines.append("[TABLE]")
             lines.extend(table_to_row_style(block))
-            lines.append("[/TABLE]")
-
-    return "\n".join(lines).strip()
+            lines.append(DOCX_PARA_BREAK)  # mark table boundary
+    collapsed = collapse_docx_paragraphs(lines)
+    return "\n".join(collapsed).strip()
 
 
 def table_to_row_style(table):
-    """Convert a python-docx table into Row N: column=value lines."""
+    """Return table rows as plain lines (header then each row)."""
     if not table.rows:
         return []
 
-    headers = [cell.text.strip() for cell in table.rows[0].cells]
-    header_count = len(headers)
-    safe_headers = [
-        header if header else f"Column{idx + 1}" for idx, header in enumerate(headers)
-    ]
-
+    headers = [normalize_docx_line(cell.text) for cell in table.rows[0].cells]
     lines = []
-    for row_index, row in enumerate(table.rows[1:], start=1):
-        pairs = []
+    # Include header row if it contains any text
+    if any(headers):
+        lines.append(" | ".join(headers))
+
+    for row in table.rows[1:]:
+        cells = []
         for col_index, cell in enumerate(row.cells):
-            header = safe_headers[col_index] if col_index < header_count else f"Column{col_index + 1}"
-            value = cell.text.strip()
-            pairs.append(f"{header}={value}")
-        lines.append(f"Row {row_index}: " + ", ".join(pairs))
+            # Skip duplicate cells caused by merged cells sharing the same _tc
+            if col_index > 0 and row.cells[col_index - 1]._tc is cell._tc:
+                continue
+            cells.append(normalize_docx_line(cell.text))
+        lines.append(" | ".join(cells))
     return lines
-
-
-def normalize_docx_text(raw_text):
-    try:
-        prompt = DOCX_USER_PROMPT.format(DOCX_RAW_TEXT=raw_text)
-        response = bedrock.converse(
-            modelId=MODEL_ID,
-            system=[{"text": NORMALIZATION_SYSTEM_PROMPT}],
-            messages=[{"role": "user", "content": [{"text": prompt}]}],
-            inferenceConfig={
-                "maxTokens": TEXT_MAX_TOKENS,
-                "temperature": TEXT_TEMPERATURE,
-                "topP": TEXT_TOP_P,
-            },
-        )
-        raw_output = response["output"]["message"]["content"][0]["text"].strip()
-        return raw_output or raw_text
-    except Exception:
-        logger.exception("Bedrock DOCX normalization failed; falling back to raw text")
-        return raw_text
 
 
 def merge_lines(text):
@@ -371,6 +316,57 @@ def merge_lines(text):
     merged = re.sub(r"([^\n])\n(?=[^\n])", r"\1 ", text.strip())
     # Normalize presentation forms (common in Arabic PDFs) back to base codepoints.
     return unicodedata.normalize("NFKC", merged)
+
+
+def normalize_docx_line(text: str) -> str:
+    """Normalize DOCX line: strip, replace NBSP, and normalize presentation forms."""
+    if text is None:
+        return ""
+    cleaned = text.replace("\u00a0", " ").strip()
+    return unicodedata.normalize("NFKC", cleaned)
+
+
+def collapse_docx_paragraphs(lines):
+    """
+    Merge consecutive DOCX paragraph lines into flowing paragraphs.
+    - Table rows (containing ' | ') are kept as-is.
+    - Blank lines or explicit paragraph breaks flush the current paragraph.
+    - Short/fragmented lines get concatenated until punctuation ends the sentence.
+    """
+    out = []
+    buffer = ""
+
+    def flush():
+        nonlocal buffer
+        if buffer.strip():
+            out.append(buffer.strip())
+        buffer = ""
+
+    sentence_end = re.compile(r"[.!؟!]+$")
+
+    for raw_line in lines:
+        line = raw_line.strip()
+        if not line or line == DOCX_PARA_BREAK:
+            flush()
+            continue
+        if " | " in line:
+            flush()
+            out.append(line)
+            continue
+        if line.startswith(("-", "•", "*")):
+            flush()
+            buffer = line
+            flush()
+            continue
+        if buffer:
+            buffer = f"{buffer} {line}"
+        else:
+            buffer = line
+        if sentence_end.search(line):
+            flush()
+
+    flush()
+    return out
 
 
 def format_page_output(page_index, body):
