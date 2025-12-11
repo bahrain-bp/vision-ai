@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Upload } from "lucide-react";
 import "./Classification.css";
 import { SessionData } from "../ProcessingView";
@@ -7,6 +7,18 @@ interface ClassificationProps {
   sessionData: SessionData;
   language?: "en" | "ar";
   onExtractedKey?: (key: string) => void;
+  persistedData?: {
+    text?: string;
+    category?: string;
+    confidence?: number | null;
+    classificationReason?: string | null;
+  } | null;
+  onDataChange?: (data: {
+    text: string;
+    category: string;
+    confidence: number | null;
+    classificationReason: string | null;
+  }) => void;
 }
 
 type LoadingState = "idle" | "upload" | "extract" | "classify" | "save";
@@ -22,18 +34,58 @@ const ALLOWED_TYPES = [
 const Classification: React.FC<ClassificationProps> = ({
   sessionData,
   language = "en",
+  persistedData,
+  onDataChange,
   onExtractedKey,
 }) => {
   const [file, setFile] = useState<File | null>(null);
-  const [text, setText] = useState<string>("");
-  const [category, setCategory] = useState<string>("");
-  const [confidence, setConfidence] = useState<number | null>(null);
+  const [text, setText] = useState<string>(() => persistedData?.text || "");
+  const [category, setCategory] = useState<string>(() => persistedData?.category || "");
+  const [confidence, setConfidence] = useState<number | null>(() =>
+    typeof persistedData?.confidence === "number" ? persistedData.confidence : null
+  );
   const [loading, setLoading] = useState<LoadingState>("idle");
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+  const [classificationReason, setClassificationReason] = useState<string | null>(
+    persistedData?.classificationReason || null
+  );
 
   const isArabic = language === "ar";
   const t = (en: string, ar: string) => (isArabic ? ar : en);
+  const confidenceLabel = isArabic ? "نسبة الثقة:" : "Confidence:";
+  const hydrateFromPersisted =
+    persistedData &&
+    (persistedData.text ||
+      persistedData.category ||
+      persistedData.confidence !== undefined ||
+      persistedData.classificationReason);
+
+  // hydrate from parent when available
+  useEffect(() => {
+    if (!hydrateFromPersisted) return;
+    if (persistedData?.text !== undefined) setText(persistedData.text || "");
+    if (persistedData?.category !== undefined) setCategory(persistedData.category || "");
+    if (persistedData?.confidence !== undefined) {
+      setConfidence(
+        typeof persistedData.confidence === "number" ? persistedData.confidence : null
+      );
+    }
+    if (persistedData?.classificationReason !== undefined) {
+      setClassificationReason(persistedData.classificationReason || null);
+    }
+  }, [hydrateFromPersisted, persistedData]);
+
+  // persist to parent on change
+  useEffect(() => {
+    if (!onDataChange) return;
+    onDataChange({
+      text,
+      category,
+      confidence,
+      classificationReason,
+    });
+  }, [onDataChange, text, category, confidence, classificationReason]);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const apiBase = process.env.REACT_APP_API_ENDPOINT || "";
@@ -86,6 +138,7 @@ const Classification: React.FC<ClassificationProps> = ({
     setText("");
     setCategory("");
     setConfidence(null);
+    setClassificationReason(null);
   };
 
   const getUploadUrl = async (selectedFile: File) => {
@@ -182,6 +235,7 @@ const Classification: React.FC<ClassificationProps> = ({
       setText(result.extracted_text || "");
       setCategory("");
       setConfidence(null);
+      setClassificationReason(null);
       setInfo(t("Text extracted successfully.", "تم استخراج النص بنجاح."));
 
       setLoading("classify");
@@ -193,13 +247,11 @@ const Classification: React.FC<ClassificationProps> = ({
           ? classification.confidence
           : null
       );
-      if (classification.reason) {
-        setInfo(isArabic ? `تم التصنيف. ${classification.reason}` : `Classified. ${classification.reason}`);
-      } else {
-        setInfo(t("Classified successfully.", "تم التصنيف بنجاح."));
-      }
+      setClassificationReason(classification.reason || null);
+      setInfo(t("Classified successfully.", "تم التصنيف بنجاح."));
     } catch (e: any) {
       setError(e.message || t("Something went wrong.", "حدث خطأ ما."));
+      setClassificationReason(null);
     } finally {
       setLoading("idle");
     }
@@ -243,11 +295,20 @@ const Classification: React.FC<ClassificationProps> = ({
 
   const isBusy = loading !== "idle";
 
+  useEffect(() => {
+    if (!info) return;
+    const timer = window.setTimeout(() => setInfo(null), 10000);
+    return () => window.clearTimeout(timer);
+  }, [info]);
+
   return (
-    <div className="classification-page">
+    <div
+      className={`classification-page${isArabic ? " rtl" : ""}`}
+      dir={isArabic ? "rtl" : "ltr"}
+    >
       {/* title + description like other tabs */}
       <div className="classification-header">
-        <h2>{t("Document Classification", "تصنيف المستند")}</h2>
+        <h2>{t("Report Classification", "تصنيف التقرير")}</h2>
         <p>
           {t(
             "Upload an investigation document, extract the key text, and view the detected category for the case.",
@@ -272,7 +333,7 @@ const Classification: React.FC<ClassificationProps> = ({
           <p className="upload-sub">
             {t(
               `PDF, Word, or TXT — up to ${MAX_FILE_SIZE_MB} MB`,
-              ` MB ${MAX_FILE_SIZE_MB} أقصى حجم - TXT او word او PDF ملفات `
+              `ملف PDF او Word او TXT - أقصى حجم ${MAX_FILE_SIZE_MB}MB`,
 
             )}
           </p>
@@ -330,19 +391,28 @@ const Classification: React.FC<ClassificationProps> = ({
         />
 
         <div className="category-block">
-          <p className="category-label">{t("Detected Category", "الفئة المكتشفة")}</p>
-          <textarea
-            className="category-textarea"
-            placeholder={t("Category will appear here.", "سيظهر التصنيف هنا.")}
-            value={category}
-            readOnly
-          />
-          <p className="category-label" style={{ marginTop: 8 }}>
-            {t("Confidence", "درجة الثقة")}
-          </p>
-          <p className="category-textarea" style={{ minHeight: "auto", padding: "10px" }}>
-            {confidence !== null ? `${(confidence * 100).toFixed(1)}%` : t("Not classified yet.", "لم يتم التصنيف بعد.")}
-          </p>
+          <div className="category-header">
+            <p className="category-label">{t("Detected Category", "الفئة المكتشفة")}</p>
+          </div>
+          <div className="category-display">
+            <p className="category-main">
+              {category || t("Category will appear here.", "سيظهر التصنيف هنا.")}
+            </p>
+            {(classificationReason || confidence !== null) && (
+              <div className="category-meta">
+                {classificationReason ? (
+                  <p className="category-reason">{classificationReason}</p>
+                ) : (
+                  <span />
+                )}
+                {confidence !== null ? (
+                  <span className="category-confidence-inline">
+                    {confidenceLabel} {(confidence * 100).toFixed(1)}%
+                  </span>
+                ) : null}
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="actions">
@@ -370,5 +440,3 @@ const Classification: React.FC<ClassificationProps> = ({
 };
 
 export default Classification;
-
-

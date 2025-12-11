@@ -222,7 +222,7 @@ class classificationStack(Stack):
         extract_fn_url = extract_text_lambda.add_function_url(
             auth_type=_lambda.FunctionUrlAuthType.NONE,
             cors=_lambda.FunctionUrlCorsOptions(
-                allowed_origins=["http://localhost:3000"],
+                allowed_origins=["*"],
                 allowed_methods=[_lambda.HttpMethod.POST],    
                 allowed_headers=[
                     "content-type",

@@ -41,6 +41,9 @@ const ProcessingView: React.FC<ProcessingViewProps> = ({
     sessionData.extractedTextKey
   );
 
+  // State persistence for Classification
+  const [classificationData, setClassificationData] = useState<any>(null);
+
   // State persistence for AI Suggestions
   const [aiSuggestionsData, setAiSuggestionsData] = useState<any>(null);
 
@@ -68,6 +71,8 @@ const ProcessingView: React.FC<ProcessingViewProps> = ({
         <Classification
           sessionData={sessionWithKey}
           language={language}
+          persistedData={classificationData}
+          onDataChange={setClassificationData}
           onExtractedKey={handleExtractedKey}
         />
       ),
