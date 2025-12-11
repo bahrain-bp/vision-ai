@@ -1,108 +1,161 @@
-.contradictions-container {
-  max-width: 900px;
-  width: 90%;
-  margin: 40px auto;
-  padding: 30px;
-  background-color: #ffffff;
-  border: 1px solid #d1d5db;
-  border-radius: 12px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
-  min-height: 600px;
+.title {
+  margin: 0.15rem 0;
+  font-size: 1.8rem;
+  font-weight: 600;
+  color: var(--text-dark);
 }
 
-.contradictions-container h2 {
-  text-align: center;
-  margin-bottom: 30px;
-  color: #1f2937;
+.Contradictions-class {
+  padding-top: 0 !important;
+  margin-top: 0 !important;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.caption {
+  font-size: 0.9rem;
+  color: var(--text-light);
+  font-style: italic;
+  margin-bottom: 0.75rem;
 }
 
 .dropdown-container {
-  margin-bottom: 24px;
   display: flex;
   flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 1rem;
 }
 
 .dropdown-container label {
-  margin-bottom: 8px;
-  font-weight: 500;
-  color: #374151;
+  font-weight: 600;
+  color: var(--text-dark);
 }
 
 .dropdown-container select {
-  padding: 12px 14px;
-  border-radius: 8px;
-  border: 1px solid #d1d5db;
-  font-size: 14px;
-  cursor: pointer;
+  padding: 0.75rem 1rem;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  font-size: 0.95rem;
+  background: rgba(255, 255, 255, 0.85);
+  box-shadow: var(--shadow-light);
+  transition: 0.2s ease;
+}
+
+.dropdown-container select:focus {
+  border-color: var(--primary-color);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25);
 }
 
 .analyze-button-container {
-  text-align: center;
-  margin-bottom: 32px;
+  text-align: left;
+  margin-bottom: 0.5rem;
 }
 
 .analyze-btn {
-  padding: 14px 28px;
-  background-color: #153885;
+  margin-top: 0.25rem;
+  padding: 0.75rem 1.5rem;
+  background: var(--primary-color);
   color: white;
   border: none;
-  border-radius: 10px;
-  font-size: 16px;
-  font-weight: 600;
+  border-radius: 8px;
+  font-weight: 700;
   cursor: pointer;
   transition: background-color 0.2s;
+  box-shadow: var(--shadow-light);
 }
 
 .analyze-btn:hover {
-  background-color: #1e40af;
+  background: var(--primary-dark);
 }
 
 .results-container {
-  margin-top: 20px;
+  margin-top: 1rem;
 }
 
 .results-heading {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 22px;
-  font-weight: 600;
-  color: #1f2937;
-  margin-bottom: 20px;
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--text-dark);
+  margin-bottom: 0.75rem;
 }
 
 .contradiction-cards {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 1rem;
 }
 
 .contradiction-card {
-  padding: 18px 20px;
-  border-radius: 10px;
-  font-size: 15px;
-  line-height: 1.6;
+  padding: 1rem 1.25rem;
+  border-radius: 18px;
+  font-size: 0.95rem;
+  background: var(--background-white);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
   display: flex;
-  align-items: flex-start;
-  gap: 12px;
-}
-
-.contradiction-card .severity-icon {
-  font-size: 20px;
-  flex-shrink: 0;
+  align-items: center;
+  gap: 0.85rem;
+  line-height: 1.6;
 }
 
 .contradiction-card.red {
-  background-color: #fee2e2; /* light red */
-  border-left: 4px solid #ef4444;
+  background: linear-gradient(120deg, rgba(239, 68, 68, 0.12), transparent);
+  border-left: 4px solid rgba(239, 68, 68, 0.9);
 }
 
 .contradiction-card.yellow {
-  background-color: #fef3c7; /* light yellow */
-  border-left: 4px solid #f59e0b;
+  background: linear-gradient(120deg, rgba(250, 204, 21, 0.12), transparent);
+  border-left: 4px solid rgba(250, 204, 21, 0.85);
 }
 
 .contradiction-card.green {
-  background-color: #dcfce7; /* light green */
-  border-left: 4px solid #10b981;
+  background: linear-gradient(120deg, rgba(34, 197, 94, 0.12), transparent);
+  border-left: 4px solid rgba(34, 197, 94, 0.85);
+}
+
+.priority-tag {
+  padding: 0.25rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.priority-tag.red {
+  background: rgba(239, 68, 68, 0.18);
+  color: rgba(220, 38, 38, 1);
+}
+
+.priority-tag.yellow {
+  background: rgba(250, 204, 21, 0.2);
+  color: rgba(202, 138, 4, 1);
+}
+
+.priority-tag.green {
+  background: rgba(34, 197, 94, 0.18);
+  color: rgba(21, 128, 61, 1);
+}
+
+.Contradictions-class.rtl {
+  direction: rtl;
+  text-align: right;
+}
+
+.Contradictions-class.rtl .contradiction-card.red {
+  border-right: 4px solid rgba(239, 68, 68, 0.9);
+  border-left: none;
+}
+
+.Contradictions-class.rtl .contradiction-card.yellow {
+  border-right: 4px solid rgba(250, 204, 21, 0.85);
+  border-left: none;
+}
+
+.Contradictions-class.rtl .contradiction-card.green {
+  border-right: 4px solid rgba(34, 197, 94, 0.85);
+  border-left: none;
 }
