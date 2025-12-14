@@ -11,6 +11,11 @@ from vision_ai.advanced_analysis_stack import AdvancedAnalysisStack
 from vision_ai.rewrite_stack import RewriteStack
 from vision_ai.api_deployment_stack import APIDeploymentStack
 from vision_ai.transcription_stack import TranscriptionStack
+from vision_ai.police_document_processing_stack import PoliceDocumentProcessingStack
+from vision_ai.s3_event_wiring_stack import S3EventWiringStack
+from vision_ai.AI_Assistant_RT_stack import AIAssistantRTStack
+
+
 
 load_dotenv()
 app = cdk.App()
@@ -128,8 +133,56 @@ transcription_stack = TranscriptionStack(
 )
 transcription_stack.add_dependency(shared_stack)
 
+
 # ==========================================
-# 7. API DEPLOYMENT STACK
+# 7. POLICE DOCUMENT PROCESSING STACK (Requirement 0)
+# PDF summarization using Bedrock Nova Lite
+# ==========================================
+police_doc_stack = PoliceDocumentProcessingStack(
+    app, f"{app_name}-police-document-processing-stack",
+    investigation_bucket=shared_stack.investigation_bucket,
+    env=env,
+    description="Police Document Processing: Automated PDF summarization using Amazon Bedrock"
+)
+police_doc_stack.add_dependency(shared_stack)
+
+# ==========================================
+# 8. S3 EVENT WIRING STACK
+# Configures S3 → Lambda event notifications (avoids cyclic dependencies)
+# ==========================================
+s3_wiring_stack = S3EventWiringStack(
+    app, f"{app_name}-s3-event-wiring-stack",
+    env=env,
+    investigation_bucket_name="vision-rt-investigation-system",  
+    police_doc_lambda_name="vision-ai-process-police-document", 
+    description="S3 event notifications: Triggers Lambda on PDF uploads"
+)
+# Explicit dependencies (deployed after both shared and police stacks)
+s3_wiring_stack.add_dependency(shared_stack)
+s3_wiring_stack.add_dependency(police_doc_stack)
+
+
+# ==========================================
+# 9. AI ASSISTANT RT STACK
+# Real-time question generation support
+# ==========================================
+ai_assistant_rt_stack = AIAssistantRTStack(
+    app, f"{app_name}-ai-assistant-rt-stack",
+    env=env,
+    investigation_bucket=shared_stack.investigation_bucket,
+    shared_api_id=shared_stack.shared_api.rest_api_id,
+    shared_api_root_resource_id=shared_stack.shared_api.rest_api_root_resource_id,
+    cases_resource_id=case_management_stack.cases_resource.resource_id,  # ← Changed to ID
+    case_by_id_resource_id=case_management_stack.case_by_id_resource.resource_id,  # ← Changed to ID
+    description="AI Assistant RT: Question generation with case summary and victim testimony"
+)
+
+# Ensure AI assistant stack depends on shared stack
+# Note: Dependency on case_management_stack is automatic via resource references
+ai_assistant_rt_stack.add_dependency(shared_stack)
+
+# ==========================================
+# 10. API DEPLOYMENT STACK
 # Deploys API after all routes are added
 # ==========================================
 deployment_stack = APIDeploymentStack(
@@ -147,6 +200,10 @@ deployment_stack.add_dependency(case_management_stack)
 deployment_stack.add_dependency(advanced_analysis_stack)
 deployment_stack.add_dependency(rewrite_stack)
 deployment_stack.add_dependency(transcription_stack)
+deployment_stack.add_dependency(police_doc_stack)
+deployment_stack.add_dependency(s3_wiring_stack)
+deployment_stack.add_dependency(ai_assistant_rt_stack)
+
 
 # Add tags
 cdk.Tags.of(app).add("Project", "VisionAI")

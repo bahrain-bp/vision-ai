@@ -1,5 +1,5 @@
 import React from "react";
-import { X, Download, Share2 } from "lucide-react";
+import { X, Share2, FileText } from "lucide-react";
 
 interface SessionData {
   sessionId: string;
@@ -12,11 +12,13 @@ interface SessionData {
 interface SessionSummaryModalProps {
   sessionData: SessionData;
   onClose: () => void;
+  onGenerateSummary: () => void;  // ← ADDED THIS
 }
 
 const SessionSummaryModal: React.FC<SessionSummaryModalProps> = ({
   sessionData,
   onClose,
+  onGenerateSummary,  // ← ADDED THIS
 }) => {
   return (
     <div className="modal-overlay">
@@ -58,9 +60,13 @@ const SessionSummaryModal: React.FC<SessionSummaryModalProps> = ({
           </div>
 
           <div className="modal-actions">
-            <button className="action-btn primary">
-              <Download className="btn-icon" />
-              <span>Download PDF</span>
+            {/* ← CHANGED THIS BUTTON */}
+            <button 
+              className="action-btn primary"
+              onClick={onGenerateSummary}
+            >
+              <FileText className="btn-icon" />
+              <span>Generate AI Summary</span>
             </button>
             <button className="action-btn secondary">
               <Share2 className="btn-icon" />

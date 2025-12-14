@@ -5,7 +5,9 @@
     "tailwindcss": "^4.1.16"
   },
   "dependencies": {
+    "@types/axios": "^0.9.36",
     "aws-amplify": "^6.15.7",
+    "axios": "^1.13.2",
     "lucide-react": "^0.548.0"
   }
 }

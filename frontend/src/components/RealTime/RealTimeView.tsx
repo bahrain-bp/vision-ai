@@ -1,54 +1,28 @@
-import React, { useState } from "react";
-import {
-  User,
-  ChevronUp,
-  ChevronDown,
-} from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { User, ChevronUp, ChevronDown, FileText } from "lucide-react";
 import LiveTranscription from "../LiveTranscription/LiveTranscription";
 import Translation from "./Translation";
 import SessionInfo from "./SessionInfo";
 import IdentityVerification from "./IdentityVerification/IdentityVerification";
-import TranscriptionSessionSetup from "../LiveTranscription/TranscriptionSessionSetup"
-import QuestionGenerator from './AIAssistant/QuestionGenerator';
-import { TranslationProvider } from '../../context/TranslationContext';
-import { RecordingStatus, sessionType } from "../../types/";
-
+import TranscriptionSessionSetup from "../LiveTranscription/TranscriptionSessionSetup";
+import QuestionGenerator from "./AIAssistant/QuestionGenerator";
+import ManualQuestionInput from "./AIAssistant/ManualQuestionInput";  
+import { TranslationProvider } from "../../context/TranslationContext";
+import {
+  RecordingStatus,
+  SessionType,
+  LanguagePreferences,
+} from "../../types/";
+import SummarizationReport from "./SummarizationReport";
+import { useLanguage } from "../../context/LanguageContext";
 
 interface SessionData {
   sessionId: string;
-  participant: string;
   language: string;
+  participant: string; //should remove it after all components use the context in their code
   duration: string;
   status: string;
   investigator?: string;
-}
-
-interface IdentityData {
-  referencePhoto: File | null;
-  cpr: File | null;
-  passport: File | null;
-  isVerified: boolean;
-}
-
-interface InvestigationData {
-  witness: string;
-  idNumber: string;
-  identityData: IdentityData;
-  investigator: string;
-  duration: string;
-  status: string;
-}
-
-interface WitnessData {
-  fullName: string;
-  idNumber: string;
-}
-
-interface IdentityData {
-  referencePhoto: File | null;
-  cpr: File | null;
-  passport: File | null;
-  isVerified: boolean;
 }
 
 interface TranslationSettings {
@@ -56,46 +30,44 @@ interface TranslationSettings {
   targetLanguage: string;
 }
 
-interface SetupData {
-  witnessData: WitnessData;
-  identityData: IdentityData;
-  translationSettings: TranslationSettings;
-}
-
 interface RealTimeViewProps {
   sessionState: RecordingStatus;
   setSessionState: (state: RecordingStatus) => void;
   sessionData: SessionData;
-  setupData: SetupData;
-  onWitnessDataChange: (field: keyof WitnessData, value: string) => void;
-  onIdentityDataChange: (field: keyof IdentityData, value: any) => void;
+  translationSettings: TranslationSettings;
   onTranslationSettingsChange: (
     field: keyof TranslationSettings,
     value: string
   ) => void;
-  onVerifyIdentity: () => void;
+  triggerSummarization: boolean;
 }
 
 const RealTimeView: React.FC<RealTimeViewProps> = ({
   sessionState,
   setSessionState,
   sessionData,
-  //identityData,
-  //onIdentityDataChange,
-  //onVerifyIdentity,
+  triggerSummarization,
 }) => {
-  const [activeTab, setActiveTab] = useState<"identity" | "transcription">(
-    "identity"
-  );
+  const { t } = useLanguage();
+  const [activeTab, setActiveTab] = useState<
+    "identity" | "transcription" | "summarization"
+  >("identity");
   const [aiExpanded, setAiExpanded] = useState(false);
   const [isIdentityVerified, setIsIdentityVerified] = useState(false);
   const [startRecording, setStartRecording] = useState(false);
-  const [selectedLanguage, setSelectedLanguage] = useState<string>("en-US");
-  const [sessionType, setSessionType] = useState<sessionType>("standard");
-  const [detectionLanguages,setDetectionLanguages] = useState([]);
+  const [sessionType, setSessionType] = useState<SessionType>("standard");
+  const [detectionLanguages, setDetectionLanguages] = useState([]);
 
-  const handleStartInvestigation = (investigationData: InvestigationData) => {
-    console.log("Starting investigation with data:", investigationData);
+  const [languagePreferences, setLanguagePreferences] =
+    useState<LanguagePreferences>({
+      languageMode: "unified",
+      sharedLanguage: "en-US",
+      investigatorLanguage: "",
+      witnessLanguage: "",
+    });
+
+  const handleStartInvestigation = () => {
+    console.log("Starting investigation");
     setIsIdentityVerified(true);
     setActiveTab("transcription");
   };
@@ -103,15 +75,19 @@ const RealTimeView: React.FC<RealTimeViewProps> = ({
   const handleBackToDashboard = () => {
     console.log("Going back to dashboard");
   };
+
+  useEffect(() => {
+    if (triggerSummarization) {
+      setActiveTab("summarization");
+    }
+  }, [triggerSummarization]);
+
   return (
     <div className="realtime-view">
       <div className="main-content">
         {sessionState === "off" && activeTab === "identity" && (
           <div className="recording-content">
             <IdentityVerification
-              //identityData={identityData}
-              //onIdentityDataChange={onIdentityDataChange}
-              //onVerifyIdentity={onVerifyIdentity}
               onStartInvestigation={handleStartInvestigation}
               onBackToDashboard={handleBackToDashboard}
             />
@@ -121,8 +97,8 @@ const RealTimeView: React.FC<RealTimeViewProps> = ({
         {sessionState === "off" && activeTab === "transcription" && (
           <>
             <TranscriptionSessionSetup
-              selectedLanguage={selectedLanguage}
-              setSelectedLanguage={setSelectedLanguage}
+              languagePreferences={languagePreferences}
+              setLanguagePreferences={setLanguagePreferences}
               detectionLanguages={detectionLanguages}
               setDetectionLanguages={setDetectionLanguages}
               sessionType={sessionType}
@@ -141,20 +117,25 @@ const RealTimeView: React.FC<RealTimeViewProps> = ({
                 <LiveTranscription
                   startRecordingProp={startRecording}
                   setSessionState={setSessionState}
-                  selectedLanguage={selectedLanguage}
+                  languagePreferences={languagePreferences}
                   detectionLanguages={detectionLanguages}
                   setSessionType={setSessionType}
                   sessionType={sessionType}
                 />
-                {/* WRAP Translation with Provider */}
-                <TranslationProvider 
-                  investigatorLanguage="en" 
+                <TranslationProvider
+                  investigatorLanguage="en"
                   witnessLanguage="ar"
                 >
                   <Translation />
                 </TranslationProvider>
               </>
             )}
+          </div>
+        )}
+
+        {activeTab === "summarization" && (
+          <div className="recording-content">
+            <SummarizationReport sessionData={sessionData} />
           </div>
         )}
       </div>
@@ -169,7 +150,7 @@ const RealTimeView: React.FC<RealTimeViewProps> = ({
             disabled={isIdentityVerified}
           >
             <User className="btn-icon" />
-            <span>Identity Verification</span>
+            <span>{t("identity.title")}</span>
           </button>
 
           <button
@@ -181,24 +162,46 @@ const RealTimeView: React.FC<RealTimeViewProps> = ({
             <User className="btn-icon" />
             <span>Transcription & Translation</span>
           </button>
+
+          <button
+            onClick={() => setActiveTab("summarization")}
+            className={`sidebar-btn ${
+              activeTab === "summarization" ? "active" : ""
+            }`}
+          >
+            <FileText className="btn-icon" />
+            <span>Summarization</span>
+          </button>
         </div>
 
+        {/* AI Assistant Section */}
         <div className="ai-section">
-  <button
-    onClick={() => setAiExpanded(!aiExpanded)}
-    className="ai-toggle-btn"
-  >
-    AI Assistant
-    {aiExpanded ? <ChevronUp /> : <ChevronDown />}
-  </button>
+          <button
+            onClick={() => setAiExpanded(!aiExpanded)}
+            className="ai-toggle-btn"
+          >
+            AI Assistant
+            {aiExpanded ? <ChevronUp /> : <ChevronDown />}
+          </button>
+          
+          {aiExpanded && (
+            <div className="mt-4 space-y-4">
+              {/* AI Question Generator */}
+              <QuestionGenerator />
 
-  {aiExpanded && (
-  <div className="mt-4">
-    <QuestionGenerator />
-  </div>
-)}
+              {/* Divider */}
+              <div className="border-t border-gray-200 my-4"></div>
 
-</div>
+              {/* Manual Question Evaluation Tool */}
+              <ManualQuestionInput />
+              
+              
+              
+              
+            </div>
+          )}
+        </div>
+
         <SessionInfo sessionData={sessionData} />
       </div>
     </div>

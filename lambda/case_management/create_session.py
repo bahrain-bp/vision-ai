@@ -1,5 +1,6 @@
 import json
 import boto3
+import re
 import os
 import uuid
 from datetime import datetime
@@ -24,6 +25,22 @@ def handler(event, context):
         if not all([case_id, investigator]):
             return build_response(400, {
                 'error': 'Missing required fields: caseId, investigator'
+            })
+        
+        if not validate_id_format(case_id, 'caseId'):
+            return build_response(400, {
+                'error': 'Invalid caseId format'
+            })
+        
+        if not validate_input_string(investigator, 'investigator', 100):
+            return build_response(400, {
+                'error': 'Invalid investigator format'
+            })
+        
+        # Verify case exists
+        if not verify_case_exists(case_id):
+            return build_response(404, {
+                'error': 'Case not found'
             })
         
         # Validate person type
@@ -96,3 +113,41 @@ def build_response(status_code, body):
         'body': json.dumps(body)
     }
 
+def validate_id_format(value, field_name):
+    """Validate that ID contains only safe characters"""
+    if not value:
+        return False
+    # Allow only alphanumeric, hyphens, and underscores
+    if not re.match(r'^[a-zA-Z0-9_-]+$', value):
+        print(f"Invalid {field_name} format: {value}")
+        return False
+    # Prevent path traversal
+    if '..' in value or '/' in value or '\\' in value:
+        print(f"Path traversal attempt in {field_name}: {value}")
+        return False
+    return True
+
+def validate_input_string(value, field_name, max_length=200):
+    """Validate user input strings"""
+    if not value:
+        return False
+    
+    if len(value) > max_length:
+        print(f"Invalid {field_name}: exceeds maximum length")
+        return False
+    
+    # Prevent null bytes and control characters
+    if '\x00' in value or any(ord(char) < 32 and char not in ['\n', '\r', '\t'] for char in value):
+        print(f"Invalid {field_name}: contains invalid characters")
+        return False
+    
+    return True
+
+def verify_case_exists(case_id):
+    """Verify that case exists"""
+    try:
+        case_key = f"cases/{case_id}/case.json"
+        s3_client.head_object(Bucket=bucket_name, Key=case_key)
+        return True
+    except:
+        return False

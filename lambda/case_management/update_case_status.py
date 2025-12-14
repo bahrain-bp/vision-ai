@@ -3,6 +3,7 @@ import boto3
 import os
 from datetime import datetime
 from botocore.exceptions import ClientError
+import re
 
 s3_client = boto3.client('s3')
 bucket_name = os.environ['BUCKET_NAME']
@@ -22,6 +23,11 @@ def handler(event, context):
         if not case_id:
             return build_response(400, {
                 'error': 'Case ID is required'
+            })
+        
+        if not validate_id_format(case_id, 'caseId'):
+            return build_response(400, {
+                'error': 'Invalid caseId format'
             })
         
         # Parse request body
@@ -83,3 +89,17 @@ def build_response(status_code, body):
         },
         'body': json.dumps(body)
     }
+
+def validate_id_format(value, field_name):
+    """Validate that ID contains only safe characters"""
+    if not value:
+        return False
+    # Allow only alphanumeric, hyphens, and underscores
+    if not re.match(r'^[a-zA-Z0-9_-]+$', value):
+        print(f"Invalid {field_name} format: {value}")
+        return False
+    # Prevent path traversal
+    if '..' in value or '/' in value or '\\' in value:
+        print(f"Path traversal attempt in {field_name}: {value}")
+        return False
+    return True

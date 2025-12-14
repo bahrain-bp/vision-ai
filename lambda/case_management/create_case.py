@@ -1,5 +1,6 @@
 import json
 import boto3
+import re
 import os
 import uuid
 from datetime import datetime
@@ -25,6 +26,22 @@ def handler(event, context):
                 'error': 'Missing required fields: caseTitle, createdBy'
             })
         
+        
+        if not validate_input_string(case_title, 'caseTitle', 200):
+            return build_response(400, {
+                'error': 'Invalid caseTitle format'
+            })
+        
+        if not validate_input_string(created_by, 'createdBy', 100):
+            return build_response(400, {
+                'error': 'Invalid createdBy format'
+            })
+        
+        if case_description and not validate_input_string(case_description, 'caseDescription', 1000):
+            return build_response(400, {
+                'error': 'Invalid caseDescription format'
+            })
+        
         # Generate unique case ID 
         case_id = generate_case_id()
         
@@ -36,7 +53,6 @@ def handler(event, context):
             'createdAt': datetime.utcnow().isoformat() + 'Z',
             'createdBy': created_by,
             'status': 'active',
-            'totalSessions': 0,
             'lastUpdated': datetime.utcnow().isoformat() + 'Z'
         }
         
@@ -47,6 +63,13 @@ def handler(event, context):
             Key=case_key,
             Body=json.dumps(case_data, indent=2),
             ContentType='application/json'
+        )
+
+        police_docs_key = f"cases/{case_id}/police-documents/"
+        s3_client.put_object(
+        Bucket=bucket_name,
+        Key=police_docs_key,
+        Body=''
         )
         
         print(f"Successfully created case: {case_id}")
@@ -81,4 +104,19 @@ def build_response(status_code, body):
         'body': json.dumps(body)
     }
 
-
+def validate_input_string(value, field_name, max_length=500):
+    """Validate user input strings to prevent injection"""
+    if not value:
+        return False
+    
+    # Check length
+    if len(value) > max_length:
+        print(f"Invalid {field_name}: exceeds maximum length of {max_length}")
+        return False
+    
+    # Prevent null bytes and control characters
+    if '\x00' in value or any(ord(char) < 32 and char not in ['\n', '\r', '\t'] for char in value):
+        print(f"Invalid {field_name}: contains invalid characters")
+        return False
+    
+    return True
