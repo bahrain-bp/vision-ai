@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from "react";
-import { FileText, Copy, Loader } from "lucide-react";
+import { FileText, Loader } from "lucide-react";
 import { useTranscription } from "../../hooks/useTranscription";
 import {
   RecordingStatus,
@@ -7,10 +7,11 @@ import {
   SessionType,
   LanguagePreferences,
 } from "../../types/";
-import PDFExporter from "../RealTime/TranslationPDFExporter"; 
+import PDFExporter from "../RealTime/TranslationPDFExporter";
 import ErrorDisplay from "./ErrorDisplay";
 import { useState } from "react";
-import {useCaseContext} from "../../hooks/useCaseContext"
+import { useCaseContext } from "../../hooks/useCaseContext";
+import { useLanguage } from "../../context/LanguageContext";
 
 interface LiveTranscriptionProps {
   startRecordingProp: boolean;
@@ -26,21 +27,17 @@ const LiveTranscription: React.FC<LiveTranscriptionProps> = ({
   setSessionState,
   languagePreferences,
   detectionLanguages,
-  //setSessionType,
   sessionType,
 }) => {
+  const { t } = useLanguage();
   const { audioStatus, recordingStatus, startRecording, getFullTranscript } =
     useTranscription();
 
-    const {currentCase,currentSession} = useCaseContext();
+  const { currentCase, currentSession } = useCaseContext();
 
-    
   const [error, setError] = useState<TranscriptionStatus | null>(null);
-
   const [isStarting, setIsStarting] = useState(false);
-
   const hasStarted = useRef(false);
-
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -110,7 +107,7 @@ const LiveTranscription: React.FC<LiveTranscriptionProps> = ({
         <div className="flex flex-col items-center gap-4">
           <Loader className="w-8 h-8 animate-spin text-blue-500" />
           <p className="text-gray-600 font-medium">
-            Initializing recording session...
+            {t("transcription.initializing")}
           </p>
         </div>
       </div>
@@ -122,7 +119,7 @@ const LiveTranscription: React.FC<LiveTranscriptionProps> = ({
       <div className="card-header">
         <div className="header-left">
           <FileText className="header-icon" />
-          <h3 className="card-title">Live Transcription</h3>
+          <h3 className="card-title">{t("transcription.title")}</h3>
         </div>
 
         <div className="recording-status">
@@ -131,8 +128,8 @@ const LiveTranscription: React.FC<LiveTranscriptionProps> = ({
           ></span>
           <span>
             {audioStatus
-              ? "Recording / Audio Detected"
-              : "Recording / No Audio Input"}
+              ? t("transcription.recordingAudioDetected")
+              : t("transcription.recordingNoAudio")}
           </span>
         </div>
       </div>
@@ -140,18 +137,22 @@ const LiveTranscription: React.FC<LiveTranscriptionProps> = ({
         value={getFullTranscript}
         readOnly
         ref={textareaRef}
-        placeholder="Transcript will appear here..."
+        placeholder={t("transcription.placeholder")}
         style={{
           width: "100%",
           minHeight: "300px",
-          padding: "12px",
-          fontFamily: "monospace",
+          padding: "16px",
+          fontFamily: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace",
           fontSize: "14px",
-          border: "1px solid #ddd",
-          borderRadius: "4px",
+          lineHeight: "1.8",
+          border: "1px solid #e5e7eb",
+          backgroundColor: "#f9fafb",
+          borderRadius: "8px",
           resize: "vertical",
           whiteSpace: "pre-wrap",
           overflow: "auto",
+          color: "#1f2937",
+          boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.1)",
         }}
       />
 
@@ -159,13 +160,14 @@ const LiveTranscription: React.FC<LiveTranscriptionProps> = ({
         <PDFExporter
           transcript={getFullTranscript}
           title={"Investigation Transcript"}
-          fileName={"transcript-"+currentCase?.caseId+"-"+currentSession?.sessionId}
+          fileName={
+            "transcript-" +
+            currentCase?.caseId +
+            "-" +
+            currentSession?.sessionId
+          }
           sessionDate={new Date().toLocaleDateString()}
         />
-        <button className="action-btn">
-          <Copy className="btn-icon" />
-          <span>Copy All</span>
-        </button>
       </div>
     </div>
   );

@@ -161,7 +161,7 @@ const RealTimeView: React.FC<RealTimeViewProps> = ({
             disabled={!isIdentityVerified}
           >
             <User className="btn-icon" />
-            <span>Transcription & Translation</span>
+            <span>{t('session.Transcription_Translation')}</span>
           </button>
 
           <button

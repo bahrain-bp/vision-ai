@@ -17,6 +17,7 @@ import {
 } from "../../types/";
 import { STREAMING_LANGUAGES } from "./StreamLanguages";
 import Multiselect from "multiselect-react-dropdown";
+import { useLanguage } from "../../context/LanguageContext";
 
 interface TranscriptionSessionSetupProps {
   languagePreferences: LanguagePreferences;
@@ -40,6 +41,8 @@ const TranscriptionSessionSetup: React.FC<TranscriptionSessionSetupProps> = ({
   setSessionState,
   setActiveTab,
 }) => {
+  const { t } = useLanguage();
+
   const handleLanguageSelect = (selectedList: any) => {
     setDetectionLanguages(selectedList.map((lang: any) => lang.code));
   };
@@ -60,17 +63,14 @@ const TranscriptionSessionSetup: React.FC<TranscriptionSessionSetupProps> = ({
         <div className="play-icon-container">
           <Play className="play-icon" />
         </div>
-        <h2 className="ready-title">Ready to Start</h2>
-        <p className="ready-description">
-          Configure your session settings before starting the recording.
-        </p>
+        <h2 className="ready-title">{t("setup.readyToStart")}</h2>
+        <p className="ready-description">{t("setup.configureSession")}</p>
 
         <div className="w-full space-y-5 mt-8">
-          {/* Language Mode Selection */}
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
             <label className="flex items-center gap-2 text-sm font-semibold text-gray-800 mb-4">
               <Languages className="w-4 h-4 text-purple-600" />
-              Language Configuration Mode
+              {t("setup.languageMode")}
             </label>
 
             <div className="space-y-3">
@@ -102,15 +102,14 @@ const TranscriptionSessionSetup: React.FC<TranscriptionSessionSetupProps> = ({
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
                     <span className="font-semibold text-gray-900">
-                      Single Language for Entire Session
+                      {t("setup.singleLanguage")}
                     </span>
                     <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs font-medium rounded-full">
-                      Simple
+                      {t("setup.simple")}
                     </span>
                   </div>
                   <p className="text-sm text-gray-600 mt-1.5 leading-relaxed">
-                    Everyone speaks the same language. Best for standard
-                    investigations.
+                    {t("setup.singleLanguageDesc")}
                   </p>
                 </div>
               </label>
@@ -143,28 +142,26 @@ const TranscriptionSessionSetup: React.FC<TranscriptionSessionSetupProps> = ({
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
                     <span className="font-semibold text-gray-900">
-                      Separate Languages (Multilingual)
+                      {t("setup.separateLanguages")}
                     </span>
                     <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded-full">
-                      Advanced
+                      {t("setup.advanced")}
                     </span>
                   </div>
                   <p className="text-sm text-gray-600 mt-1.5 leading-relaxed">
-                    Investigator and witnesses speak different languages with
-                    translation.
+                    {t("setup.separateLanguagesDesc")}
                   </p>
                 </div>
               </label>
             </div>
           </div>
 
-          {/* Unified Mode */}
           {languagePreferences.languageMode === "unified" && (
             <>
               <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
                 <label className="flex items-center gap-2 text-sm font-semibold text-gray-800 mb-3">
                   <Settings className="w-4 h-4 text-blue-600" />
-                  Session Language
+                  {t("setup.sessionLanguage")}
                 </label>
                 <select
                   id="language-select"
@@ -179,9 +176,7 @@ const TranscriptionSessionSetup: React.FC<TranscriptionSessionSetupProps> = ({
                    focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
                    text-gray-900 font-medium cursor-pointer hover:bg-gray-100 transition-all"
                 >
-                  <option value="auto">
-                    🌐 Auto Detect Multiple Languages
-                  </option>
+                  <option value="auto">🌐 {t("setup.autoDetect")}</option>
                   {Object.entries(STREAMING_LANGUAGES).map(([code, name]) => (
                     <option key={code} value={code}>
                       {name}
@@ -192,7 +187,7 @@ const TranscriptionSessionSetup: React.FC<TranscriptionSessionSetupProps> = ({
               {languagePreferences.sharedLanguage === "auto" && (
                 <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Select Languages to Detect
+                    {t("setup.selectLanguages")}
                   </label>
                   <Multiselect
                     options={Object.entries(STREAMING_LANGUAGES).map(
@@ -202,7 +197,7 @@ const TranscriptionSessionSetup: React.FC<TranscriptionSessionSetupProps> = ({
                       })
                     )}
                     displayValue="name"
-                    placeholder="Choose languages..."
+                    placeholder={t("setup.chooseLanguages")}
                     showCheckbox={true}
                     onSelect={handleLanguageSelect}
                     onRemove={handleLanguageRemove}
@@ -232,24 +227,22 @@ const TranscriptionSessionSetup: React.FC<TranscriptionSessionSetupProps> = ({
                     }}
                   />
                   <p className="mt-2 text-xs text-gray-500">
-                    💡 Languages are prioritized in order of selection - first
-                    selected language gets highest priority
+                    💡 {t("setup.languagePriority")}
                   </p>
                 </div>
               )}
             </>
           )}
 
-          {/* Separate Mode */}
           {languagePreferences.languageMode === "separate" && (
             <>
               <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
                 <label className="flex items-center gap-2 text-sm font-semibold text-gray-800 mb-3">
                   <User className="w-4 h-4 text-blue-600" />
-                  Investigator Language
+                  {t("setup.investigatorLanguage")}
                 </label>
                 <p className="text-xs text-gray-600 mb-3">
-                  Select your language for the investigation
+                  {t("setup.investigatorLanguageDesc")}
                 </p>
                 <select
                   id="investigator-language-select"
@@ -264,7 +257,7 @@ const TranscriptionSessionSetup: React.FC<TranscriptionSessionSetupProps> = ({
                    focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
                    text-gray-900 font-medium cursor-pointer hover:bg-gray-100 transition-all"
                 >
-                  <option value="">Select your language...</option>
+                  <option value="">{t("setup.selectYourLanguage")}</option>
                   {Object.entries(STREAMING_LANGUAGES).map(([code, name]) => (
                     <option key={code} value={code}>
                       {name}
@@ -276,10 +269,10 @@ const TranscriptionSessionSetup: React.FC<TranscriptionSessionSetupProps> = ({
               <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
                 <label className="flex items-center gap-2 text-sm font-semibold text-gray-800 mb-3">
                   <Globe className="w-4 h-4 text-green-600" />
-                  Witness Language
+                  {t("setup.witnessLanguage")}
                 </label>
                 <p className="text-xs text-gray-600 mb-3">
-                  Select the witness language
+                  {t("setup.witnessLanguageDesc")}
                 </p>
                 <select
                   id="witness-language-select"
@@ -294,7 +287,7 @@ const TranscriptionSessionSetup: React.FC<TranscriptionSessionSetupProps> = ({
                    focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent
                    text-gray-900 font-medium cursor-pointer hover:bg-gray-100 transition-all"
                 >
-                  <option value="">Select witness language...</option>
+                  <option value="">{t("setup.selectWitnessLanguage")}</option>
                   {Object.entries(STREAMING_LANGUAGES)
                     .filter(
                       ([code]) =>
@@ -310,11 +303,10 @@ const TranscriptionSessionSetup: React.FC<TranscriptionSessionSetupProps> = ({
             </>
           )}
 
-          {/* Session Type Card */}
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
             <label className="flex items-center gap-2 text-sm font-semibold text-gray-800 mb-4">
               <Users className="w-4 h-4 text-blue-600" />
-              Speaker Detection Mode
+              {t("setup.speakerMode")}
             </label>
 
             <div className="space-y-3">
@@ -338,16 +330,15 @@ const TranscriptionSessionSetup: React.FC<TranscriptionSessionSetupProps> = ({
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
                     <span className="font-semibold text-gray-900">
-                      One-on-One Interview
+                      {t("setup.oneOnOne")}
                     </span>
                     <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs font-medium rounded-full flex items-center gap-1">
                       <Zap className="w-3 h-3" />
-                      Recommended
+                      {t("setup.recommended")}
                     </span>
                   </div>
                   <p className="text-sm text-gray-600 mt-1.5 leading-relaxed">
-                    Standard interview with two speakers (investigator + one
-                    participant). Provides the highest accuracy.
+                    {t("setup.oneOnOneDesc")}
                   </p>
                 </div>
               </label>
@@ -370,21 +361,18 @@ const TranscriptionSessionSetup: React.FC<TranscriptionSessionSetupProps> = ({
                 />
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
-                    {" "}
-                    {/* Add this wrapper with items-center */}
                     <span className="font-semibold text-gray-900">
-                      Multiple Participants
+                      {t("setup.multipleParticipants")}
                     </span>
                     <span className="px-2 py-0.5 bg-yellow-100 text-yellow-700 text-xs font-medium rounded-full flex items-center gap-1">
-                      <AlertTriangle className="w-3 h-3" />{" "}
-                      {/* You'll need to import this */}
-                      In Development
+                      <AlertTriangle className="w-3 h-3" />
+                      {t("setup.inDevelopment")}
                     </span>
                   </div>
                   <p className="text-sm text-gray-600 mt-1.5 leading-relaxed">
-                    For group interviews or when multiple people are present.
+                    {t("setup.multipleParticipantsDesc")}{" "}
                     <span className="font-medium text-yellow-700">
-                      May produce inaccurate results.
+                      {t("setup.mayProduceInaccurate")}
                     </span>
                   </p>
                 </div>
@@ -395,8 +383,8 @@ const TranscriptionSessionSetup: React.FC<TranscriptionSessionSetupProps> = ({
               <Info className="w-4 h-4 flex-shrink-0" />
               <span>
                 {sessionType === "standard"
-                  ? 'Speakers will be labeled as "Investigator" and "Witness" for example.'
-                  : 'Speakers will be labeled as "Investigator", "Speaker 0", "Speaker 1", etc. for example.'}
+                  ? t("setup.speakerLabelStandard")
+                  : t("setup.speakerLabelMulti")}
               </span>
             </div>
           </div>
@@ -407,7 +395,7 @@ const TranscriptionSessionSetup: React.FC<TranscriptionSessionSetupProps> = ({
           className="start-recording-btn mt-8 shadow-lg hover:shadow-xl"
         >
           <Play className="btn-icon" />
-          <span>Start Recording</span>
+          <span>{t("setup.startRecording")}</span>
         </button>
       </div>
     </div>
