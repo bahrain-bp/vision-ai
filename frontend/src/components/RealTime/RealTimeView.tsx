@@ -14,6 +14,7 @@ import {
 } from "../../types/";
 import SummarizationReport from "./Summarization/SummarizationReport";
 import { useLanguage } from "../../context/LanguageContext";
+import ManualQuestionInput from "./AIAssistant/ManualQuestionInput";
 
 interface SessionData {
   sessionId: string;
@@ -175,7 +176,7 @@ const RealTimeView: React.FC<RealTimeViewProps> = ({
           </button>
         </div>
 
-        <div className="ai-section">
+         <div className="ai-section">
           <button
             onClick={() => setAiExpanded(!aiExpanded)}
             className="ai-toggle-btn"
@@ -183,10 +184,17 @@ const RealTimeView: React.FC<RealTimeViewProps> = ({
             AI Assistant
             {aiExpanded ? <ChevronUp /> : <ChevronDown />}
           </button>
-
+          
           {aiExpanded && (
-            <div className="mt-4">
+            <div className="mt-4 space-y-4">
+              {/* AI Question Generator */}
               <QuestionGenerator />
+
+              {/* Divider */}
+              <div className="border-t border-gray-200 my-4"></div>
+
+              {/* Manual Question Evaluation Tool */}
+              <ManualQuestionInput />
             </div>
           )}
         </div>

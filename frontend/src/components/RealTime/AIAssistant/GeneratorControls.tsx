@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Sparkles, Loader2 } from 'lucide-react';
 import { QuestionGeneratorControlsProps, Language } from '../../../types/aiQuestionsRT';
+import { useQuestionContext } from '../../../hooks/useQuestionContext'; // ← NEW: Import hook
 
 /**
  * GeneratorControls Component
@@ -15,12 +16,14 @@ import { QuestionGeneratorControlsProps, Language } from '../../../types/aiQuest
  * - isLoading: Whether generation is in progress
  * - disabled: Disable all controls (e.g., when recording is off)
  */
-
 const GeneratorControls: React.FC<QuestionGeneratorControlsProps> = ({
   onGenerate,
   isLoading,
   disabled = false,
 }) => {
+  // ← NEW: Access canGenerate from context
+  const { canGenerate } = useQuestionContext();
+
   // Local state for selected options
   const [questionCount, setQuestionCount] = useState<number>(5);
   const [language, setLanguage] = useState<Language>('en');
@@ -36,19 +39,17 @@ const GeneratorControls: React.FC<QuestionGeneratorControlsProps> = ({
 
   // Handle generate button click
   const handleGenerate = () => {
-    if (disabled || isLoading) return;
+    if (disabled || isLoading || !canGenerate) return; // ← UPDATED: Added !canGenerate check
     onGenerate(questionCount, language);
   };
 
   // Determine if controls should be disabled
-  const isDisabled = disabled || isLoading;
+  const isDisabled = disabled || isLoading || !canGenerate; // ← UPDATED: Added !canGenerate
 
   return (
     <div className="space-y-3">
-
       {/* Dropdowns Container */}
       <div className="flex gap-2">
-
         {/* Question Count Dropdown */}
         <div className="flex-1">
           <select
@@ -98,7 +99,6 @@ const GeneratorControls: React.FC<QuestionGeneratorControlsProps> = ({
             ))}
           </select>
         </div>
-
       </div>
 
       {/* Generate Button */}
@@ -127,6 +127,13 @@ const GeneratorControls: React.FC<QuestionGeneratorControlsProps> = ({
           </>
         )}
       </button>
+
+      {/* ← NEW: Helper text when disabled due to prerequisites */}
+      {!canGenerate && !isLoading && (
+        <p className="text-xs text-gray-500 text-center mt-2">
+          Waiting for transcript...
+        </p>
+      )}
     </div>
   );
 };
