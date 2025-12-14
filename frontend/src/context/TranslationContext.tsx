@@ -1,5 +1,5 @@
 import React, { createContext, useState, useCallback, ReactNode, useEffect } from "react";
-import { translationService, TranslationResult } from "../services/LiveTranslation/TranslationService";
+import { translationService, TranslationResult, SpeakerType } from "../services/LiveTranslation/TranslationService";
 import { useTranscription } from "../hooks/useTranscription";
 import { useCaseContext } from "../hooks/useCaseContext";
 
@@ -12,10 +12,10 @@ export interface TranslationContextType {
   hasMoreConversation: boolean;
   currentSpeaker: string | null;
   investigatorLanguage: string;
-  witnessLanguage: string;
+  participantLanguage: string;
   setInvestigatorLanguage: (language: string) => void;
-  setWitnessLanguage: (language: string) => void;
-  saveTranslationsToS3: () => Promise<void>; 
+  setParticipantLanguage: (language: string) => void;
+  saveTranslationsToS3: () => Promise<void>;
 }
 
 export const TranslationContext = createContext<TranslationContextType | undefined>(undefined);
@@ -35,167 +35,172 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({
   const [isTranslating, setIsTranslating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [investigatorLanguage, setInvestigatorLanguage] = useState(initialInvestigatorLanguage);
-  const [witnessLanguage, setWitnessLanguage] = useState(initialWitnessLanguage);
+  const [participantLanguage, setParticipantLanguage] = useState(initialWitnessLanguage);
   
-  // Get transcription data
-  const { getFullTranscript, recordingStatus } = useTranscription();
+  const { getTranscriptSegments, recordingStatus, resetTrigger } = useTranscription();
+  const { currentCase, currentSession, currentPersonType } = useCaseContext();
   
-  // NEW: Get case and session from context (same as transcription does)
-  const { currentCase, currentSession } = useCaseContext();
-  
-  // Track processed content to avoid duplicates
-  const [lastProcessedContent, setLastProcessedContent] = useState("");
+  const [processedSegmentIds, setProcessedSegmentIds] = useState<Set<string>>(new Set());
 
-  // Save data to localStorage for the witness view
+  // Listen for reset trigger from transcription
+  useEffect(() => {
+    console.log('🔄 Reset trigger detected, clearing translations');
+    clearConversation();
+    setProcessedSegmentIds(new Set());
+  }, [resetTrigger]);
+
   const syncToLocalStorage = useCallback((translationData: TranslationResult[]) => {
     try {
       const syncData = {
         translations: translationData,
         lastUpdated: new Date().toISOString(),
         investigatorLanguage,
-        witnessLanguage
+        participantLanguage
       };
       localStorage.setItem('vision-ai-translations', JSON.stringify(syncData));
+      
+      // ✨ Dispatch custom event for instant updates
+      window.dispatchEvent(new CustomEvent('translations-updated', {
+        detail: { count: translationData.length }
+      }));
+      
     } catch (err) {
-      console.error(' Failed to sync to localStorage:', err);
+      console.error('❌ Failed to sync to localStorage:', err);
     }
-  }, [investigatorLanguage, witnessLanguage]);
+  }, [investigatorLanguage, participantLanguage]);
 
-  // Clean and extract speaker from the transcription text
-  const extractSpeakerAndText = (content: string): { speaker: "Investigator" | "Witness"; text: string } => {
-    console.log(` Raw transcription: "${content}"`);
+  // Normalize speaker type to match SpeakerType
+  const normalizeSpeaker = (speaker: string): SpeakerType => {
+    const normalized = speaker.trim();
     
-    // Remove timestamp patterns 
-    let cleanedContent = content.replace(/\[\d{2}:\d{2}:\d{2}\]/g, '').trim();
+    if (normalized === "Investigator") return "Investigator";
     
-    console.log(` After timestamp removal: "${cleanedContent}"`);
+    // Check for participant types
+    if (normalized === "Witness" || normalized.includes("Witness")) return "Witness";
+    if (normalized === "Accused" || normalized.includes("Accused")) return "Accused";
+    if (normalized === "Victim" || normalized.includes("Victim")) return "Victim";
     
-    // Extract speaker - look for "Investigator:" or "Witness:" patterns
-    if (cleanedContent.includes('Investigator:')) {
-      const text = cleanedContent.split('Investigator:').pop()?.trim() || '';
-      return {
-        speaker: 'Investigator',
-        text: text
-      };
-    } else if (cleanedContent.includes('Witness:')) {
-      const text = cleanedContent.split('Witness:').pop()?.trim() || '';
-      return {
-        speaker: 'Witness',
-        text: text
-      };
+    // Check for multi-participant mode (Speaker 0, Speaker 1, etc.)
+    if (normalized.match(/Speaker \d+/)) {
+      // Use the current person type or default to Witness
+      return (currentPersonType as SpeakerType) || "Witness";
     }
     
-    // If no clear speaker, use alternating pattern
-    const lastTranslation = translations[translations.length - 1];
-    const fallbackSpeaker = lastTranslation?.speaker === "Investigator" ? "Witness" : "Investigator";
-    
-    console.warn(` No clear speaker found in: "${content}". Using fallback: ${fallbackSpeaker}`);
-    
-    return {
-      speaker: fallbackSpeaker,
-      text: cleanedContent
-    };
+    // Default fallback based on current person type
+    return (currentPersonType as SpeakerType) || "Witness";
   };
 
-  // Listen to transcription changes and translate new content
   useEffect(() => {
-    const processNewTranscription = async () => {
-      if (!getFullTranscript || !recordingStatus || recordingStatus !== "on") {
+    const processNewSegments = async () => {
+      if (!recordingStatus || recordingStatus !== "on") {
         return;
       }
 
-      const newContent = getFullTranscript.slice(lastProcessedContent.length).trim();
+      const segments = getTranscriptSegments();
       
-      if (!newContent) {
+      if (!segments || segments.length === 0) {
         return;
       }
 
-      // Skip if this looks like duplicate or incomplete content
-      if (newContent.length < 3 || newContent === lastProcessedContent) {
+      // Find new segments that haven't been processed
+      const newSegments = segments.filter(segment => {
+        const segmentId = `${segment.timeStamp}-${segment.speaker}-${segment.formattedTranscript.substring(0, 20)}`;
+        return !processedSegmentIds.has(segmentId);
+      });
+
+      if (newSegments.length === 0) {
         return;
       }
 
-      setIsTranslating(true);
-      setError(null);
+      console.log(`🆕 Processing ${newSegments.length} new segment(s)`);
 
-      try {
-        console.log(` New transcription to process: "${newContent}"`);
+      for (const segment of newSegments) {
+        const segmentId = `${segment.timeStamp}-${segment.speaker}-${segment.formattedTranscript.substring(0, 20)}`;
+        
+        try {
+          const actualText = segment.formattedTranscript.trim();
+          
+          if (!actualText || actualText.length < 2) {
+            console.log('⏭️ Skipping - no meaningful text');
+            continue;
+          }
 
-        // Extract speaker and clean text
-        const { speaker, text: actualText } = extractSpeakerAndText(newContent);
+          const speaker = normalizeSpeaker(segment.speaker);
+          
+          console.log(`✅ Processing segment - Speaker: ${speaker}, Text: "${actualText}"`);
+          console.log(`🌐 Translation settings - Investigator: ${investigatorLanguage}, Participant: ${participantLanguage}`);
 
-        // Skip if no actual text content after cleaning
-        if (!actualText || actualText.length < 2) {
-          console.log(' Skipping - no meaningful text after cleaning');
-          return;
-        }
+          setIsTranslating(true);
+          setError(null);
 
-        console.log(` Processing - Speaker: ${speaker}, Text: "${actualText}"`);
-        console.log(` Translation settings - Investigator: ${investigatorLanguage}, Witness: ${witnessLanguage}`);
+          const investigatorLangCode = investigatorLanguage.split('-')[0];
+          const participantLangCode = participantLanguage.split('-')[0];
 
-        // Convert language codes for AWS Translate
-        const investigatorLangCode = investigatorLanguage.split('-')[0];
-        const witnessLangCode = witnessLanguage.split('-')[0];
+          const { investigatorDisplay, participantDisplay, originalLanguage } = 
+            await translationService.translateConversation(
+              actualText,
+              speaker,
+              investigatorLangCode,
+              participantLangCode
+            );
 
-        const { investigatorDisplay, witnessDisplay, originalLanguage } = 
-          await translationService.translateConversation(
-            actualText,
+          const newTranslation: TranslationResult = {
+            id: translationService.generateId(),
+            originalText: actualText,
+            originalLanguage,
             speaker,
-            investigatorLangCode,
-            witnessLangCode
-          );
+            investigatorDisplay,
+            participantDisplay,
+            timestamp: new Date(),
+          };
 
-        const newTranslation: TranslationResult = {
-          id: translationService.generateId(),
-          originalText: actualText,
-          originalLanguage,
-          speaker,
-          investigatorDisplay,
-          witnessDisplay,
-          timestamp: new Date(),
-        };
+          setTranslations(prev => {
+            const updatedTranslations = [...prev, newTranslation];
+            syncToLocalStorage(updatedTranslations);
+            return updatedTranslations;
+          });
 
-        setTranslations(prev => {
-          const updatedTranslations = [...prev, newTranslation];
-          syncToLocalStorage(updatedTranslations);
-          return updatedTranslations;
-        });
-
-        setLastProcessedContent(getFullTranscript);
-        
-        console.log('Translation completed:', {
-          speaker,
-          originalText: actualText,
-          investigatorSees: investigatorDisplay,
-          witnessSees: witnessDisplay
-        });
-        
-      } catch (err) {
-        console.error(' Translation failed:', err);
-        setError('Translation failed. Please try again.');
-      } finally {
-        setIsTranslating(false);
+          setProcessedSegmentIds(prev => new Set([...prev, segmentId]));
+          
+          console.log('✅ Translation completed:', {
+            speaker,
+            originalText: actualText,
+            investigatorSees: investigatorDisplay,
+            participantSees: participantDisplay
+          });
+          
+        } catch (err) {
+          console.error('❌ Translation failed for segment:', err);
+          setError('Translation failed. Please try again.');
+        } finally {
+          setIsTranslating(false);
+        }
       }
     };
 
     if (recordingStatus === "on") {
-      processNewTranscription();
+      processNewSegments();
     }
-  }, [getFullTranscript, recordingStatus, lastProcessedContent, investigatorLanguage, witnessLanguage, syncToLocalStorage, translations]);
+  }, [
+    getTranscriptSegments, 
+    recordingStatus, 
+    investigatorLanguage, 
+    participantLanguage, 
+    syncToLocalStorage, 
+    processedSegmentIds,
+    currentPersonType
+  ]);
 
-  // Keep for backward compatibility
   const addConversationTurn = useCallback(async () => {
     console.log('ℹ️ Translation is now automatic with real transcription');
   }, []);
 
   const clearConversation = useCallback(() => {
     setTranslations([]);
-    setLastProcessedContent("");
     syncToLocalStorage([]);
-    console.log('🧹 Conversation cleared');
+    console.log('🧹 Conversation and translations cleared');
   }, [syncToLocalStorage]);
 
-  // UPDATED: Save translations to S3 (same pattern as transcription)
   const saveTranslationsToS3 = useCallback(async () => {
     try {
       if (translations.length === 0) {
@@ -203,7 +208,6 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({
         return;
       }
 
-      // Get case and session from context (same as transcription does)
       const caseId = currentCase?.caseId || "";
       const sessionId = currentSession?.sessionId || currentCase?.caseId + "_" + crypto.randomUUID();
 
@@ -212,7 +216,7 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({
         sessionId,
         count: translations.length,
         investigatorLanguage,
-        witnessLanguage
+        participantLanguage
       });
 
       await translationService.saveTranslations({
@@ -221,16 +225,16 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({
         translations,
         metadata: {
           investigatorLanguage,
-          witnessLanguage,
+          participantLanguage,
           totalMessages: translations.length,
         }
       });
 
-      console.log(' Translations saved successfully to S3');
+      console.log('✅ Translations saved successfully to S3');
     } catch (error) {
-      console.error(' Failed to save translations to S3:', error);
+      console.error('❌ Failed to save translations to S3:', error);
     }
-  }, [translations, investigatorLanguage, witnessLanguage, currentCase, currentSession]);
+  }, [translations, investigatorLanguage, participantLanguage, currentCase, currentSession]);
 
   const value: TranslationContextType = {
     translations,
@@ -241,9 +245,9 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({
     hasMoreConversation: recordingStatus === "on",
     currentSpeaker: translations.length > 0 ? translations[translations.length - 1].speaker : null,
     investigatorLanguage,
-    witnessLanguage,
+    participantLanguage,
     setInvestigatorLanguage,
-    setWitnessLanguage,
+    setParticipantLanguage,
     saveTranslationsToS3,
   };
 

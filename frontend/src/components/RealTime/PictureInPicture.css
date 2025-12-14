@@ -1,0 +1,138 @@
+.pip-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+  position: relative;
+  overflow: hidden;
+}
+
+.pip-toggle-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s;
+}
+
+.pip-toggle-btn:hover::before {
+  left: 100%;
+}
+
+.pip-toggle-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(102, 126, 234, 0.5);
+}
+
+.pip-toggle-btn.active {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  animation: pip-pulse 2s infinite;
+}
+
+@keyframes pip-pulse {
+  0%, 100% {
+    box-shadow: 0 4px 12px rgba(245, 87, 108, 0.4);
+  }
+  50% {
+    box-shadow: 0 4px 20px rgba(245, 87, 108, 0.6);
+  }
+}
+
+.pip-toggle-btn:active {
+  transform: translateY(0);
+}
+
+.pip-toggle-btn svg {
+  flex-shrink: 0;
+}
+
+.pip-not-supported {
+  padding: 12px 16px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 8px;
+  text-align: center;
+  color: #dc2626;
+}
+
+.pip-not-supported p {
+  margin: 4px 0;
+  font-size: 14px;
+}
+
+.pip-active-notice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: rgba(34, 197, 94, 0.1);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  border-radius: 8px;
+  margin-top: 12px;
+  animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.pip-pulse {
+  width: 12px;
+  height: 12px;
+  background: #22c55e;
+  border-radius: 50%;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.2);
+  }
+}
+
+.pip-active-notice span {
+  font-size: 14px;
+  font-weight: 500;
+  color: #16a34a;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .pip-toggle-btn {
+    padding: 10px 16px;
+    font-size: 13px;
+  }
+
+  .pip-toggle-btn span {
+    display: none;
+  }
+
+  .pip-active-notice {
+    flex-direction: column;
+    text-align: center;
+  }
+}

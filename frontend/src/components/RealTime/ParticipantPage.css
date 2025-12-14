@@ -1,11 +1,11 @@
-.witness-page {
+.participant-page {
   min-height: 100vh;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   padding: 20px;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
 }
 
-.witness-page .witness-container {
+.participant-page .participant-container {
   background: white;
   border-radius: 12px;
   padding: 0;
@@ -16,8 +16,8 @@
   overflow: hidden;
 }
 
-/* Witness Header */
-.witness-header {
+/* Participant Header */
+.participant-header {
   background: var(--primary-color);
   color: white;
   padding: 24px;
@@ -25,7 +25,7 @@
   border-radius: 12px 12px 0 0;
 }
 
-.witness-logo {
+.participant-logo {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -37,39 +37,31 @@
   color: white;
 }
 
-.witness-title {
+.participant-title {
   font-size: 28px;
   font-weight: bold;
   margin: 0;
   color: white;
 }
 
-.witness-subtitle {
+.participant-subtitle {
   margin-top: 16px;
 }
 
-.arabic-title {
+.subtitle-title {
   font-size: 20px;
   font-weight: 600;
   margin: 0 0 12px 0;
-  direction: rtl;
 }
 
-.witness-notice {
+.participant-notice {
   font-size: 14px;
   margin: 8px 0;
   color: rgba(255, 255, 255, 0.9);
 }
 
-.arabic-notice {
-  font-size: 14px;
-  margin: 8px 0;
-  color: rgba(255, 255, 255, 0.9);
-  direction: rtl;
-}
-
-/* Witness Content */
-.witness-content {
+/* Participant Content */
+.participant-content {
   padding: 24px;
   min-height: 500px;
   display: flex;
@@ -88,7 +80,7 @@
 }
 
 /* Empty State */
-.empty-witness {
+.empty-participant {
   text-align: center;
   padding: 60px 20px;
   color: var(--text-light);
@@ -99,16 +91,11 @@
   margin-bottom: 16px;
 }
 
-.empty-witness h3 {
+.empty-participant h3 {
   font-size: 18px;
   font-weight: 600;
   margin: 0 0 8px 0;
   color: var(--text-dark);
-}
-
-.arabic-text {
-  direction: rtl;
-  margin: 8px 0;
 }
 
 .instruction {
@@ -132,6 +119,7 @@
   position: relative;
 }
 
+/* Investigator messages - always on the left */
 .message.investigator {
   background: #e0e7ff;
   border: 1px solid #c7d2fe;
@@ -139,22 +127,26 @@
   margin-right: auto;
 }
 
-.message.witness {
+/* Participant messages (Witness, Accused, Victim) - always on the right */
+.message.witness,
+.message.accused,
+.message.victim {
   background: #f0fdf4;
   border: 1px solid #bbf7d0;
   align-self: flex-end;
   margin-left: auto;
 }
 
-/* RTL Support for Arabic Messages */
-.message.witness[dir="rtl"],
-.message.witness .message-text[dir="rtl"] {
+/* RTL Support for Participant Messages */
+.message.witness .message-text,
+.message.accused .message-text,
+.message.victim .message-text {
   direction: rtl;
   text-align: right;
 }
 
-.message.investigator[dir="ltr"],
-.message.investigator .message-text[dir="ltr"] {
+/* LTR Support for Investigator Messages */
+.message.investigator .message-text {
   direction: ltr;
   text-align: left;
 }
@@ -186,24 +178,8 @@
   word-wrap: break-word;
 }
 
-.witness-text {
-  /* Default to RTL for witness (Arabic) */
-  direction: rtl;
-  text-align: right;
-}
-
-/* Original Note */
-.original-note {
-  font-size: 11px;
-  color: var(--text-light);
-  font-style: italic;
-  margin-top: 8px;
-  direction: ltr; /* Keep note in LTR */
-  text-align: left;
-}
-
-/* Witness Status */
-.witness-status {
+/* Participant Status */
+.participant-status {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -249,27 +225,27 @@
 
 /* Responsive Design */
 @media (max-width: 768px) {
-  .witness-page {
+  .participant-page {
     padding: 12px;
   }
   
-  .witness-container {
+  .participant-container {
     min-height: calc(100vh - 24px);
   }
   
-  .witness-content {
+  .participant-content {
     padding: 16px;
   }
   
-  .witness-header {
+  .participant-header {
     padding: 20px 16px;
   }
   
-  .witness-title {
+  .participant-title {
     font-size: 24px;
   }
   
-  .arabic-title {
+  .subtitle-title {
     font-size: 18px;
   }
   
@@ -277,7 +253,7 @@
     max-width: 90%;
   }
   
-  .witness-status {
+  .participant-status {
     flex-direction: column;
     gap: 12px;
     text-align: center;
@@ -285,12 +261,12 @@
 }
 
 @media (max-width: 480px) {
-  .witness-logo {
+  .participant-logo {
     flex-direction: column;
     gap: 8px;
   }
   
-  .witness-title {
+  .participant-title {
     font-size: 20px;
   }
   
@@ -312,7 +288,25 @@
     align-items: flex-start;
   }
   
-  .message.witness .message-header {
+  .message.witness .message-header,
+  .message.accused .message-header,
+  .message.victim .message-header {
     align-items: flex-end;
+  }
+}
+
+/* PiP Controls */
+.pip-controls {
+  margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .pip-controls {
+    margin-top: 16px;
   }
 }
