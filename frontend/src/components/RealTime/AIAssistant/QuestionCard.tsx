@@ -35,7 +35,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
 
   // Category color mapping
   const getCategoryStyles = (category: QuestionCategory) => {
-    const styles = {
+    const styles: Record<string, { bg: string; text: string; border: string }> = {
       clarification: {
         bg: 'bg-indigo-100',
         text: 'text-indigo-700',
@@ -56,8 +56,19 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
         text: 'text-green-700',
         border: 'border-green-500',
       },
+      contradiction: {
+        bg: 'bg-red-50',
+        text: 'text-red-700',
+        border: 'border-red-200',
+      },
     };
-    return styles[category];
+
+    // Return the style for the category, or a default style if category is unknown
+    return styles[category] || {
+      bg: 'bg-gray-100',
+      text: 'text-gray-700',
+      border: 'border-gray-500',
+    };
   };
 
   const categoryStyles = getCategoryStyles(question.category);
@@ -125,23 +136,50 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
           `}
           style={{ backfaceVisibility: 'hidden' }}
         >
-          {/* Header: Checkbox + Category Badge */}
-          <div className="flex items-start gap-3 mb-3">
-            <input
-              type="checkbox"
-              checked={isSelected}
-              onChange={handleSelect}
-              disabled={disabled}
-              className="mt-1 w-4 h-4 text-indigo-600 rounded focus:ring-2 focus:ring-indigo-500 cursor-pointer disabled:cursor-not-allowed"
-            />
-            
-            <span className={`
-              ${categoryStyles.bg} ${categoryStyles.text}
-              text-xs font-semibold px-3 py-1 rounded-full
-            `}>
-              {formatCategory(question.category)}
-            </span>
-          </div>
+          {/* Header: Checkbox + Category Badge + Confidence */}
+<div className="flex items-start gap-3 mb-3">
+  <input
+    type="checkbox"
+    checked={isSelected}
+    onChange={handleSelect}
+    disabled={disabled}
+    className="mt-1 w-4 h-4 text-indigo-600 rounded focus:ring-2 focus:ring-indigo-500 cursor-pointer disabled:cursor-not-allowed"
+  />
+  
+  <div className="flex items-center gap-2 flex-wrap">
+    {/* Category Badge */}
+    <span className={`
+      ${categoryStyles.bg} ${categoryStyles.text}
+      text-xs font-semibold px-3 py-1 rounded-full
+    `}>
+      {formatCategory(question.category)}
+    </span>
+
+    {/* High Priority Badge */}
+    {question.priority === 'high' && (
+      <span className="
+        bg-red-50 text-red-700 border border-red-200
+        text-xs font-semibold px-2.5 py-1 rounded-full
+        flex items-center gap-1
+      ">
+        <span className="text-red-500">🔥</span>
+        High Priority
+      </span>
+    )}
+
+    {/* High Confidence Badge */}
+    {question.confidence === 'high' && (
+      <span className="
+        bg-green-50 text-green-700 border border-green-200
+        text-xs font-semibold px-2.5 py-1 rounded-full
+        flex items-center gap-1
+      ">
+        <span className="text-green-500">✓</span>
+        High Confidence
+      </span>
+    )}
+  </div>
+</div>
 
           {/* Question Text */}
           <p className="text-sm text-gray-800 leading-relaxed mb-4 pl-7">

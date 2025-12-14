@@ -1,5 +1,4 @@
 // src/components/RealTime/AIAssistant/QuestionGenerator.tsx
-
 import React from 'react';
 import { Sparkles } from 'lucide-react';
 import { useQuestionContext } from '../../../hooks/useQuestionContext';
@@ -20,6 +19,7 @@ import QuestionList from './QuestionList';
  * - Context building from CaseContext + TranscriptionContext
  * - Question generation via QuestionContext
  * - Progressive UI disclosure (components appear after generation)
+ * - Deduplication of previous questions
  * 
  * No props needed - gets everything from contexts
  */
@@ -33,6 +33,8 @@ const QuestionGenerator: React.FC = () => {
     selectedQuestionIds,
     metrics,
     isLoading,
+    error,
+    clearError,
     generateQuestions,
     confirmAttempt,
     retryWithSelection,
@@ -41,7 +43,11 @@ const QuestionGenerator: React.FC = () => {
   } = useQuestionContext();
 
   // Case Context - Session data only
-  const { currentSession } = useCaseContext();
+  const { 
+    currentSession, 
+    currentPersonType, 
+    currentPersonName 
+  } = useCaseContext();
 
   // Transcription Context - Live transcript
   const { recordingStatus, getFullTranscript } = useTranscription();
@@ -52,6 +58,27 @@ const QuestionGenerator: React.FC = () => {
   const hasSession = !!currentSession;
   const canGenerate = isRecording && hasSession;
 
+  // ========== HELPER FUNCTIONS ==========
+  
+  /**
+   * Deduplicate questions by removing exact text matches
+   * Normalizes to lowercase and trims whitespace for comparison
+   */
+  const deduplicateQuestions = (questions: string[]): string[] => {
+    const seen = new Set<string>();
+    const unique: string[] = [];
+    
+    for (const question of questions) {
+      const normalized = question.trim().toLowerCase();
+      if (!seen.has(normalized)) {
+        seen.add(normalized);
+        unique.push(question);
+      }
+    }
+    
+    return unique;
+  };
+
   // ========== GENERATION HANDLER ==========
   
   const handleGenerate = async (questionCount: number, language: Language) => {
@@ -60,30 +87,61 @@ const QuestionGenerator: React.FC = () => {
       return;
     }
 
-    // Build context from available data
+    console.log('🔍 [QuestionGenerator] Building context from currentSession:', {
+      caseId: currentSession?.caseId,
+      sessionId: currentSession?.sessionId,
+      personType: currentPersonType,
+      personName: currentPersonName,
+      hasSession: !!currentSession,
+    });
+
+    // Collect all confirmed questions from all confirmed attempts
+    const allPreviousQuestions = attempts
+      .filter(a => a.isConfirmed)
+      .flatMap(a => 
+        a.questions
+          .filter(q => q.status === 'confirmed')
+          .map(q => q.text)
+      );
+
+    // DEDUPLICATE before sending to backend
+    const uniquePreviousQuestions = deduplicateQuestions(allPreviousQuestions);
+
+    console.log('🔍 Previous questions analysis:', {
+      total: allPreviousQuestions.length,
+      unique: uniquePreviousQuestions.length,
+      duplicatesRemoved: allPreviousQuestions.length - uniquePreviousQuestions.length,
+    });
+
+    // Build context - backend will fetch case summary and victim testimony
     const context: QuestionGenerationContext = {
       caseId: currentSession!.caseId,
       sessionId: currentSession!.sessionId,
-      personType: currentSession!.personType,
+      personType: currentPersonType as "witness" | "accused" | "victim",
       
-      // TODO: Fetch actual case summary from backend/S3
-      caseSummary: 'Placeholder: Case summary will be fetched from case documents',
+      // These will be fetched by QuestionContext from backend
+      caseSummary: '', // Placeholder - will be fetched
+      victimTestimony: undefined, // Placeholder - will be fetched if needed
       
       // Get live transcript
       currentTranscript: getFullTranscript,
-      
-      // TODO: Fetch victim testimony if available
-      victimTestimony: undefined,
       
       // From UI selections
       language,
       questionCount,
       
-      // For duplicate prevention
-      previousQuestions: attempts.flatMap(a => a.questions),
+      // ✅ Use deduplicated questions
+      previousQuestions: uniquePreviousQuestions,
     };
 
-    // Call context action
+    console.log('🔍 [QuestionGenerator] Context built:', {
+      personType: context.personType,
+      previousQuestionsCount: context.previousQuestions?.length || 0,
+      confirmedAttemptsCount: attempts.filter(a => a.isConfirmed).length,
+      totalAttemptsCount: attempts.length,
+    });
+
+    // Call context action (it handles the API calls)
     await generateQuestions(context);
   };
 
@@ -92,18 +150,91 @@ const QuestionGenerator: React.FC = () => {
   const handleRetry = async () => {
     if (!currentAttempt || !canGenerate) return;
 
-    // Build context (same as generate)
+    // Determine if this is "Retry All" or "Retry Selected"
+    const isRetryAll = selectedQuestionIds.length === 0;
+
+    console.log('🔄 [QuestionGenerator] Retry type:', {
+      isRetryAll,
+      selectedCount: selectedQuestionIds.length,
+      totalInAttempt: currentAttempt.questions.length,
+    });
+
+    // Collect previous questions based on retry type
+    let allPreviousQuestions: string[];
+
+    if (isRetryAll) {
+      // ✅ RETRY ALL: Include questions from OTHER confirmed attempts 
+      // AND questions from the CURRENT attempt (to avoid regenerating same questions)
+      allPreviousQuestions = [
+        // From other confirmed attempts
+        ...attempts
+          .filter(a => a.isConfirmed && a.attemptId !== currentAttempt.attemptId)
+          .flatMap(a => 
+            a.questions
+              .filter(q => q.status === 'confirmed')
+              .map(q => q.text)
+          ),
+        // ✅ CRITICAL FIX: Include current attempt's questions too!
+        ...currentAttempt.questions.map(q => q.text)
+      ];
+
+      console.log('🔄 Retry All - Including current attempt questions to avoid duplicates');
+    } else {
+      // RETRY SELECTED: Include questions from OTHER confirmed attempts
+      // AND unselected questions from CURRENT attempt
+      const unselectedQuestions = currentAttempt.questions
+        .filter(q => !selectedQuestionIds.includes(q.id))
+        .map(q => q.text);
+
+      allPreviousQuestions = [
+        // From other confirmed attempts
+        ...attempts
+          .filter(a => a.isConfirmed && a.attemptId !== currentAttempt.attemptId)
+          .flatMap(a => 
+            a.questions
+              .filter(q => q.status === 'confirmed')
+              .map(q => q.text)
+          ),
+        // Unselected questions from current attempt
+        ...unselectedQuestions
+      ];
+
+      console.log('🔄 Retry Selected - Including unselected questions:', {
+        selectedCount: selectedQuestionIds.length,
+        unselectedCount: unselectedQuestions.length,
+      });
+    }
+
+    // ✅ DEDUPLICATE before sending
+    const uniquePreviousQuestions = deduplicateQuestions(allPreviousQuestions);
+
+    console.log('🔍 Previous questions for retry:', {
+      retryType: isRetryAll ? 'ALL' : 'SELECTED',
+      total: allPreviousQuestions.length,
+      unique: uniquePreviousQuestions.length,
+      duplicatesRemoved: allPreviousQuestions.length - uniquePreviousQuestions.length,
+      currentAttemptId: currentAttempt.attemptId,
+    });
+
     const context: QuestionGenerationContext = {
       caseId: currentSession!.caseId,
       sessionId: currentSession!.sessionId,
-      personType: currentSession!.personType,
-      caseSummary: 'Placeholder: Case summary will be fetched from case documents',
+      personType: currentPersonType as "witness" | "accused" | "victim",
+      caseSummary: '', // Will be fetched
       currentTranscript: getFullTranscript,
-      victimTestimony: undefined,
+      victimTestimony: undefined, // Will be fetched if needed
       language: currentAttempt.language,
-      questionCount: currentAttempt.questions.length,
-      previousQuestions: attempts.flatMap(a => a.questions),
+      questionCount: isRetryAll ? currentAttempt.questions.length : selectedQuestionIds.length,
+      
+      // ✅ Use deduplicated questions (including current attempt for "Retry All")
+      previousQuestions: uniquePreviousQuestions,
     };
+
+    console.log('🔄 [QuestionGenerator] Retry context built:', {
+      questionCount: context.questionCount,
+      previousQuestionsCount: context.previousQuestions?.length || 0,
+      language: context.language,
+    });
 
     await retryWithSelection(context);
   };
@@ -171,6 +302,42 @@ const QuestionGenerator: React.FC = () => {
               />
             );
           })()}
+
+          {/* Error Display */}
+          {error && (
+            <div className="mb-4 p-4 bg-red-50 border-l-4 border-red-500 rounded-r-lg">
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0">
+                  <svg className="w-5 h-5 text-red-500 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-sm font-semibold text-red-800 mb-1">
+                    Cannot Generate Questions
+                  </h3>
+                  <p className="text-sm text-red-700">
+                    {error}
+                  </p>
+                  {!canGenerate && (
+                    <p className="text-xs text-red-600 mt-2">
+                      💡 <strong>Tip:</strong> {!isRecording 
+                        ? 'Start the recording to begin collecting testimony.' 
+                        : 'Wait for the witness to speak so the system can generate relevant questions.'}
+                    </p>
+                  )}
+                </div>
+                <button
+                  onClick={clearError}
+                  className="flex-shrink-0 text-red-500 hover:text-red-700 transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Question List - Shows after generation */}
           {showQuestions ? (
@@ -243,7 +410,6 @@ const QuestionGenerator: React.FC = () => {
           )}
         </>
       )}
-
     </div>
   );
 };
