@@ -111,7 +111,7 @@ const SessionPageContent: React.FC<SessionPageProps & {
   const { stopRecording, toggleRecordingPause, toggleReset } =
     useTranscription();
   
-  const { saveTranslationsToS3 } = useRealTimeTranslation();
+  const { saveTranslationsToS3, clearConversation } = useRealTimeTranslation();
   const { language: contextLanguage } = useLanguage();
 
   const [language, setLanguage] = useState<"en" | "ar">(contextLanguage);
@@ -174,6 +174,8 @@ const SessionPageContent: React.FC<SessionPageProps & {
     stopRecording(setSessionState);
 
     await saveTranslationsToS3();
+
+    clearConversation();
 
     if (currentSession && currentCase) {
       try {

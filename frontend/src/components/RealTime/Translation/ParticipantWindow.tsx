@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { useParticipantTranslation } from '../../hooks/useRealTimeTranslation';
+import { useParticipantTranslation } from '../../../hooks/useRealTimeTranslation';
 import { Eye, User, Clock } from 'lucide-react';
 import PictureInPicture from './PictureInPicture';
 

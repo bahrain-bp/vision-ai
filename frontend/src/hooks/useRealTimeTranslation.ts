@@ -33,7 +33,7 @@ export const useParticipantTranslation = () => {
           setParticipantView(participantViewData);
         }
       } catch (err) {
-        console.error('❌ Failed to update participant view:', err);
+        console.error(' Failed to update participant view:', err);
       }
     };
 

@@ -1,9 +1,9 @@
 import React, { useEffect, useRef } from 'react';
-import { useRealTimeTranslation } from '../../hooks/useRealTimeTranslation';
+import { useRealTimeTranslation } from '../../../hooks/useRealTimeTranslation';
 import { Globe, Eye } from 'lucide-react'; 
 import TranslationSettings from './TranslationSettings';
 import PDFExporter from './TranslationPDFExporter';
-import { useLanguage } from '../../context/LanguageContext';
+import { useLanguage } from '../../../context/LanguageContext';
 
 interface TranslationSettings {
   sourceLanguage: string;
@@ -13,7 +13,7 @@ interface TranslationSettings {
 const Translation: React.FC = () => {
   const {
     translations,
-    isTranslating,
+    isTranslating, 
     error,
     investigatorLanguage,
     participantLanguage,
@@ -148,26 +148,7 @@ const Translation: React.FC = () => {
         />
       </div>
 
-      {translations.length > 0 && (
-        <div className="translation-stats">
-          <div className="stat-item">
-            <span className="stat-label">{t("sessionInfo.statistics")}:</span>
-            <span className="stat-value">{translations.length}</span>
-          </div>
-          <div className="stat-item">
-            <span className="stat-label">{t("session.investigator")}:</span>
-            <span className="stat-value">
-              {translations.filter(t => t.speaker === 'Investigator').length}
-            </span>
-          </div>
-          <div className="stat-item">
-            <span className="stat-label">Participant:</span>
-            <span className="stat-value">
-              {translations.filter(t => t.speaker !== 'Investigator').length}
-            </span>
-          </div>
-        </div>
-      )}
+     
     </div>
   );
 };

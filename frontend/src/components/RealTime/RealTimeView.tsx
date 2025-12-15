@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { User, ChevronUp, ChevronDown, FileText } from "lucide-react";
 import LiveTranscription from "../LiveTranscription/LiveTranscription";
-import Translation from "./Translation";
+import Translation from "./Translation/Translation";
 import SessionInfo from "./SessionInfo";
 import IdentityVerification from "./IdentityVerification/IdentityVerification";
 import TranscriptionSessionSetup from "../LiveTranscription/TranscriptionSessionSetup";

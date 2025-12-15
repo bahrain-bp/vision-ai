@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Download, Printer } from "lucide-react";
 import "./TranslationPDFExporter.css";
-import { useLanguage } from "../../context/LanguageContext";
+import { useLanguage } from "../../../context/LanguageContext";
 
 interface TranslationPDFExporterProps {
   transcript: string;
@@ -204,10 +204,10 @@ const TranslationPDFExporter: React.FC<TranslationPDFExporterProps> = ({
 
       printWindow.document.close();
       
-      // ✅ FIX: Don't wait for window to load, trigger print immediately and re-enable button
+    
       setTimeout(() => {
         printWindow.print();
-        setIsGenerating(false); // ✅ Re-enable button immediately after print dialog opens
+        setIsGenerating(false); 
       }, 100);
       
     } catch (error) {

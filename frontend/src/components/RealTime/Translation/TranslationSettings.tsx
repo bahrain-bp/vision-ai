@@ -1,7 +1,7 @@
 import React from "react";
 import "./TranslationSettings.css";
-import { useCaseContext } from "../../hooks/useCaseContext";
-import { useLanguage } from "../../context/LanguageContext";
+import { useCaseContext } from "../../../hooks/useCaseContext";
+import { useLanguage } from "../../../context/LanguageContext";
 
 interface TranslationSettingsType {
   sourceLanguage: string;

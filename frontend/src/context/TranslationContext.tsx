@@ -44,7 +44,7 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({
 
   // Listen for reset trigger from transcription
   useEffect(() => {
-    console.log('🔄 Reset trigger detected, clearing translations');
+    console.log(' Reset trigger detected, clearing translations');
     clearConversation();
     setProcessedSegmentIds(new Set());
   }, [resetTrigger]);
@@ -65,7 +65,7 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({
       }));
       
     } catch (err) {
-      console.error('❌ Failed to sync to localStorage:', err);
+      console.error(' Failed to sync to localStorage:', err);
     }
   }, [investigatorLanguage, participantLanguage]);
 
@@ -112,7 +112,7 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({
         return;
       }
 
-      console.log(`🆕 Processing ${newSegments.length} new segment(s)`);
+      console.log(` Processing ${newSegments.length} new segment(s)`);
 
       for (const segment of newSegments) {
         const segmentId = `${segment.timeStamp}-${segment.speaker}-${segment.formattedTranscript.substring(0, 20)}`;
@@ -121,14 +121,14 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({
           const actualText = segment.formattedTranscript.trim();
           
           if (!actualText || actualText.length < 2) {
-            console.log('⏭️ Skipping - no meaningful text');
+            console.log(' Skipping - no meaningful text');
             continue;
           }
 
           const speaker = normalizeSpeaker(segment.speaker);
           
-          console.log(`✅ Processing segment - Speaker: ${speaker}, Text: "${actualText}"`);
-          console.log(`🌐 Translation settings - Investigator: ${investigatorLanguage}, Participant: ${participantLanguage}`);
+          console.log(` Processing segment - Speaker: ${speaker}, Text: "${actualText}"`);
+          console.log(` Translation settings - Investigator: ${investigatorLanguage}, Participant: ${participantLanguage}`);
 
           setIsTranslating(true);
           setError(null);
@@ -162,7 +162,7 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({
 
           setProcessedSegmentIds(prev => new Set([...prev, segmentId]));
           
-          console.log('✅ Translation completed:', {
+          console.log('Translation completed:', {
             speaker,
             originalText: actualText,
             investigatorSees: investigatorDisplay,
@@ -170,7 +170,7 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({
           });
           
         } catch (err) {
-          console.error('❌ Translation failed for segment:', err);
+          console.error('Translation failed for segment:', err);
           setError('Translation failed. Please try again.');
         } finally {
           setIsTranslating(false);
@@ -192,13 +192,13 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({
   ]);
 
   const addConversationTurn = useCallback(async () => {
-    console.log('ℹ️ Translation is now automatic with real transcription');
+    console.log('Translation is now automatic with real transcription');
   }, []);
 
   const clearConversation = useCallback(() => {
     setTranslations([]);
     syncToLocalStorage([]);
-    console.log('🧹 Conversation and translations cleared');
+    console.log('Conversation and translations cleared');
   }, [syncToLocalStorage]);
 
   const saveTranslationsToS3 = useCallback(async () => {
@@ -230,9 +230,9 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({
         }
       });
 
-      console.log('✅ Translations saved successfully to S3');
+      console.log('Translations saved successfully to S3');
     } catch (error) {
-      console.error('❌ Failed to save translations to S3:', error);
+      console.error('Failed to save translations to S3:', error);
     }
   }, [translations, investigatorLanguage, participantLanguage, currentCase, currentSession]);
 

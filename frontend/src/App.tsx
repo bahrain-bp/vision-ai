@@ -10,7 +10,7 @@ import { TranscriptionProvider } from "./context/TranscriptionContext";
 import { CaseProvider } from "./context/CaseContext"; // ADD THIS IMPORT
 import { QuestionProvider } from "./context/QuestionContext";
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import ParticipantPage from "./components/RealTime/ParticipantPage";
+import ParticipantPage from "./components/RealTime/Translation/ParticipantPage";
 
 Amplify.configure(awsConfig);
 
