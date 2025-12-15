@@ -1,5 +1,6 @@
 // src/components/RealTime/AIAssistant/ManualQuestionInput.tsx
 import React, { useState } from 'react';
+import { useLanguage } from '../../../context/LanguageContext'; // ← ADDED
 import { useCaseContext } from '../../../hooks/useCaseContext';
 import { useTranscription } from '../../../hooks/useTranscription';
 import questionService from '../../../services/AIAssistant/questionServiceRT';  
@@ -24,6 +25,8 @@ const ScoreBar: React.FC<{ label: string; score: number }> = ({ label, score }) 
 );
 
 const ManualQuestionInput: React.FC = () => {
+   const { t } = useLanguage(); // ← ADDED
+   const { language } = useLanguage();
   const [manualQuestion, setManualQuestion] = useState('');
   const [evaluation, setEvaluation] = useState<QuestionEvaluation | null>(null);
   const [isEvaluating, setIsEvaluating] = useState(false);
@@ -39,6 +42,7 @@ const ManualQuestionInput: React.FC = () => {
     setIsEvaluating(true);
     setError(null);
     
+    
     try {
       const response = await questionService.evaluateQuestion({
         question: manualQuestion,
@@ -47,6 +51,7 @@ const ManualQuestionInput: React.FC = () => {
         personType: currentPersonType as 'witness' | 'accused' | 'victim',
         caseSummary: '', // Will be fetched by backend
         currentTranscript: getFullTranscript,
+        language: language, // ← ADD THIS - sends 'en' or 'ar'
       });
       
       if (response.evaluation) {
@@ -71,21 +76,20 @@ const ManualQuestionInput: React.FC = () => {
     <div className="bg-white p-4 rounded-lg border-2 border-blue-200">
       <div className="flex items-center gap-2 mb-3">
         <span className="text-lg">✍️</span>
-        <h3 className="font-semibold text-gray-700">Question Evaluation Tool</h3>
+        <h3 className="font-semibold text-gray-700">{t("evaluation.title")}</h3> {/* ← CHANGED */}
         <span className="ml-auto text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
-          Training & Quality Check
+          {t("evaluation.subtitle")} {/* ← CHANGED */}
         </span>
       </div>
 
       <p className="text-xs text-gray-600 mb-3">
-        Type your own question below and get instant AI feedback on clarity, relevance, and appropriateness. 
-        This helps improve your questioning skills without affecting the current session.
+        {t("evaluation.instructions")} {/* ← CHANGED */}
       </p>
       
       <textarea
         value={manualQuestion}
         onChange={(e) => setManualQuestion(e.target.value)}
-        placeholder="Example: Can you describe what happened at approximately 3:00 PM when you saw the accused?"
+        placeholder={t("evaluation.placeholder")} // CHANGED 
         className="w-full p-3 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
         rows={3}
       />
@@ -99,11 +103,11 @@ const ManualQuestionInput: React.FC = () => {
           {isEvaluating ? (
             <>
               <span className="animate-spin">⚙️</span>
-              Evaluating...
+              {t("evaluation.evaluating")} {/* ← CHANGED */}
             </>
           ) : (
             <>
-              🔍 Evaluate Question
+              🔍 {t("evaluation.evaluateButton")} {/* ← CHANGED */}
             </>
           )}
         </button>
@@ -113,7 +117,7 @@ const ManualQuestionInput: React.FC = () => {
           disabled={!manualQuestion && !evaluation}
           className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 disabled:bg-gray-100 disabled:cursor-not-allowed transition-all"
         >
-          Clear
+         {t("evaluation.clear")} {/* ← CHANGED */}
         </button>
       </div>
 
@@ -132,7 +136,7 @@ const ManualQuestionInput: React.FC = () => {
         <div className="mt-4 p-4 bg-gradient-to-br from-blue-50 to-purple-50 rounded-lg border border-blue-200">
           {/* Overall Score */}
           <div className="flex items-center justify-between mb-4">
-            <h4 className="font-semibold text-gray-700">AI Evaluation Results</h4>
+            <h4 className="font-semibold text-gray-700">{t("evaluation.resultsTitle")}</h4> {/* ← CHANGED */}
             <div className={`px-4 py-2 rounded-full font-bold text-lg ${
               evaluation.overallScore >= 80 ? 'bg-green-100 text-green-700' :
               evaluation.overallScore >= 60 ? 'bg-yellow-100 text-yellow-700' :
@@ -145,16 +149,16 @@ const ManualQuestionInput: React.FC = () => {
           
           {/* Score Breakdown */}
           <div className="grid grid-cols-3 gap-3 mb-4">
-            <ScoreBar label="Clarity" score={evaluation.clarity} />
-            <ScoreBar label="Relevance" score={evaluation.relevance} />
-            <ScoreBar label="Appropriate" score={evaluation.appropriateness} />
+            <ScoreBar label={t("evaluation.clarity")} score={evaluation.clarity} /> {/* ← CHANGED */}
+            <ScoreBar label={t("evaluation.relevance")} score={evaluation.relevance} /> {/* ← CHANGED */}
+            <ScoreBar label={t("evaluation.appropriate")} score={evaluation.appropriateness} /> {/* ← CHANGED */}
           </div>
           
           {/* Category */}
           <div className="mb-3">
-            <span className="text-xs text-gray-600">Detected Category:</span>
+            <span className="text-xs text-gray-600">{t("evaluation.category")}:</span> {/* ← CHANGED */}
             <span className="ml-2 px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-xs font-semibold">
-              {evaluation.category.charAt(0).toUpperCase() + evaluation.category.slice(1)}
+              {t(`aiAssistant.category.${evaluation.category}`)} {/* ← CHANGED */}
             </span>
           </div>
           
@@ -163,7 +167,7 @@ const ManualQuestionInput: React.FC = () => {
             <div className="mb-3 p-3 bg-red-50 rounded-lg border border-red-200">
               <div className="text-xs font-semibold text-red-700 mb-2 flex items-center gap-1">
                 <span>⚠️</span>
-                Issues Found:
+                {t("evaluation.issuesFound")} {/* ← CHANGED */}
               </div>
               <ul className="text-xs text-red-600 space-y-1 list-disc list-inside">
                 {evaluation.issues.map((issue: string, i: number) => (
@@ -178,7 +182,7 @@ const ManualQuestionInput: React.FC = () => {
             <div className="mb-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
               <div className="text-xs font-semibold text-blue-700 mb-2 flex items-center gap-1">
                 <span>💡</span>
-                Suggestions for Improvement:
+               {t("evaluation.suggestions")} {/* ← CHANGED */}
               </div>
               <ul className="text-xs text-blue-600 space-y-1 list-disc list-inside">
                 {evaluation.suggestions.map((suggestion: string, i: number) => (
@@ -193,7 +197,7 @@ const ManualQuestionInput: React.FC = () => {
             <div className="p-3 bg-white rounded-lg border-l-4 border-green-500 shadow-sm">
               <div className="text-xs font-semibold text-green-700 mb-2 flex items-center gap-1">
                 <span>✨</span>
-                AI Improved Version:
+                {t("evaluation.improved")} {/* ← CHANGED */}
               </div>
               <p className="text-sm text-gray-700 italic mb-2">"{evaluation.improvedVersion}"</p>
              
@@ -206,7 +210,7 @@ const ManualQuestionInput: React.FC = () => {
               <div className="flex items-center gap-2 text-green-700">
                 <span>✓</span>
                 <p className="text-sm font-semibold">
-                  Excellent question! This meets professional investigation standards.
+                  {t("evaluation.excellentQuestion")} {/* ← CHANGED */}
                 </p>
               </div>
             </div>

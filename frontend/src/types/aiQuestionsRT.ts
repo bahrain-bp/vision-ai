@@ -210,6 +210,7 @@ export interface EvaluateQuestionRequest {
   personType: 'witness' | 'accused' | 'victim';
   caseSummary: string;
   currentTranscript: string;
+  language?: 'en' | 'ar'; // ← ADD THIS
 }
 
 export interface EvaluateQuestionResponse {

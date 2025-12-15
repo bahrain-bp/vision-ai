@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Check, X, RotateCcw } from 'lucide-react';
+import { useLanguage } from '../../../context/LanguageContext'; // ← ADDED
 import { MetricsWidgetProps } from '../../../types/aiQuestionsRT';
 
 /**
@@ -17,6 +18,7 @@ import { MetricsWidgetProps } from '../../../types/aiQuestionsRT';
  * - className: Optional additional CSS classes
  */
 const MetricsWidget: React.FC<MetricsWidgetProps> = ({ metrics, className = '' }) => {
+   const { t } = useLanguage();
   return (
     <div className={`flex items-center justify-center gap-3 py-2 ${className}`}>
       
@@ -26,7 +28,7 @@ const MetricsWidget: React.FC<MetricsWidgetProps> = ({ metrics, className = '' }
           <Check className="w-4 h-4" />
           <span>{metrics.confirmedCount}</span>
         </div>
-        <span className="text-xs text-gray-600 font-medium">Confirmed</span>
+        <span className="text-xs text-gray-600 font-medium">{t("aiAssistant.confirmed")}</span> {/* ← CHANGED */}
       </div>
 
       {/* Rejected Badge with Label */}
@@ -35,7 +37,7 @@ const MetricsWidget: React.FC<MetricsWidgetProps> = ({ metrics, className = '' }
           <X className="w-4 h-4" />
           <span>{metrics.rejectedCount}</span>
         </div>
-        <span className="text-xs text-gray-600 font-medium">Rejected</span>
+        <span className="text-xs text-gray-600 font-medium">{t("aiAssistant.rejected")}</span> {/* ← CHANGED */}
       </div>
 
       {/* Retry Badge with Label */}
@@ -44,7 +46,8 @@ const MetricsWidget: React.FC<MetricsWidgetProps> = ({ metrics, className = '' }
           <RotateCcw className="w-4 h-4" />
           <span>{metrics.retryCount}</span>
         </div>
-        <span className="text-xs text-gray-600 font-medium">Retries</span>
+        <span className="text-xs text-gray-600 font-medium">{t("aiAssistant.retries")}</span> {/* ← CHANGED */}
+
       </div>
       
     </div>

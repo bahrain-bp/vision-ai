@@ -48,6 +48,7 @@ def lambda_handler(event, context):
         case_id = body.get('caseId')
         person_type = body.get('personType')
         current_transcript = body.get('currentTranscript', '')
+        language = body.get('language', 'en')  # ← ADD THIS - default to English
         
         if LOG_LEVEL == 'INFO':
             print(f"INFO: Evaluating question for case {case_id}")
@@ -61,7 +62,8 @@ def lambda_handler(event, context):
             question=question,
             case_summary=case_summary,
             current_transcript=current_transcript,
-            person_type=person_type
+            person_type=person_type,
+            language=language  # ← ADD THIS
         )
         
         if LOG_LEVEL == 'INFO':
@@ -122,14 +124,28 @@ def get_case_summary(case_id):
         print(f"ERROR: Failed to fetch case summary: {str(e)}")
         return "Case summary not available"
 
-def build_evaluation_prompt(question, case_summary, current_transcript, person_type):
+def build_evaluation_prompt(question, case_summary, current_transcript, person_type, language):
     """
-    Build the evaluation prompt for Bedrock
+    Build the evaluation prompt for Bedrock with language support
     """
     # Truncate transcript if too long (to save tokens)
     truncated_transcript = current_transcript[:1000] if len(current_transcript) > 1000 else current_transcript
     
+    # Language-specific instructions
+    if language == 'ar':
+        language_instruction = """
+IMPORTANT: Respond in Arabic. All evaluation feedback (issues, suggestions, improved version) must be in Arabic.
+        """
+        output_language = "Arabic"
+    else:
+        language_instruction = """
+IMPORTANT: Respond in English. All evaluation feedback (issues, suggestions, improved version) must be in English.
+        """
+        output_language = "English"
+    
     return f"""You are an expert legal investigator trainer for Bahrain's Public Prosecution. Evaluate this question.
+
+{language_instruction}
 
 CASE CONTEXT:
 {case_summary[:500]}
@@ -143,28 +159,28 @@ QUESTION TO EVALUATE:
 "{question}"
 
 EVALUATION CRITERIA:
-
 1. CLARITY (0-100): Clear, specific, unambiguous?
    - Deduct for vague terms, compound questions, confusing structure
-
+   
 2. RELEVANCE (0-100): Relevant to case and testimony?
    - Award for connecting to case facts, addressing gaps
    - Deduct for irrelevant tangents
-
+   
 3. APPROPRIATENESS (0-100): Follows legal/cultural standards?
    - Respect Bahraini norms, avoid leading questions, maintain dignity
-
+   
 4. CATEGORY: clarification, verification, timeline, motivation, or contradiction
 
-5. ISSUES: List specific problems (empty array if none)
+5. ISSUES: List specific problems in {output_language} (empty array if none)
 
-6. SUGGESTIONS: List improvements (empty array if none)
+6. SUGGESTIONS: List improvements in {output_language} (empty array if none)
 
-7. IMPROVED VERSION: Better phrasing (null if already good)
+7. IMPROVED VERSION: Better phrasing in {output_language} (null if already good)
 
 8. OVERALL SCORE: Average of clarity, relevance, appropriateness
 
-Return ONLY valid JSON (no markdown, no explanation):
+CRITICAL: Return ONLY valid JSON (no markdown, no explanation). All text fields (issues, suggestions, improvedVersion) MUST be in {output_language}:
+
 {{
   "clarity": 85,
   "relevance": 90,

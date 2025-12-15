@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { Copy, RotateCcw } from 'lucide-react';
+import { useLanguage } from '../../../context/LanguageContext'; // ← ADDED
 import { 
   QuestionCardProps, 
   QuestionCategory 
@@ -27,6 +28,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
   isFlipped: controlledIsFlipped,
   disabled = false,
 }) => {
+  const { t } = useLanguage(); // ← ADDED
   // Local flip state (if not controlled by parent)
   const [localIsFlipped, setLocalIsFlipped] = useState(false);
   
@@ -104,9 +106,9 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
   };
 
   // Format category name for display
-  const formatCategory = (category: string) => {
-    return category.charAt(0).toUpperCase() + category.slice(1);
-  };
+ // const formatCategory = (category: string) => {
+   // return category.charAt(0).toUpperCase() + category.slice(1);
+ // };
 
   return (
     <div
@@ -152,7 +154,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
       ${categoryStyles.bg} ${categoryStyles.text}
       text-xs font-semibold px-3 py-1 rounded-full
     `}>
-      {formatCategory(question.category)}
+      {t(`aiAssistant.category.${question.category}`)} {/* ← CHANGED */}
     </span>
 
     {/* High Priority Badge */}
@@ -163,7 +165,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
         flex items-center gap-1
       ">
         <span className="text-red-500">🔥</span>
-        High Priority
+        {t("aiAssistant.highPriority")} {/* ← CHANGED */}
       </span>
     )}
 
@@ -175,7 +177,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
         flex items-center gap-1
       ">
         <span className="text-green-500">✓</span>
-        High Confidence
+        {t("aiAssistant.highConfidence")} {/* ← CHANGED */}
       </span>
     )}
   </div>
@@ -200,7 +202,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
               "
             >
               <RotateCcw className="w-3.5 h-3.5" />
-              Show Reasoning
+              {t("aiAssistant.showReasoning")} {/* ← CHANGED */}
             </button>
 
             <button
@@ -215,7 +217,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
               "
             >
               <Copy className="w-3.5 h-3.5" />
-              Copy
+              {t("aiAssistant.copy")} {/* ← CHANGED */}
             </button>
           </div>
         </div>
@@ -235,7 +237,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
           <div className="flex items-center gap-2 mb-3">
             <div className="w-2 h-2 bg-indigo-500 rounded-full"></div>
             <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wide">
-              AI Reasoning
+             {t("aiAssistant.aiReasoning")} {/* ← CHANGED */}
             </h4>
           </div>
 
@@ -252,7 +254,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
           {question.sourceContext && (
             <div className="mb-4 p-2 bg-gray-50 rounded border-l-2 border-gray-300">
               <p className="text-xs text-gray-600">
-                <span className="font-semibold">Source: </span>
+                <span className="font-semibold">{t("aiAssistant.source")}: </span> {/* ← CHANGED */}
                 {question.sourceContext}
               </p>
             </div>
@@ -271,7 +273,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
             "
           >
             <RotateCcw className="w-3.5 h-3.5" />
-            Show Question
+            {t("aiAssistant.showQuestion")} {/* ← CHANGED */}
           </button>
         </div>
       </div>

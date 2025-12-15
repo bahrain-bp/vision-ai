@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import { Sparkles, Loader2 } from 'lucide-react';
 import { QuestionGeneratorControlsProps, Language } from '../../../types/aiQuestionsRT';
 import { useQuestionContext } from '../../../hooks/useQuestionContext'; // ← NEW: Import hook
+import { useLanguage } from '../../../context/LanguageContext'; // ← ADDED
+
+
 
 /**
  * GeneratorControls Component
@@ -21,6 +24,7 @@ const GeneratorControls: React.FC<QuestionGeneratorControlsProps> = ({
   isLoading,
   disabled = false,
 }) => {
+  const { t } = useLanguage(); // ← ADDED
   // ← NEW: Access canGenerate from context
   const { canGenerate } = useQuestionContext();
 
@@ -33,8 +37,8 @@ const GeneratorControls: React.FC<QuestionGeneratorControlsProps> = ({
 
   // Language options with display labels
   const languageOptions: { value: Language; label: string }[] = [
-    { value: 'en', label: 'English' },
-    { value: 'ar', label: 'Arabic' },
+    { value: 'en', label: 'English 🇬🇧 ' },
+    { value: 'ar', label: ' العربية 🇧🇭' },
   ];
 
   // Handle generate button click
@@ -69,7 +73,7 @@ const GeneratorControls: React.FC<QuestionGeneratorControlsProps> = ({
           >
             {countOptions.map((count) => (
               <option key={count} value={count}>
-                {count} Questions
+                {count} {t("aiAssistant.questions")} {/* ← CHANGED */}
               </option>
             ))}
           </select>
@@ -118,12 +122,12 @@ const GeneratorControls: React.FC<QuestionGeneratorControlsProps> = ({
         {isLoading ? (
           <>
             <Loader2 className="w-5 h-5 animate-spin" />
-            <span>Generating...</span>
+            <span>{t("aiAssistant.generating")}</span> {/* ← CHANGED */}
           </>
         ) : (
           <>
             <Sparkles className="w-5 h-5" />
-            <span>Generate Questions</span>
+             <span>{t("aiAssistant.generateButton")}</span> {/* ← CHANGED */}
           </>
         )}
       </button>
@@ -131,7 +135,7 @@ const GeneratorControls: React.FC<QuestionGeneratorControlsProps> = ({
       {/* ← NEW: Helper text when disabled due to prerequisites */}
       {!canGenerate && !isLoading && (
         <p className="text-xs text-gray-500 text-center mt-2">
-          Waiting for transcript...
+          {t("aiAssistant.waitingForTranscript")} {/* ← CHANGED */}
         </p>
       )}
     </div>

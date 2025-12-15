@@ -207,6 +207,77 @@ const translations = {
     "summarization.summaryId": "Summary ID",
     "summarization.caseId": "Case ID",
     "summarization.language": "Language",
+
+
+    // ==================== AI ASSISTANT ====================
+    // Main Generator
+    "aiAssistant.title": "AI Assistant",
+    "aiAssistant.startRecording": "Start recording to generate questions",
+    "aiAssistant.questionsBasedOnTestimony": "Questions will be generated based on live testimony",
+    "aiAssistant.noQuestionsYet": "No questions generated yet",
+    "aiAssistant.clickGenerate": "Click \"Generate Questions\" above to start",
+    "aiAssistant.cannotGenerate": "Cannot Generate Questions",
+    "aiAssistant.tip": "Tip",
+    "aiAssistant.tipStartRecording": "Start the recording to begin collecting testimony.",
+    "aiAssistant.tipWaitForSpeech": "Wait for the witness to speak so the system can generate relevant questions.",
+    "aiAssistant.rejectedQuestions": "Rejected Questions",
+    "aiAssistant.clickToExpand": "Click to expand",
+
+     // Generator Controls
+    "aiAssistant.questions": "Questions",
+    "aiAssistant.generateButton": "Generate Questions",
+    "aiAssistant.generating": "Generating...",
+    "aiAssistant.waitingForTranscript": "Waiting for transcript...",
+
+    // Metrics
+    "aiAssistant.confirmed": "Confirmed",
+    "aiAssistant.rejected": "Rejected",
+    "aiAssistant.retries": "Retries",
+
+     // Question Card
+    "aiAssistant.highPriority": "High Priority",
+    "aiAssistant.highConfidence": "High Confidence",
+    "aiAssistant.showReasoning": "Show Reasoning",
+    "aiAssistant.copy": "Copy",
+    "aiAssistant.aiReasoning": "AI Reasoning",
+    "aiAssistant.source": "Source",
+    "aiAssistant.showQuestion": "Show Question",
+
+     // Question Categories
+    "aiAssistant.category.clarification": "Clarification",
+    "aiAssistant.category.verification": "Verification",
+    "aiAssistant.category.contradiction": "Contradiction",
+    "aiAssistant.category.timeline": "Timeline",
+    "aiAssistant.category.motivation": "Motivation",
+    
+    // Question List
+    "aiAssistant.confirmAll": "Confirm All",
+    "aiAssistant.retryAll": "Retry All",
+    "aiAssistant.retrySelected": "Retry Selected",
+    
+    // Attempt Navigation
+    "aiAssistant.attempt": "Attempt",
+    "aiAssistant.of": "of",
+    "aiAssistant.previousAttempt": "Previous attempt",
+    "aiAssistant.nextAttempt": "Next attempt",
+
+    // Question Evaluation Tool
+    "evaluation.title": "Question Evaluation Tool",
+    "evaluation.subtitle": "Training & Quality Check",
+    "evaluation.instructions": "Type your own question below and get instant AI feedback on clarity, relevance, and appropriateness. This helps improve your questioning skills without affecting the current session.",
+    "evaluation.placeholder": "Example: Can you describe what happened at approximately 3:00 PM when you saw the accused?",
+    "evaluation.evaluateButton": "Evaluate Question",
+    "evaluation.evaluating": "Evaluating...",
+    "evaluation.clear": "Clear",
+    "evaluation.resultsTitle": "AI Evaluation Results",
+    "evaluation.clarity": "Clarity",
+    "evaluation.relevance": "Relevance",
+    "evaluation.appropriate": "Appropriate",
+    "evaluation.category": "Detected Category",
+    "evaluation.issuesFound": "Issues Found:",
+    "evaluation.suggestions": "Suggestions for Improvement:",
+    "evaluation.improved": "AI Improved Version:",
+    "evaluation.excellentQuestion": "Excellent question! This meets professional investigation standards.",
   },
   ar: {
     // HomePage translations
@@ -404,6 +475,76 @@ const translations = {
     "summarization.summaryId": "رقم الملخص",
     "summarization.caseId": "رقم القضية",
     "summarization.language": "اللغة",
+
+     // ==================== AI ASSISTANT ====================
+     // Main Generator
+    "aiAssistant.title": "المساعد الذكي",
+    "aiAssistant.startRecording": "ابدأ التسجيل لتوليد الأسئلة",
+    "aiAssistant.questionsBasedOnTestimony": "سيتم توليد الأسئلة بناءً على الشهادة المباشرة",
+    "aiAssistant.noQuestionsYet": "لم يتم توليد أسئلة بعد",
+    "aiAssistant.clickGenerate": "انقر على \"توليد الأسئلة\" أعلاه للبدء",
+    "aiAssistant.cannotGenerate": "لا يمكن توليد الأسئلة",
+    "aiAssistant.tip": "نصيحة",
+    "aiAssistant.tipStartRecording": "ابدأ التسجيل لبدء جمع الشهادة.",
+    "aiAssistant.tipWaitForSpeech": "انتظر حتى يتحدث الشاهد حتى يتمكن النظام من توليد أسئلة ذات صلة.",
+    "aiAssistant.rejectedQuestions": "الأسئلة المرفوضة",
+    "aiAssistant.clickToExpand": "انقر للتوسيع",
+    
+    // Generator Controls
+    "aiAssistant.questions": "أسئلة",
+    "aiAssistant.generateButton": "توليد الأسئلة",
+    "aiAssistant.generating": "جارٍ التوليد...",
+    "aiAssistant.waitingForTranscript": "في انتظار النص...",
+    
+    // Metrics
+    "aiAssistant.confirmed": "مؤكد",
+    "aiAssistant.rejected": "مرفوض",
+    "aiAssistant.retries": "إعادة المحاولة",
+    
+    // Question Card
+    "aiAssistant.highPriority": "أولوية عالية",
+    "aiAssistant.highConfidence": "ثقة عالية",
+    "aiAssistant.showReasoning": "إظهار السبب",
+    "aiAssistant.copy": "نسخ",
+    "aiAssistant.aiReasoning": "تفسير الذكاء الاصطناعي",
+    "aiAssistant.source": "المصدر",
+    "aiAssistant.showQuestion": "إظهار السؤال",
+    
+    // Question Categories
+    "aiAssistant.category.clarification": "توضيح",
+    "aiAssistant.category.verification": "تحقق",
+    "aiAssistant.category.contradiction": "تناقض",
+    "aiAssistant.category.timeline": "الخط الزمني",
+    "aiAssistant.category.motivation": "الدافع",
+    
+    // Question List
+    "aiAssistant.confirmAll": "تأكيد الكل",
+    "aiAssistant.retryAll": "إعادة محاولة الكل",
+    "aiAssistant.retrySelected": "إعادة محاولة المحدد",
+
+     // Attempt Navigation
+    "aiAssistant.attempt": "محاولة",
+    "aiAssistant.of": "من",
+    "aiAssistant.previousAttempt": "المحاولة السابقة",
+    "aiAssistant.nextAttempt": "المحاولة التالية",
+    
+    // Question Evaluation Tool
+    "evaluation.title": "أداة تقييم الأسئلة",
+    "evaluation.subtitle": "التدريب وفحص الجودة",
+    "evaluation.instructions": "اكتب سؤالك أدناه واحصل على تقييم فوري من الذكاء الاصطناعي حول الوضوح والصلة والملاءمة. يساعد هذا على تحسين مهارات طرح الأسئلة دون التأثير على الجلسة الحالية.",
+    "evaluation.placeholder": "مثال: هل يمكنك وصف ما حدث في حوالي الساعة 3:00 مساءً عندما رأيت المتهم؟",
+    "evaluation.evaluateButton": "تقييم السؤال",
+    "evaluation.evaluating": "جارٍ التقييم...",
+    "evaluation.clear": "مسح",
+    "evaluation.resultsTitle": "نتائج تقييم الذكاء الاصطناعي",
+    "evaluation.clarity": "الوضوح",
+    "evaluation.relevance": "الصلة",
+    "evaluation.appropriate": "المناسبة",
+    "evaluation.category": "الفئة المكتشفة",
+    "evaluation.issuesFound": "المشاكل المكتشفة:",
+    "evaluation.suggestions": "اقتراحات للتحسين:",
+    "evaluation.improved": "النسخة المحسنة:",
+    "evaluation.excellentQuestion": "سؤال ممتاز! يستوفي هذا معايير التحقيق المهنية.",
   },
 };
 
