@@ -22,6 +22,7 @@ const PictureInPicture: React.FC<PictureInPictureProps> = ({
   const animationIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [isPiPActive, setIsPiPActive] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const scrollPositionRef = useRef<number>(0);
 
   const isSupported = () => {
     return 'pictureInPictureEnabled' in document && 
@@ -29,8 +30,18 @@ const PictureInPicture: React.FC<PictureInPictureProps> = ({
            videoRef.current?.requestPictureInPicture;
   };
 
+  const getSpeakerLabels = (speaker: string): { en: string; ar: string } => {
+    const labels: Record<string, { en: string; ar: string }> = {
+      'Investigator': { en: 'Investigator', ar: 'المحقق' },
+      'Witness': { en: 'Witness', ar: 'الشاهد' },
+      'Accused': { en: 'Accused', ar: 'المتهم' },
+      'Victim': { en: 'Victim', ar: 'الضحية' }
+    };
+    return labels[speaker] || { en: speaker, ar: speaker };
+  };
+
   /* ===============================
-     DRAW CANVAS CONTENT
+     DRAW CANVAS CONTENT - SHOWING ALL MESSAGES WITH SCROLL
   =============================== */
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -39,49 +50,144 @@ const PictureInPicture: React.FC<PictureInPictureProps> = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    const HEADER_HEIGHT = 100;
+    const FOOTER_HEIGHT = 50;
+    const CONTENT_START_Y = HEADER_HEIGHT;
+    const CONTENT_HEIGHT = canvas.height - HEADER_HEIGHT - FOOTER_HEIGHT;
+
     const drawFrame = () => {
       // Clear canvas
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Background
+      // Background gradient
       const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
       gradient.addColorStop(0, '#667eea');
       gradient.addColorStop(1, '#764ba2');
       ctx.fillStyle = gradient;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      // Header
+      // Header section
+      ctx.fillStyle = 'rgba(102, 126, 234, 1)';
+      ctx.fillRect(0, 0, canvas.width, HEADER_HEIGHT);
+
+      // Title
       ctx.fillStyle = '#fff';
-      ctx.font = 'bold 26px Arial';
+      ctx.font = 'bold 28px Arial';
       ctx.textAlign = 'center';
-      ctx.fillText(title, canvas.width / 2, 40);
+      ctx.fillText('VISION AI - Participant View', canvas.width / 2, 40);
 
-      // Divider line
-      ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+      // Subtitle
+      ctx.font = '20px Arial';
+      ctx.fillText('العرض المخصص للمشارك', canvas.width / 2, 75);
+
+      // Content area background (white)
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, HEADER_HEIGHT, canvas.width, CONTENT_HEIGHT);
+
+      // Calculate total height needed for all messages
+      let totalContentHeight = 20; // Start padding
+      const messageHeights: number[] = [];
+      
+      messages.forEach((msg) => {
+        const messageWidth = canvas.width * 0.75;
+        
+        // Calculate text height
+        ctx.font = '16px Arial';
+        const lines = wrapTextMeasure(ctx, msg.text, messageWidth - 30);
+        const textHeight = lines.length * 20;
+        const messageHeight = 80 + Math.max(0, textHeight - 40); // Base height + extra for long text
+        
+        messageHeights.push(messageHeight);
+        totalContentHeight += messageHeight + 10; // 10px gap
+      });
+
+      // Auto-scroll to bottom when new messages arrive
+      if (messages.length > 0) {
+        const maxScroll = Math.max(0, totalContentHeight - CONTENT_HEIGHT);
+        scrollPositionRef.current = maxScroll;
+      }
+
+      // Draw messages with scroll offset
+      ctx.save();
       ctx.beginPath();
-      ctx.moveTo(40, 60);
-      ctx.lineTo(canvas.width - 40, 60);
-      ctx.stroke();
+      ctx.rect(0, CONTENT_START_Y, canvas.width, CONTENT_HEIGHT);
+      ctx.clip();
 
-      // Draw latest messages
-      let y = 100;
-      const latest = messages.slice(-3);
+      let y = CONTENT_START_Y + 20 - scrollPositionRef.current;
 
-      if (!latest.length) {
-        ctx.font = '20px Arial';
-        ctx.fillText('Waiting for conversation…', canvas.width / 2, canvas.height / 2);
+      if (messages.length === 0) {
+        // Empty state
+        ctx.fillStyle = '#9ca3af';
+        ctx.font = '18px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('Waiting for conversation...', canvas.width / 2, canvas.height / 2 - 20);
+        ctx.fillText('في انتظار المحادثة...', canvas.width / 2, canvas.height / 2 + 10);
       } else {
-        ctx.textAlign = 'left';
-        latest.forEach(msg => {
-          ctx.font = 'bold 18px Arial';
-          ctx.fillText(`${msg.speaker}:`, 30, y);
-          y += 30;
-
-          ctx.font = '16px Arial';
-          wrapText(ctx, msg.text, 30, y, canvas.width - 60, 24);
-          y += (msg.text.length > 40 ? 70 : 40);
+        messages.forEach((msg, index) => {
+          const labels = getSpeakerLabels(msg.speaker);
+          const isInvestigator = msg.speaker === 'Investigator';
+          
+          const messageWidth = canvas.width * 0.75;
+          const messageX = isInvestigator ? 30 : canvas.width - messageWidth - 30;
+          const messageHeight = messageHeights[index];
+          
+          // Only draw if visible in viewport
+          if (y + messageHeight > CONTENT_START_Y && y < CONTENT_START_Y + CONTENT_HEIGHT) {
+            // Background for message
+            ctx.fillStyle = isInvestigator ? '#e0e7ff' : '#f0fdf4';
+            ctx.fillRect(messageX, y, messageWidth, messageHeight);
+            
+            // Border
+            ctx.strokeStyle = isInvestigator ? '#c7d2fe' : '#bbf7d0';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(messageX, y, messageWidth, messageHeight);
+            
+            // Speaker label
+            ctx.fillStyle = '#374151';
+            ctx.font = 'bold 14px Arial';
+            ctx.textAlign = 'left';
+            ctx.fillText(`${labels.en} / ${labels.ar}`, messageX + 15, y + 20);
+            
+            // Time
+            ctx.fillStyle = '#6b7280';
+            ctx.font = '12px Arial';
+            ctx.textAlign = 'right';
+            ctx.fillText(msg.timestamp.toLocaleTimeString(), messageX + messageWidth - 15, y + 20);
+            
+            // Message text
+            ctx.fillStyle = '#111827';
+            ctx.font = '16px Arial';
+            ctx.textAlign = isInvestigator ? 'left' : 'right';
+            
+            const textX = isInvestigator ? messageX + 15 : messageX + messageWidth - 15;
+            wrapText(ctx, msg.text, textX, y + 45, messageWidth - 30, 20);
+          }
+          
+          y += messageHeight + 10;
         });
       }
+
+      ctx.restore();
+
+      // Footer
+      ctx.fillStyle = '#f3f4f6';
+      ctx.fillRect(0, canvas.height - FOOTER_HEIGHT, canvas.width, FOOTER_HEIGHT);
+      
+      // Live indicator
+      ctx.fillStyle = '#10b981';
+      ctx.beginPath();
+      ctx.arc(30, canvas.height - 25, 6, 0, Math.PI * 2);
+      ctx.fill();
+      
+      ctx.fillStyle = '#10b981';
+      ctx.font = '14px Arial';
+      ctx.textAlign = 'left';
+      ctx.fillText('Live Translation Active', 45, canvas.height - 20);
+      
+      // Message count
+      ctx.fillStyle = '#6b7280';
+      ctx.textAlign = 'right';
+      ctx.fillText(`${messages.length} messages / رسائل`, canvas.width - 20, canvas.height - 20);
     };
 
     // Draw immediately
@@ -92,7 +198,7 @@ const PictureInPicture: React.FC<PictureInPictureProps> = ({
       animationIntervalRef.current = setInterval(drawFrame, 1000 / 30); // 30 FPS
     }
 
-    // Cleanup function - always return one
+    // Cleanup function
     return () => {
       if (animationIntervalRef.current) {
         clearInterval(animationIntervalRef.current);
@@ -180,11 +286,11 @@ const PictureInPicture: React.FC<PictureInPictureProps> = ({
 
   return (
     <div className="pip-container">
-      {/* Canvas - visible but off-screen */}
+      {/* Canvas - hidden but rendered */}
       <canvas
         ref={canvasRef}
-        width={800}
-        height={600}
+        width={900}
+        height={700}
         style={{
           position: 'absolute',
           top: '-9999px',
@@ -212,7 +318,7 @@ const PictureInPicture: React.FC<PictureInPictureProps> = ({
       {/* Control button */}
       <button 
         onClick={togglePiP} 
-        className="pip-toggle-btn"
+        className={`pip-toggle-btn ${isPiPActive ? 'active' : ''}`}
         disabled={!isSupported()}
       >
         {isPiPActive ? (
@@ -228,11 +334,19 @@ const PictureInPicture: React.FC<PictureInPictureProps> = ({
         )}
       </button>
 
+      {/* Active indicator */}
+      {isPiPActive && (
+        <div className="pip-active-notice">
+          <div className="pip-pulse"></div>
+          <span>✅ PiP Active! Share this floating window in Teams/Zoom</span>
+        </div>
+      )}
+
       {/* Browser support notice */}
       {!isSupported() && (
-        <div className="pip-warning">
-          Picture-in-Picture is not supported in your browser.
-          Please use Chrome, Edge, or Opera.
+        <div className="pip-not-supported">
+          <p>⚠️ Picture-in-Picture not supported</p>
+          <p>Please use Chrome, Edge, or Safari</p>
         </div>
       )}
 
@@ -247,7 +361,34 @@ const PictureInPicture: React.FC<PictureInPictureProps> = ({
 };
 
 /* ===============================
-   TEXT WRAP HELPER
+   TEXT WRAP HELPER - Measure only
+================================ */
+function wrapTextMeasure(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  maxWidth: number
+): string[] {
+  const words = text.split(' ');
+  const lines: string[] = [];
+  let line = '';
+
+  for (let i = 0; i < words.length; i++) {
+    const test = line + words[i] + ' ';
+    const { width } = ctx.measureText(test);
+
+    if (width > maxWidth && i > 0) {
+      lines.push(line);
+      line = words[i] + ' ';
+    } else {
+      line = test;
+    }
+  }
+  lines.push(line);
+  return lines;
+}
+
+/* ===============================
+   TEXT WRAP HELPER - Draw
 ================================ */
 function wrapText(
   ctx: CanvasRenderingContext2D,
@@ -259,20 +400,21 @@ function wrapText(
 ) {
   const words = text.split(' ');
   let line = '';
+  let currentY = y;
 
   for (let i = 0; i < words.length; i++) {
     const test = line + words[i] + ' ';
     const { width } = ctx.measureText(test);
 
     if (width > maxWidth && i > 0) {
-      ctx.fillText(line, x, y);
+      ctx.fillText(line, x, currentY);
       line = words[i] + ' ';
-      y += lineHeight;
+      currentY += lineHeight;
     } else {
       line = test;
     }
   }
-  ctx.fillText(line, x, y);
+  ctx.fillText(line, x, currentY);
 }
 
 export default PictureInPicture;

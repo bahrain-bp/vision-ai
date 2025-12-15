@@ -186,7 +186,7 @@ const SessionPageContent: React.FC<SessionPageProps & {
         console.error("Failed to update session status:", error);
       }
     }
-
+    
     // Trigger switch to summarization tab
     setTriggerSummarization(true);
   };

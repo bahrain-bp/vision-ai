@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Download, FileText, Printer } from "lucide-react";
+import { Download, Printer } from "lucide-react";
 import "./TranslationPDFExporter.css";
 import { useLanguage } from "../../context/LanguageContext";
 
@@ -20,64 +20,6 @@ const TranslationPDFExporter: React.FC<TranslationPDFExporterProps> = ({
 }) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const { t, language } = useLanguage();
-
-  // Convert transcript to Markdown format
-  const generateMarkdownContent = (): string => {
-    if (contentType === 'report') {
-      const markdown = `# ${title}
-
-**Date:** ${sessionDate}
-
----
-
-${transcript}
-
----
-
-*${language === 'ar' ? 'تم الإنشاء في' : 'Generated on'} ${new Date().toLocaleString()}*
-`;
-      return markdown;
-    }
-
-    const markdown = `# ${title}
-
-**${language === 'ar' ? 'التاريخ:' : 'Date:'}** ${sessionDate}
-
----
-
-${language === 'ar' ? '## النسخ' : '## Transcript'}
-
-${transcript.split('\n').map(line => {
-  if (line.trim()) {
-    const match = line.match(/\[(.*?)\]\s*\[(.*?)\]:\s*(.*)/);
-    if (match) {
-      const [, time, speaker, text] = match;
-      return `**[${time}] ${speaker}:**\n> ${text}\n`;
-    }
-    return `> ${line}\n`;
-  }
-  return '';
-}).join('\n')}
-
----
-
-*${language === 'ar' ? 'تم الإنشاء في' : 'Generated on'} ${new Date().toLocaleString()}*
-`;
-
-    return markdown;
-  };
-
-  // Download as Markdown file
-  const downloadMarkdown = () => {
-    const markdown = generateMarkdownContent();
-    const blob = new Blob([markdown], { type: 'text/markdown; charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${fileName}-${sessionDate.replace(/\//g, "-")}.md`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
 
   // Generate PDF using browser print
   const generatePDF = () => {
@@ -262,27 +204,21 @@ ${transcript.split('\n').map(line => {
 
       printWindow.document.close();
       
-      // Wait for content to load then trigger print
-      printWindow.onload = () => {
-        setTimeout(() => {
-          printWindow.print();
-          // Close the window after printing
-          printWindow.onafterprint = () => {
-            printWindow.close();
-          };
-          setIsGenerating(false);
-        }, 250);
-      };
+      // ✅ FIX: Don't wait for window to load, trigger print immediately and re-enable button
+      setTimeout(() => {
+        printWindow.print();
+        setIsGenerating(false); // ✅ Re-enable button immediately after print dialog opens
+      }, 100);
       
     } catch (error) {
       console.error('PDF generation failed:', error);
-      alert(language === 'ar' ? 'فشل إنشاء ملف PDF. الرجاء محاولة تصدير Word أو Markdown بدلاً من ذلك.' : 'PDF generation failed. Please try Word or Markdown export instead.');
+      alert(language === 'ar' ? 'فشل إنشاء ملف PDF. الرجاء محاولة تصدير Word بدلاً من ذلك.' : 'PDF generation failed. Please try Word export instead.');
       setIsGenerating(false);
     }
   };
 
-  // Generate Word document from Markdown
-  const generateWordFromMarkdown = () => {
+  // Generate Word document
+  const generateWord = () => {
     if (!transcript) return;
 
     const lines = transcript.split('\n').filter(line => line.trim());
@@ -290,18 +226,32 @@ ${transcript.split('\n').map(line => {
     let contentHTML = '';
     
     if (contentType === 'report') {
-      contentHTML = lines.map(line => `<p>${line}</p>`).join('');
+      contentHTML = lines.map(line => `
+        <div style="margin-bottom: 12pt;">
+          <p style="margin: 0; padding: 8pt 0;">${line}</p>
+        </div>
+      `).join('');
     } else {
       contentHTML = lines.map(line => {
         const match = line.match(/\[(.*?)\]\s*\[(.*?)\]:\s*(.*)/);
         if (match) {
           const [, time, speaker, text] = match;
           return `
-            <p><strong>[${time}] ${speaker}:</strong></p>
-            <blockquote>${text}</blockquote>
+            <div style="margin-bottom: 12pt; page-break-inside: avoid;">
+              <p style="margin: 0 0 4pt 0;"><strong style="font-size: 11pt;">[${time}] ${speaker}:</strong></p>
+              <div style="margin: 0; padding: 8pt 15pt; background-color: #f5f5f5; border-${language === 'ar' ? 'right' : 'left'}: 4pt solid #4A90E2; font-size: 12pt; word-wrap: break-word;">
+                ${text}
+              </div>
+            </div>
           `;
         }
-        return `<blockquote>${line}</blockquote>`;
+        return `
+          <div style="margin-bottom: 12pt; page-break-inside: avoid;">
+            <div style="margin: 0; padding: 8pt 15pt; background-color: #f5f5f5; border-${language === 'ar' ? 'right' : 'left'}: 4pt solid #4A90E2; font-size: 12pt; word-wrap: break-word;">
+              ${line}
+            </div>
+          </div>
+        `;
       }).join('');
     }
 
@@ -326,7 +276,7 @@ ${transcript.split('\n').map(line => {
     }
     body {
       font-family: ${language === 'ar' ? "'Noto Sans Arabic', 'Segoe UI', Arial, sans-serif" : "'Calibri', 'Segoe UI', Arial, sans-serif"};
-      font-size: 11pt;
+      font-size: 12pt;
       line-height: 1.4;
       color: #000;
       direction: ${language === 'ar' ? 'rtl' : 'ltr'};
@@ -346,44 +296,34 @@ ${transcript.split('\n').map(line => {
       margin-bottom: 10pt;
       color: #444;
     }
-    strong {
-      font-weight: bold;
-      color: #000;
-    }
-    blockquote {
-      margin: 0;
-      padding: 8pt 15pt;
-      background-color: ${contentType === 'report' ? 'transparent' : '#f5f5f5'};
-      border-${language === 'ar' ? 'right' : 'left'}: ${contentType === 'report' ? 'none' : '4pt solid #4A90E2'};
-      font-family: inherit;
-      page-break-inside: avoid;
-      word-wrap: break-word;
-      overflow-wrap: break-word;
-      direction: ${language === 'ar' ? 'rtl' : 'ltr'};
-      text-align: ${language === 'ar' ? 'right' : 'left'};
-    }
-    hr {
-      border: none;
-      border-top: 1pt solid #ccc;
-      margin: 16pt 0;
-    }
     p {
-      margin: 0 0 10pt 0;
-      page-break-inside: avoid;
-      text-align: ${language === 'ar' ? 'right' : 'justify'};
+      margin: 0;
     }
   </style>
 </head>
 <body>
-  <h1>${title}</h1>
-  <p><strong>${language === 'ar' ? 'التاريخ:' : 'Date:'}</strong> ${sessionDate}</p>
-  <hr>
-  ${contentType === 'transcript' ? `<h2>${language === 'ar' ? 'النسخ' : 'Transcript'}</h2>` : ''}
+  <div style="text-align: center; margin-bottom: 30pt; border-bottom: 2pt solid #333; padding-bottom: 20pt;">
+    <h1 style="font-size: 22pt; margin: 0 0 8pt 0; color: #333; font-weight: bold;">${title}</h1>
+    <p style="font-size: 11pt; color: #666; margin: 0;">
+      <strong>${language === 'ar' ? 'التاريخ:' : 'Date:'}</strong> ${sessionDate}
+    </p>
+  </div>
+  
+  ${contentType === 'transcript' ? `
+    <div style="margin-bottom: 20pt;">
+      <h2 style="font-size: 16pt; margin: 0 0 12pt 0; color: #444; font-weight: bold;">
+        ${language === 'ar' ? 'النسخ' : 'Transcript'}
+      </h2>
+    </div>
+  ` : ''}
+  
   ${contentHTML}
-  <hr>
-  <p style="text-align: center; font-size: 9pt; color: #999;">
-    <em>${language === 'ar' ? 'تم الإنشاء في' : 'Generated on'} ${new Date().toLocaleString()}</em>
-  </p>
+  
+  <div style="margin-top: 40pt; padding-top: 20pt; border-top: 1pt solid #ccc; text-align: center;">
+    <p style="font-size: 10pt; color: #999; margin: 0;">
+      <em>${language === 'ar' ? 'تم الإنشاء في' : 'Generated on'} ${new Date().toLocaleString()}</em>
+    </p>
+  </div>
 </body>
 </html>`;
 
@@ -412,23 +352,13 @@ ${transcript.split('\n').map(line => {
       </button>
 
       <button 
-        onClick={generateWordFromMarkdown}
+        onClick={generateWord}
         disabled={!transcript}
         className="action-btn"
         title={t("pdf.exportAsWord")}
       >
         <Download className="btn-icon" />
         <span>{t("pdf.downloadWord")}</span>
-      </button>
-
-      <button 
-        onClick={downloadMarkdown}
-        disabled={!transcript}
-        className="action-btn"
-        title={t("pdf.exportAsMarkdown")}
-      >
-        <FileText className="btn-icon" />
-        <span>{t("pdf.downloadMarkdown")}</span>
       </button>
     </div>
   );
