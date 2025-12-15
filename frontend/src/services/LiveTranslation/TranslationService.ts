@@ -73,11 +73,11 @@ class TranslationService {
       });
       
       const response = await this.translateClient!.send(command);
-      console.log(`✅ Translation successful`);
+      console.log(` Translation successful`);
       
       return response.TranslatedText || text;
     } catch (error: any) {
-      console.error('❌ Translation API error:', error);
+      console.error(' Translation API error:', error);
       
       // Throw a custom error with a user-friendly message
       if (error.name === 'NetworkError' || error.message?.includes('network')) {
@@ -101,8 +101,7 @@ class TranslationService {
     originalLanguage: string;
     error?: string; // ✅ NEW: Include error in return
   }> {
-    console.log(`\n🗣️ Processing: "${speaker}" says: "${originalText}"`);
-    console.log(`🌐 Investigator lang: ${investigatorLanguage}, Participant lang: ${participantLanguage}`);
+
 
     let investigatorDisplay = originalText;
     let participantDisplay = originalText;
@@ -118,7 +117,6 @@ class TranslationService {
           investigatorLanguage, 
           participantLanguage
         );
-        console.log(`   ✅ Participant will see: "${participantDisplay.substring(0, 50)}..."`);
       } else {
         // Participant spoke - translate for investigator
         console.log(`🧑 Translating for investigator...`);
@@ -127,12 +125,11 @@ class TranslationService {
           participantLanguage, 
           investigatorLanguage
         );
-        console.log(`   ✅ Investigator will see: "${investigatorDisplay.substring(0, 50)}..."`);
       }
     } catch (error: any) {
-      console.error('❌ translateConversation failed:', error);
+      console.error(' translateConversation failed:', error);
       
-      // ✅ Capture error message but continue with original text
+      //  Capture error message but continue with original text
       errorMessage = error instanceof TranslationError 
         ? error.message 
         : 'Translation failed. Please try again.';
@@ -140,12 +137,12 @@ class TranslationService {
       console.warn('⚠️ Displaying original text due to translation error');
     }
 
-    // ✅ Always return result (with original text if translation failed)
+    //  Always return result (with original text if translation failed)
     return {
       investigatorDisplay,
       participantDisplay,
       originalLanguage,
-      error: errorMessage // ✅ Include error if it occurred
+      error: errorMessage //  Include error if it occurred
     };
   }
 
@@ -190,10 +187,10 @@ class TranslationService {
       }
 
       const result = await response.json();
-      console.log("✅ Translations saved successfully:", result);
+      console.log("Translations saved successfully:", result);
       return result;
     } catch (error) {
-      console.error("❌ Error saving translations:", error);
+      console.error("Error saving translations:", error);
       throw error;
     }
   }

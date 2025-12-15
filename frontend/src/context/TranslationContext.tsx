@@ -66,14 +66,14 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({
       }));
       
     } catch (err) {
-      console.error('❌ Failed to sync to localStorage:', err);
+      console.error(' Failed to sync to localStorage:', err);
     }
   }, [investigatorLanguage, participantLanguage]);
 
   // Clear error method
   const clearError = useCallback(() => {
     setError(null);
-    console.log('✅ Error cleared');
+    console.log(' Error cleared');
   }, []);
 
   // Normalize speaker type to match SpeakerType
@@ -133,15 +133,15 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({
 
         const speaker = normalizeSpeaker(segment.speaker);
         
-        console.log(`🗣️ Processing segment - Speaker: ${speaker}, Text: "${actualText}"`);
-        console.log(`🌐 Translation settings - Investigator: ${investigatorLanguage}, Participant: ${participantLanguage}`);
+        console.log(`Processing segment - Speaker: ${speaker}, Text: "${actualText}"`);
+        console.log(`Translation settings - Investigator: ${investigatorLanguage}, Participant: ${participantLanguage}`);
 
         setIsTranslating(true);
 
         const investigatorLangCode = investigatorLanguage.split('-')[0];
         const participantLangCode = participantLanguage.split('-')[0];
 
-        // ✅ Call translation service (which now returns error in result instead of throwing)
+        //  Call translation service (which now returns error in result instead of throwing)
         const translationResult = await translationService.translateConversation(
           actualText,
           speaker,
@@ -149,16 +149,16 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({
           participantLangCode
         );
 
-        // ✅ Check if there was an error during translation
+        //  Check if there was an error during translation
         if (translationResult.error) {
           console.error('⚠️ Translation error occurred:', translationResult.error);
-          setError(translationResult.error); // ✅ Set error in state to show UI banner
+          setError(translationResult.error); // Set error in state to show UI banner
         } else {
-          // ✅ Clear any previous error since this translation succeeded
+          //  Clear any previous error since this translation succeeded
           setError(null);
         }
 
-        // ✅ Create translation entry with original text (fallback if translation failed)
+        //  Create translation entry with original text (fallback if translation failed)
         const newTranslation: TranslationResult = {
           id: translationService.generateId(),
           originalText: actualText,
@@ -242,9 +242,9 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({
         }
       });
 
-      console.log('✅ Translations saved successfully to S3');
+      console.log(' Translations saved successfully to S3');
     } catch (error) {
-      console.error('❌ Failed to save translations to S3:', error);
+      console.error(' Failed to save translations to S3:', error);
       setError('Failed to save translations. Please try again.');
     }
   }, [translations, investigatorLanguage, participantLanguage, currentCase, currentSession]);

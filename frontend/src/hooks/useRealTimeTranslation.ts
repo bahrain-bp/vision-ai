@@ -40,9 +40,8 @@ export const useParticipantTranslation = () => {
     // Initial load
     updateParticipantView();
 
-    // ✨ Listen for custom event (instant updates, same tab)
+    // Listen for custom event (instant updates, same tab)
     const handleTranslationUpdate = () => {
-      console.log('🔔 Translation update received');
       updateParticipantView();
     };
 

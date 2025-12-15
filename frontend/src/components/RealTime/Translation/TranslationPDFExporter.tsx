@@ -212,7 +212,6 @@ const TranslationPDFExporter: React.FC<TranslationPDFExporterProps> = ({
       
     } catch (error) {
       console.error('PDF generation failed:', error);
-      alert(language === 'ar' ? 'فشل إنشاء ملف PDF. الرجاء محاولة تصدير Word بدلاً من ذلك.' : 'PDF generation failed. Please try Word export instead.');
       setIsGenerating(false);
     }
   };
