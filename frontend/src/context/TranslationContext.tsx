@@ -9,6 +9,7 @@ export interface TranslationContextType {
   clearConversation: () => void;
   isTranslating: boolean;
   error: string | null;
+  clearError: () => void;
   hasMoreConversation: boolean;
   currentSpeaker: string | null;
   investigatorLanguage: string;
@@ -44,7 +45,7 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({
 
   // Listen for reset trigger from transcription
   useEffect(() => {
-    console.log(' Reset trigger detected, clearing translations');
+    console.log('🔄 Reset trigger detected, clearing translations');
     clearConversation();
     setProcessedSegmentIds(new Set());
   }, [resetTrigger]);
@@ -59,15 +60,21 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({
       };
       localStorage.setItem('vision-ai-translations', JSON.stringify(syncData));
       
-      // ✨ Dispatch custom event for instant updates
+      // Dispatch custom event for instant updates
       window.dispatchEvent(new CustomEvent('translations-updated', {
         detail: { count: translationData.length }
       }));
       
     } catch (err) {
-      console.error(' Failed to sync to localStorage:', err);
+      console.error('❌ Failed to sync to localStorage:', err);
     }
   }, [investigatorLanguage, participantLanguage]);
+
+  // Clear error method
+  const clearError = useCallback(() => {
+    setError(null);
+    console.log('✅ Error cleared');
+  }, []);
 
   // Normalize speaker type to match SpeakerType
   const normalizeSpeaker = (speaker: string): SpeakerType => {
@@ -82,7 +89,6 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({
     
     // Check for multi-participant mode (Speaker 0, Speaker 1, etc.)
     if (normalized.match(/Speaker \d+/)) {
-      // Use the current person type or default to Witness
       return (currentPersonType as SpeakerType) || "Witness";
     }
     
@@ -112,69 +118,74 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({
         return;
       }
 
-      console.log(` Processing ${newSegments.length} new segment(s)`);
+      console.log(`🔄 Processing ${newSegments.length} new segment(s)`);
 
       for (const segment of newSegments) {
         const segmentId = `${segment.timeStamp}-${segment.speaker}-${segment.formattedTranscript.substring(0, 20)}`;
         
-        try {
-          const actualText = segment.formattedTranscript.trim();
-          
-          if (!actualText || actualText.length < 2) {
-            console.log(' Skipping - no meaningful text');
-            continue;
-          }
-
-          const speaker = normalizeSpeaker(segment.speaker);
-          
-          console.log(` Processing segment - Speaker: ${speaker}, Text: "${actualText}"`);
-          console.log(` Translation settings - Investigator: ${investigatorLanguage}, Participant: ${participantLanguage}`);
-
-          setIsTranslating(true);
-          setError(null);
-
-          const investigatorLangCode = investigatorLanguage.split('-')[0];
-          const participantLangCode = participantLanguage.split('-')[0];
-
-          const { investigatorDisplay, participantDisplay, originalLanguage } = 
-            await translationService.translateConversation(
-              actualText,
-              speaker,
-              investigatorLangCode,
-              participantLangCode
-            );
-
-          const newTranslation: TranslationResult = {
-            id: translationService.generateId(),
-            originalText: actualText,
-            originalLanguage,
-            speaker,
-            investigatorDisplay,
-            participantDisplay,
-            timestamp: new Date(),
-          };
-
-          setTranslations(prev => {
-            const updatedTranslations = [...prev, newTranslation];
-            syncToLocalStorage(updatedTranslations);
-            return updatedTranslations;
-          });
-
+        const actualText = segment.formattedTranscript.trim();
+        
+        if (!actualText || actualText.length < 2) {
+          console.log('⏭️ Skipping - no meaningful text');
           setProcessedSegmentIds(prev => new Set([...prev, segmentId]));
-          
-          console.log('Translation completed:', {
-            speaker,
-            originalText: actualText,
-            investigatorSees: investigatorDisplay,
-            participantSees: participantDisplay
-          });
-          
-        } catch (err) {
-          console.error('Translation failed for segment:', err);
-          setError('Translation failed. Please try again.');
-        } finally {
-          setIsTranslating(false);
+          continue;
         }
+
+        const speaker = normalizeSpeaker(segment.speaker);
+        
+        console.log(`🗣️ Processing segment - Speaker: ${speaker}, Text: "${actualText}"`);
+        console.log(`🌐 Translation settings - Investigator: ${investigatorLanguage}, Participant: ${participantLanguage}`);
+
+        setIsTranslating(true);
+
+        const investigatorLangCode = investigatorLanguage.split('-')[0];
+        const participantLangCode = participantLanguage.split('-')[0];
+
+        // ✅ Call translation service (which now returns error in result instead of throwing)
+        const translationResult = await translationService.translateConversation(
+          actualText,
+          speaker,
+          investigatorLangCode,
+          participantLangCode
+        );
+
+        // ✅ Check if there was an error during translation
+        if (translationResult.error) {
+          console.error('⚠️ Translation error occurred:', translationResult.error);
+          setError(translationResult.error); // ✅ Set error in state to show UI banner
+        } else {
+          // ✅ Clear any previous error since this translation succeeded
+          setError(null);
+        }
+
+        // ✅ Create translation entry with original text (fallback if translation failed)
+        const newTranslation: TranslationResult = {
+          id: translationService.generateId(),
+          originalText: actualText,
+          originalLanguage: translationResult.originalLanguage,
+          speaker,
+          investigatorDisplay: translationResult.investigatorDisplay,
+          participantDisplay: translationResult.participantDisplay,
+          timestamp: new Date(),
+        };
+
+        setTranslations(prev => {
+          const updatedTranslations = [...prev, newTranslation];
+          syncToLocalStorage(updatedTranslations);
+          return updatedTranslations;
+        });
+
+        setProcessedSegmentIds(prev => new Set([...prev, segmentId]));
+        
+        console.log('✅ Translation completed:', {
+          speaker,
+          originalText: actualText,
+          investigatorSees: translationResult.investigatorDisplay,
+          participantSees: translationResult.participantDisplay,
+          hadError: !!translationResult.error
+        });
+        
+        setIsTranslating(false);
       }
     };
 
@@ -192,13 +203,14 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({
   ]);
 
   const addConversationTurn = useCallback(async () => {
-    console.log('Translation is now automatic with real transcription');
+    console.log('ℹ️ Translation is now automatic with real transcription');
   }, []);
 
   const clearConversation = useCallback(() => {
     setTranslations([]);
+    setError(null); // ✅ Clear errors when clearing conversation
     syncToLocalStorage([]);
-    console.log('Conversation and translations cleared');
+    console.log('🧹 Conversation and translations cleared');
   }, [syncToLocalStorage]);
 
   const saveTranslationsToS3 = useCallback(async () => {
@@ -230,9 +242,10 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({
         }
       });
 
-      console.log('Translations saved successfully to S3');
+      console.log('✅ Translations saved successfully to S3');
     } catch (error) {
-      console.error('Failed to save translations to S3:', error);
+      console.error('❌ Failed to save translations to S3:', error);
+      setError('Failed to save translations. Please try again.');
     }
   }, [translations, investigatorLanguage, participantLanguage, currentCase, currentSession]);
 
@@ -242,6 +255,7 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({
     clearConversation,
     isTranslating,
     error,
+    clearError,
     hasMoreConversation: recordingStatus === "on",
     currentSpeaker: translations.length > 0 ? translations[translations.length - 1].speaker : null,
     investigatorLanguage,

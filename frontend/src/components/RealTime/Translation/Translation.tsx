@@ -3,6 +3,7 @@ import { useRealTimeTranslation } from '../../../hooks/useRealTimeTranslation';
 import { Globe, Eye } from 'lucide-react'; 
 import TranslationSettings from './TranslationSettings';
 import PDFExporter from './TranslationPDFExporter';
+import TranslationErrorDisplay from './TranslationErrorDisplay'; // 👈 ADDED
 import { useLanguage } from '../../../context/LanguageContext';
 
 interface TranslationSettings {
@@ -15,6 +16,7 @@ const Translation: React.FC = () => {
     translations,
     isTranslating, 
     error,
+    clearError, // 👈 ADDED
     investigatorLanguage,
     participantLanguage,
     setInvestigatorLanguage,
@@ -58,6 +60,13 @@ const Translation: React.FC = () => {
     }
   };
 
+  // 👇 ADDED: Handle retry
+  const handleRetry = () => {
+    clearError();
+    // Optional: You could trigger a re-translation of the last failed segment here
+    console.log('🔄 Retrying translation...');
+  };
+
   return (
     <div className="translation-card">
       <div className="card-header">
@@ -67,16 +76,17 @@ const Translation: React.FC = () => {
         </div>
       </div>
 
+      {/* 👇 ADDED: Error display BEFORE TranslationSettings */}
+      <TranslationErrorDisplay 
+        error={error}
+        onDismiss={clearError}
+        onRetry={handleRetry}
+      />
+
       <TranslationSettings 
         translationSettings={translationSettings}
         onTranslationSettingsChange={handleTranslationSettingsChange}
       />
-
-      {error && (
-        <div className="error-message">
-          {error}
-        </div>
-      )}
 
       <div className="translation-controls">
         <button
@@ -147,8 +157,6 @@ const Translation: React.FC = () => {
           sessionDate={new Date().toLocaleDateString()}
         />
       </div>
-
-     
     </div>
   );
 };

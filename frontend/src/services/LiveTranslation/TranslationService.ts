@@ -25,6 +25,14 @@ export interface SaveTranslationRequest {
   };
 }
 
+// Custom error class to distinguish translation errors
+export class TranslationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'TranslationError';
+  }
+}
+
 class TranslationService {
   private translateClient: TranslateClient | null = null;
 
@@ -38,6 +46,7 @@ class TranslationService {
       console.log('✓ Translate client initialized');
     } catch (error) {
       console.error('✗ Failed to initialize Translate client:', error);
+      throw new TranslationError('Failed to initialize translation service');
     }
   }
 
@@ -55,17 +64,29 @@ class TranslationService {
     if (sourceCode === targetCode || !text.trim()) return text;
 
     try {
-      console.log(`🔄 Translating: "${text}" from ${sourceCode} to ${targetCode}`);
+      console.log(`🔄 Translating: "${text.substring(0, 50)}..." from ${sourceCode} to ${targetCode}`);
+      
       const command = new TranslateTextCommand({
         Text: text,
         SourceLanguageCode: sourceCode,
         TargetLanguageCode: targetCode,
       });
+      
       const response = await this.translateClient!.send(command);
+      console.log(`✅ Translation successful`);
+      
       return response.TranslatedText || text;
-    } catch (error) {
-      console.error('✗ Translation error:', error);
-      return text;
+    } catch (error: any) {
+      console.error('❌ Translation API error:', error);
+      
+      // Throw a custom error with a user-friendly message
+      if (error.name === 'NetworkError' || error.message?.includes('network')) {
+        throw new TranslationError('Translation service unavailable. Please check your internet connection.');
+      } else if (error.name === 'CredentialsError') {
+        throw new TranslationError('Authentication failed. Please refresh and try again.');
+      } else {
+        throw new TranslationError('Translation failed. Please try again.');
+      }
     }
   }
 
@@ -78,26 +99,53 @@ class TranslationService {
     investigatorDisplay: string;
     participantDisplay: string;
     originalLanguage: string;
+    error?: string; // ✅ NEW: Include error in return
   }> {
-    console.log(`🗣️ Processing: "${speaker}" says: "${originalText}"`);
-    console.log(`🌐 Translation setup - Investigator lang: ${investigatorLanguage}, Participant lang: ${participantLanguage}`);
+    console.log(`\n🗣️ Processing: "${speaker}" says: "${originalText}"`);
+    console.log(`🌐 Investigator lang: ${investigatorLanguage}, Participant lang: ${participantLanguage}`);
 
     let investigatorDisplay = originalText;
     let participantDisplay = originalText;
     let originalLanguage = 'auto';
+    let errorMessage: string | undefined;
 
-    if (speaker === "Investigator") {
-      participantDisplay = await this.translateText(originalText, investigatorLanguage, participantLanguage);
-      console.log(`   Participant sees (${participantLanguage}): "${participantDisplay}"`);
-    } else {
-      investigatorDisplay = await this.translateText(originalText, participantLanguage, investigatorLanguage);
-      console.log(`    👮 Investigator sees (${investigatorLanguage}): "${investigatorDisplay}"`);
+    try {
+      if (speaker === "Investigator") {
+        // Investigator spoke - translate for participant
+        console.log(`👨‍⚖️ Translating for participant...`);
+        participantDisplay = await this.translateText(
+          originalText, 
+          investigatorLanguage, 
+          participantLanguage
+        );
+        console.log(`   ✅ Participant will see: "${participantDisplay.substring(0, 50)}..."`);
+      } else {
+        // Participant spoke - translate for investigator
+        console.log(`🧑 Translating for investigator...`);
+        investigatorDisplay = await this.translateText(
+          originalText, 
+          participantLanguage, 
+          investigatorLanguage
+        );
+        console.log(`   ✅ Investigator will see: "${investigatorDisplay.substring(0, 50)}..."`);
+      }
+    } catch (error: any) {
+      console.error('❌ translateConversation failed:', error);
+      
+      // ✅ Capture error message but continue with original text
+      errorMessage = error instanceof TranslationError 
+        ? error.message 
+        : 'Translation failed. Please try again.';
+      
+      console.warn('⚠️ Displaying original text due to translation error');
     }
 
+    // ✅ Always return result (with original text if translation failed)
     return {
       investigatorDisplay,
       participantDisplay,
-      originalLanguage
+      originalLanguage,
+      error: errorMessage // ✅ Include error if it occurred
     };
   }
 

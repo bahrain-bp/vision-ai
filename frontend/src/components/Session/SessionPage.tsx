@@ -173,7 +173,12 @@ const SessionPageContent: React.FC<SessionPageProps & {
   const handleEndSession = async () => {
     stopRecording(setSessionState);
 
-    await saveTranslationsToS3();
+    try {
+        await saveTranslationsToS3();
+    } catch (error) {
+        console.error('Failed to save translations to S3:', error);
+    }
+
 
     clearConversation();
 
