@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { User, ChevronUp, ChevronDown, FileText } from "lucide-react";
+import { User, ChevronUp, ChevronDown, FileText , Bot } from "lucide-react";
 import LiveTranscription from "../LiveTranscription/LiveTranscription";
 import Translation from "./Translation";
 import SessionInfo from "./SessionInfo";
@@ -14,6 +14,7 @@ import {
 } from "../../types/";
 import SummarizationReport from "./Summarization/SummarizationReport";
 import { useLanguage } from "../../context/LanguageContext";
+import ManualQuestionInput from "./AIAssistant/ManualQuestionInput";
 
 interface SessionData {
   sessionId: string;
@@ -175,18 +176,28 @@ const RealTimeView: React.FC<RealTimeViewProps> = ({
           </button>
         </div>
 
-        <div className="ai-section">
+         <div className="ai-section">
           <button
-            onClick={() => setAiExpanded(!aiExpanded)}
-            className="ai-toggle-btn"
-          >
-            AI Assistant
-            {aiExpanded ? <ChevronUp /> : <ChevronDown />}
-          </button>
-
+  onClick={() => setAiExpanded(!aiExpanded)}
+  className="ai-toggle-btn"
+>
+  <div className="flex items-center gap-2"> 
+    <Bot className="btn-icon" style={{ width: '20px', height: '20px' }} />
+    <span>{t("aiAssistant.title")}</span>
+  </div>
+  {aiExpanded ? <ChevronUp /> : <ChevronDown />}
+</button>
+          
           {aiExpanded && (
-            <div className="mt-4">
+            <div className="mt-4 space-y-4">
+              {/* AI Question Generator */}
               <QuestionGenerator />
+
+              {/* Divider */}
+              <div className="border-t border-gray-200 my-4"></div>
+
+              {/* Manual Question Evaluation Tool */}
+              <ManualQuestionInput />
             </div>
           )}
         </div>

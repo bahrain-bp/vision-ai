@@ -1,5 +1,6 @@
 import React from 'react';
 import { Check, RotateCcw, Sparkles } from 'lucide-react';
+import { useLanguage } from '../../../context/LanguageContext'; // ← ADDED
 import { QuestionListProps } from '../../../types/aiQuestionsRT';
 import QuestionCard from './QuestionCard';
 
@@ -26,16 +27,17 @@ const QuestionList: React.FC<QuestionListProps> = ({
   onConfirm,
   onRetry,
 }) => {
+  const { t } = useLanguage(); // ← ADDED
   // Empty state - no questions in attempt
   if (!attempt || !attempt.questions || attempt.questions.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
         <Sparkles className="w-12 h-12 text-gray-400 mb-3" />
         <p className="text-sm font-medium text-gray-600 mb-1">
-          No questions generated yet
+          {t("aiAssistant.noQuestionsYet")} {/* ← CHANGED */}
         </p>
         <p className="text-xs text-gray-500">
-          Click "Generate Questions" to start
+          {t("aiAssistant.clickGenerate")} {/* ← CHANGED */}
         </p>
       </div>
     );
@@ -80,7 +82,7 @@ const selectedCount = selectedQuestionIds.length;
 >
   <Check className="w-5 h-5" />
   <span>
-    {attempt.isConfirmed ? 'Confirmed ✓' : 'Confirm All'}
+    {attempt.isConfirmed ? t("aiAssistant.confirmed") + ' ✓' : t("aiAssistant.confirmAll")} {/* ← CHANGED */}
   </span>
 </button>
 
@@ -100,7 +102,7 @@ const selectedCount = selectedQuestionIds.length;
 >
   <RotateCcw className="w-5 h-5" />
   <span>
-    {selectedCount === 0 ? 'Retry All' : `Retry Selected (${selectedCount})`}
+    {selectedCount === 0 ? t("aiAssistant.retryAll") : `${t("aiAssistant.retrySelected")} (${selectedCount})`} {/* ← CHANGED */}
   </span>
 </button>
 

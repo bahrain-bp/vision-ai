@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { Copy, RotateCcw } from 'lucide-react';
+import { useLanguage } from '../../../context/LanguageContext'; // ← ADDED
 import { 
   QuestionCardProps, 
   QuestionCategory 
@@ -27,6 +28,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
   isFlipped: controlledIsFlipped,
   disabled = false,
 }) => {
+  const { t } = useLanguage(); // ← ADDED
   // Local flip state (if not controlled by parent)
   const [localIsFlipped, setLocalIsFlipped] = useState(false);
   
@@ -35,7 +37,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
 
   // Category color mapping
   const getCategoryStyles = (category: QuestionCategory) => {
-    const styles = {
+    const styles: Record<string, { bg: string; text: string; border: string }> = {
       clarification: {
         bg: 'bg-indigo-100',
         text: 'text-indigo-700',
@@ -56,8 +58,19 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
         text: 'text-green-700',
         border: 'border-green-500',
       },
+      contradiction: {
+        bg: 'bg-red-50',
+        text: 'text-red-700',
+        border: 'border-red-200',
+      },
     };
-    return styles[category];
+
+    // Return the style for the category, or a default style if category is unknown
+    return styles[category] || {
+      bg: 'bg-gray-100',
+      text: 'text-gray-700',
+      border: 'border-gray-500',
+    };
   };
 
   const categoryStyles = getCategoryStyles(question.category);
@@ -93,9 +106,9 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
   };
 
   // Format category name for display
-  const formatCategory = (category: string) => {
-    return category.charAt(0).toUpperCase() + category.slice(1);
-  };
+ // const formatCategory = (category: string) => {
+   // return category.charAt(0).toUpperCase() + category.slice(1);
+ // };
 
   return (
     <div
@@ -125,23 +138,50 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
           `}
           style={{ backfaceVisibility: 'hidden' }}
         >
-          {/* Header: Checkbox + Category Badge */}
-          <div className="flex items-start gap-3 mb-3">
-            <input
-              type="checkbox"
-              checked={isSelected}
-              onChange={handleSelect}
-              disabled={disabled}
-              className="mt-1 w-4 h-4 text-indigo-600 rounded focus:ring-2 focus:ring-indigo-500 cursor-pointer disabled:cursor-not-allowed"
-            />
-            
-            <span className={`
-              ${categoryStyles.bg} ${categoryStyles.text}
-              text-xs font-semibold px-3 py-1 rounded-full
-            `}>
-              {formatCategory(question.category)}
-            </span>
-          </div>
+          {/* Header: Checkbox + Category Badge + Confidence */}
+<div className="flex items-start gap-3 mb-3">
+  <input
+    type="checkbox"
+    checked={isSelected}
+    onChange={handleSelect}
+    disabled={disabled}
+    className="mt-1 w-4 h-4 text-indigo-600 rounded focus:ring-2 focus:ring-indigo-500 cursor-pointer disabled:cursor-not-allowed"
+  />
+  
+  <div className="flex items-center gap-2 flex-wrap">
+    {/* Category Badge */}
+    <span className={`
+      ${categoryStyles.bg} ${categoryStyles.text}
+      text-xs font-semibold px-3 py-1 rounded-full
+    `}>
+      {t(`aiAssistant.category.${question.category}`)} {/* ← CHANGED */}
+    </span>
+
+    {/* High Priority Badge */}
+    {question.priority === 'high' && (
+      <span className="
+        bg-red-50 text-red-700 border border-red-200
+        text-xs font-semibold px-2.5 py-1 rounded-full
+        flex items-center gap-1
+      ">
+        <span className="text-red-500">🔥</span>
+        {t("aiAssistant.highPriority")} {/* ← CHANGED */}
+      </span>
+    )}
+
+    {/* High Confidence Badge */}
+    {question.confidence === 'high' && (
+      <span className="
+        bg-green-50 text-green-700 border border-green-200
+        text-xs font-semibold px-2.5 py-1 rounded-full
+        flex items-center gap-1
+      ">
+        <span className="text-green-500">✓</span>
+        {t("aiAssistant.highConfidence")} {/* ← CHANGED */}
+      </span>
+    )}
+  </div>
+</div>
 
           {/* Question Text */}
           <p className="text-sm text-gray-800 leading-relaxed mb-4 pl-7">
@@ -162,7 +202,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
               "
             >
               <RotateCcw className="w-3.5 h-3.5" />
-              Show Reasoning
+              {t("aiAssistant.showReasoning")} {/* ← CHANGED */}
             </button>
 
             <button
@@ -177,7 +217,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
               "
             >
               <Copy className="w-3.5 h-3.5" />
-              Copy
+              {t("aiAssistant.copy")} {/* ← CHANGED */}
             </button>
           </div>
         </div>
@@ -197,7 +237,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
           <div className="flex items-center gap-2 mb-3">
             <div className="w-2 h-2 bg-indigo-500 rounded-full"></div>
             <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wide">
-              AI Reasoning
+             {t("aiAssistant.aiReasoning")} {/* ← CHANGED */}
             </h4>
           </div>
 
@@ -214,7 +254,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
           {question.sourceContext && (
             <div className="mb-4 p-2 bg-gray-50 rounded border-l-2 border-gray-300">
               <p className="text-xs text-gray-600">
-                <span className="font-semibold">Source: </span>
+                <span className="font-semibold">{t("aiAssistant.source")}: </span> {/* ← CHANGED */}
                 {question.sourceContext}
               </p>
             </div>
@@ -233,7 +273,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
             "
           >
             <RotateCcw className="w-3.5 h-3.5" />
-            Show Question
+            {t("aiAssistant.showQuestion")} {/* ← CHANGED */}
           </button>
         </div>
       </div>

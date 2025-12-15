@@ -1,6 +1,10 @@
 import React, { useState } from 'react';
 import { Sparkles, Loader2 } from 'lucide-react';
 import { QuestionGeneratorControlsProps, Language } from '../../../types/aiQuestionsRT';
+import { useQuestionContext } from '../../../hooks/useQuestionContext'; // ← NEW: Import hook
+import { useLanguage } from '../../../context/LanguageContext'; // ← ADDED
+
+
 
 /**
  * GeneratorControls Component
@@ -15,12 +19,15 @@ import { QuestionGeneratorControlsProps, Language } from '../../../types/aiQuest
  * - isLoading: Whether generation is in progress
  * - disabled: Disable all controls (e.g., when recording is off)
  */
-
 const GeneratorControls: React.FC<QuestionGeneratorControlsProps> = ({
   onGenerate,
   isLoading,
   disabled = false,
 }) => {
+  const { t } = useLanguage(); // ← ADDED
+  // ← NEW: Access canGenerate from context
+  const { canGenerate } = useQuestionContext();
+
   // Local state for selected options
   const [questionCount, setQuestionCount] = useState<number>(5);
   const [language, setLanguage] = useState<Language>('en');
@@ -30,25 +37,23 @@ const GeneratorControls: React.FC<QuestionGeneratorControlsProps> = ({
 
   // Language options with display labels
   const languageOptions: { value: Language; label: string }[] = [
-    { value: 'en', label: 'English' },
-    { value: 'ar', label: 'Arabic' },
+    { value: 'en', label: 'English 🇬🇧 ' },
+    { value: 'ar', label: ' العربية 🇧🇭' },
   ];
 
   // Handle generate button click
   const handleGenerate = () => {
-    if (disabled || isLoading) return;
+    if (disabled || isLoading || !canGenerate) return; // ← UPDATED: Added !canGenerate check
     onGenerate(questionCount, language);
   };
 
   // Determine if controls should be disabled
-  const isDisabled = disabled || isLoading;
+  const isDisabled = disabled || isLoading || !canGenerate; // ← UPDATED: Added !canGenerate
 
   return (
     <div className="space-y-3">
-
       {/* Dropdowns Container */}
       <div className="flex gap-2">
-
         {/* Question Count Dropdown */}
         <div className="flex-1">
           <select
@@ -68,7 +73,7 @@ const GeneratorControls: React.FC<QuestionGeneratorControlsProps> = ({
           >
             {countOptions.map((count) => (
               <option key={count} value={count}>
-                {count} Questions
+                {count} {t("aiAssistant.questions")} {/* ← CHANGED */}
               </option>
             ))}
           </select>
@@ -98,7 +103,6 @@ const GeneratorControls: React.FC<QuestionGeneratorControlsProps> = ({
             ))}
           </select>
         </div>
-
       </div>
 
       {/* Generate Button */}
@@ -118,15 +122,22 @@ const GeneratorControls: React.FC<QuestionGeneratorControlsProps> = ({
         {isLoading ? (
           <>
             <Loader2 className="w-5 h-5 animate-spin" />
-            <span>Generating...</span>
+            <span>{t("aiAssistant.generating")}</span> {/* ← CHANGED */}
           </>
         ) : (
           <>
             <Sparkles className="w-5 h-5" />
-            <span>Generate Questions</span>
+             <span>{t("aiAssistant.generateButton")}</span> {/* ← CHANGED */}
           </>
         )}
       </button>
+
+      {/* ← NEW: Helper text when disabled due to prerequisites */}
+      {!canGenerate && !isLoading && (
+        <p className="text-xs text-gray-500 text-center mt-2">
+          {t("aiAssistant.waitingForTranscript")} {/* ← CHANGED */}
+        </p>
+      )}
     </div>
   );
 };

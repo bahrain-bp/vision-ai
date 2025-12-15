@@ -19,6 +19,9 @@ from vision_ai.detect_contradiction_stack import ContradictionStack
 from vision_ai.camera_footage_stack import CameraFootageAnalysisStack
 from vision_ai.audio_analysis_stack import AudioAnalysisStack
 from vision_ai.outcome_stack import OutcomeStack
+from vision_ai.police_document_processing_stack import PoliceDocumentProcessingStack
+from vision_ai.s3_event_wiring_stack import S3EventWiringStack
+from vision_ai.AI_Assistant_RT_stack import AIAssistantRTStack
 
 
 load_dotenv()
@@ -162,6 +165,48 @@ transcription_stack = TranscriptionStack(
 transcription_stack.add_dependency(shared_stack)
 
 # ==========================================
+# POLICE DOCUMENT PROCESSING STACK
+# PDF summarization using Bedrock Nova Lite
+# ==========================================
+police_doc_stack = PoliceDocumentProcessingStack(
+    app, f"{app_name}-police-document-processing-stack",
+    investigation_bucket=shared_stack.investigation_bucket,
+    env=env,
+    description="Police Document Processing: Automated PDF summarization using Amazon Bedrock"
+)
+police_doc_stack.add_dependency(shared_stack)
+
+# ==========================================
+# S3 EVENT WIRING STACK
+# Configures S3 → Lambda event notifications
+# ==========================================
+s3_wiring_stack = S3EventWiringStack(
+    app, f"{app_name}-s3-event-wiring-stack",
+    env=env,
+    investigation_bucket_name="vision-rt-investigation-system",  
+    police_doc_lambda_name="vision-ai-process-police-document", 
+    description="S3 event notifications: Triggers Lambda on PDF uploads"
+)
+s3_wiring_stack.add_dependency(shared_stack)
+s3_wiring_stack.add_dependency(police_doc_stack)
+
+# ==========================================
+# AI ASSISTANT RT STACK
+# Real-time question generation support
+# ==========================================
+ai_assistant_rt_stack = AIAssistantRTStack(
+    app, f"{app_name}-ai-assistant-rt-stack",
+    env=env,
+    investigation_bucket=shared_stack.investigation_bucket,
+    shared_api_id=shared_stack.shared_api.rest_api_id,
+    shared_api_root_resource_id=shared_stack.shared_api.rest_api_root_resource_id,
+    cases_resource_id=case_management_stack.cases_resource.resource_id,
+    case_by_id_resource_id=case_management_stack.case_by_id_resource.resource_id,
+    description="AI Assistant RT: Question generation with case summary and victim testimony"
+)
+ai_assistant_rt_stack.add_dependency(shared_stack)
+
+# ==========================================
 # 9. TRANSLATION STACK
 # Save real-time translations to S3
 # ==========================================
@@ -282,6 +327,9 @@ deployment_stack.add_dependency(summarization_stack)
 deployment_stack.add_dependency(camera_footage_stack)
 deployment_stack.add_dependency(audio_analysis_stack)
 deployment_stack.add_dependency(outcome_stack)
+deployment_stack.add_dependency(police_doc_stack)
+deployment_stack.add_dependency(s3_wiring_stack)
+deployment_stack.add_dependency(ai_assistant_rt_stack)
 
 # ==========================================
 # 15. FRONTEND STACK

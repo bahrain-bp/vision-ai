@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { useLanguage } from '../../../context/LanguageContext'; // ← ADDED
 import { AttemptNavigationProps } from '../../../types/aiQuestionsRT';
 
 /**
@@ -25,6 +26,7 @@ const AttemptNavigation: React.FC<AttemptNavigationProps> = ({
   onNavigate,
   disabled = false,
 }) => {
+  const { t } = useLanguage(); // ← ADDED
   // Don't render if only one attempt
   if (totalAttempts <= 1) {
     return null;
@@ -64,14 +66,14 @@ const AttemptNavigation: React.FC<AttemptNavigationProps> = ({
             : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
           }
         `}
-        aria-label="Previous attempt"
+        aria-label={t("aiAssistant.previousAttempt")} //CHANGED
       >
         <ChevronLeft className="w-5 h-5" />
       </button>
 
       {/* Current Attempt Indicator - Minimal */}
       <span className="text-xs font-semibold text-gray-600 px-2">
-        Attempt {displayNumber} of {totalAttempts}
+         {t("aiAssistant.attempt")} {displayNumber} {t("aiAssistant.of")} {totalAttempts} 
       </span>
 
       {/* Next Button - Icon Only */}
@@ -85,7 +87,7 @@ const AttemptNavigation: React.FC<AttemptNavigationProps> = ({
             : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
           }
         `}
-        aria-label="Next attempt"
+        aria-label={t("aiAssistant.nextAttempt")} //CHANGED
       >
         <ChevronRight className="w-5 h-5" />
       </button>
