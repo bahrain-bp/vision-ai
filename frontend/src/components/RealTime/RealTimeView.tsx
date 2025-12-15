@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { User, ChevronUp, ChevronDown, FileText , Bot } from "lucide-react";
 import LiveTranscription from "../LiveTranscription/LiveTranscription";
-import Translation from "./Translation";
+import Translation from "./Translation/Translation";
 import SessionInfo from "./SessionInfo";
 import IdentityVerification from "./IdentityVerification/IdentityVerification";
 import TranscriptionSessionSetup from "../LiveTranscription/TranscriptionSessionSetup";
 import QuestionGenerator from "./AIAssistant/QuestionGenerator";
-import { TranslationProvider } from "../../context/TranslationContext";
 import {
   RecordingStatus,
   SessionType,
@@ -122,12 +121,7 @@ const RealTimeView: React.FC<RealTimeViewProps> = ({
                   setSessionType={setSessionType}
                   sessionType={sessionType}
                 />
-                <TranslationProvider
-                  investigatorLanguage="en"
-                  witnessLanguage="ar"
-                >
                   <Translation />
-                </TranslationProvider>
               </>
             )}
           </div>

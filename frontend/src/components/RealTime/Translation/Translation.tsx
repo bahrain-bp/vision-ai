@@ -1,19 +1,26 @@
 import React, { useEffect, useRef } from 'react';
-import { useRealTimeTranslation } from '../../hooks/useRealTimeTranslation';
+import { useRealTimeTranslation } from '../../../hooks/useRealTimeTranslation';
 import { Globe, Eye } from 'lucide-react'; 
 import TranslationSettings from './TranslationSettings';
 import PDFExporter from './TranslationPDFExporter';
-import { useLanguage } from '../../context/LanguageContext';
+import TranslationErrorDisplay from './TranslationErrorDisplay'; // 👈 ADDED
+import { useLanguage } from '../../../context/LanguageContext';
 
-const RealTimeTranslation: React.FC = () => {
+interface TranslationSettings {
+  sourceLanguage: string;
+  targetLanguage: string;
+}
+
+const Translation: React.FC = () => {
   const {
     translations,
-    isTranslating,
+    isTranslating, 
     error,
+    clearError, // 👈 ADDED
     investigatorLanguage,
-    witnessLanguage,
+    participantLanguage,
     setInvestigatorLanguage,
-    setWitnessLanguage
+    setParticipantLanguage
   } = useRealTimeTranslation();
 
   const { t } = useLanguage();
@@ -36,21 +43,28 @@ const RealTimeTranslation: React.FC = () => {
     ).join('\n\n');
   };
 
-  const openWitnessWindow = () => {
-    window.open('/witness', 'witness-window', 'width=800,height=600');
+  const openParticipantWindow = () => {
+    window.open('/participant', 'participant-window', 'width=800,height=600');
   };
 
-  const translationSettings = {
+  const translationSettings: TranslationSettings = {
     sourceLanguage: investigatorLanguage,
-    targetLanguage: witnessLanguage
+    targetLanguage: participantLanguage
   };
 
   const handleTranslationSettingsChange = (field: 'sourceLanguage' | 'targetLanguage', value: string) => {
     if (field === 'sourceLanguage') {
       setInvestigatorLanguage(value);
     } else {
-      setWitnessLanguage(value);
+      setParticipantLanguage(value);
     }
+  };
+
+  // 👇 ADDED: Handle retry
+  const handleRetry = () => {
+    clearError();
+    // Optional: You could trigger a re-translation of the last failed segment here
+    console.log('🔄 Retrying translation...');
   };
 
   return (
@@ -62,25 +76,26 @@ const RealTimeTranslation: React.FC = () => {
         </div>
       </div>
 
+      {/* 👇 ADDED: Error display BEFORE TranslationSettings */}
+      <TranslationErrorDisplay 
+        error={error}
+        onDismiss={clearError}
+        onRetry={handleRetry}
+      />
+
       <TranslationSettings 
         translationSettings={translationSettings}
         onTranslationSettingsChange={handleTranslationSettingsChange}
       />
 
-      {error && (
-        <div className="error-message">
-          {error}
-        </div>
-      )}
-
       <div className="translation-controls">
         <button
-          onClick={openWitnessWindow}
+          onClick={openParticipantWindow}
           className="control-btn witness-btn"
-          title={t("session.witnessView")}
+          title={t("session.participantView")}
         >
           <Eye size={16} />
-          <span>{t("session.witnessView")}</span>
+          <span>{t("session.participantView")}</span>
         </button>
 
         <div className="conversation-status">
@@ -114,7 +129,10 @@ const RealTimeTranslation: React.FC = () => {
         ) : (
           <div className="translation-messages">
             {translations.map((translation) => (
-              <div key={translation.id} className="translation-line">
+              <div 
+                key={translation.id} 
+                className={`translation-line ${translation.speaker === 'Investigator' ? 'investigator' : 'participant'}`}
+              >
                 <div className="line-content">
                   <span className="timestamp">
                     {translation.timestamp.toLocaleTimeString()}
@@ -139,29 +157,8 @@ const RealTimeTranslation: React.FC = () => {
           sessionDate={new Date().toLocaleDateString()}
         />
       </div>
-
-      {translations.length > 0 && (
-        <div className="translation-stats">
-          <div className="stat-item">
-            <span className="stat-label">{t("sessionInfo.statistics")}:</span>
-            <span className="stat-value">{translations.length}</span>
-          </div>
-          <div className="stat-item">
-            <span className="stat-label">{t("session.investigator")}:</span>
-            <span className="stat-value">
-              {translations.filter(t => t.speaker === 'Investigator').length}
-            </span>
-          </div>
-          <div className="stat-item">
-            <span className="stat-label">{t("identity.witness")}:</span>
-            <span className="stat-value">
-              {translations.filter(t => t.speaker === 'Witness').length}
-            </span>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
 
-export default RealTimeTranslation;
+export default Translation;

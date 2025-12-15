@@ -1,14 +1,15 @@
 import { TranslateClient, TranslateTextCommand } from "@aws-sdk/client-translate";
 import { getUserCredentials } from "../authService";
 
+export type SpeakerType = "Investigator" | "Witness" | "Accused" | "Victim";
+
 export interface TranslationResult {
   id: string;
   originalText: string;
-  originalLanguage: string;        // Language the speaker actually spoke in
-  speaker: string;                 // "Investigator" or "Witness"
-  // What each person sees
-  investigatorDisplay: string;     // What investigator sees (translated if witness spoke)
-  witnessDisplay: string;          // What witness sees (translated if investigator spoke)
+  originalLanguage: string;
+  speaker: SpeakerType;
+  investigatorDisplay: string;
+  participantDisplay: string;
   timestamp: Date;
 }
 
@@ -18,10 +19,18 @@ export interface SaveTranslationRequest {
   translations: TranslationResult[];
   metadata?: {
     investigatorLanguage: string;
-    witnessLanguage: string;
+    participantLanguage: string;
     sessionDuration?: string;
     totalMessages?: number;
   };
+}
+
+// Custom error class to distinguish translation errors
+export class TranslationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'TranslationError';
+  }
 }
 
 class TranslationService {
@@ -37,6 +46,7 @@ class TranslationService {
       console.log('✓ Translate client initialized');
     } catch (error) {
       console.error('✗ Failed to initialize Translate client:', error);
+      throw new TranslationError('Failed to initialize translation service');
     }
   }
 
@@ -46,57 +56,93 @@ class TranslationService {
     targetLang: string
   ): Promise<string> {
     if (!this.translateClient) await this.initializeClient();
-    if (sourceLang === targetLang || !text.trim()) return text;
+    
+    // Extract language codes (e.g., "en-US" -> "en")
+    const sourceCode = sourceLang.split('-')[0];
+    const targetCode = targetLang.split('-')[0];
+    
+    if (sourceCode === targetCode || !text.trim()) return text;
 
     try {
-      console.log(`🔄 Translating: "${text}" from ${sourceLang} to ${targetLang}`);
+      console.log(`🔄 Translating: "${text.substring(0, 50)}..." from ${sourceCode} to ${targetCode}`);
+      
       const command = new TranslateTextCommand({
         Text: text,
-        SourceLanguageCode: sourceLang,
-        TargetLanguageCode: targetLang,
+        SourceLanguageCode: sourceCode,
+        TargetLanguageCode: targetCode,
       });
+      
       const response = await this.translateClient!.send(command);
+      console.log(` Translation successful`);
+      
       return response.TranslatedText || text;
-    } catch (error) {
-      console.error('✗ Translation error:', error);
-      return text;
+    } catch (error: any) {
+      console.error(' Translation API error:', error);
+      
+      // Throw a custom error with a user-friendly message
+      if (error.name === 'NetworkError' || error.message?.includes('network')) {
+        throw new TranslationError('Translation service unavailable. Please check your internet connection.');
+      } else if (error.name === 'CredentialsError') {
+        throw new TranslationError('Authentication failed. Please refresh and try again.');
+      } else {
+        throw new TranslationError('Translation failed. Please try again.');
+      }
     }
   }
 
-  // FIXED: Dynamic translation based on ANY selected languages
   async translateConversation(
     originalText: string,
-    speaker: "Investigator" | "Witness",
+    speaker: SpeakerType,
     investigatorLanguage: string,
-    witnessLanguage: string
+    participantLanguage: string
   ): Promise<{
     investigatorDisplay: string;
-    witnessDisplay: string;
+    participantDisplay: string;
     originalLanguage: string;
+    error?: string; // ✅ NEW: Include error in return
   }> {
-    console.log(`🗣️ Processing: "${speaker}" says: "${originalText}"`);
-    console.log(`🌐 Translation setup - Investigator lang: ${investigatorLanguage}, Witness lang: ${witnessLanguage}`);
+
 
     let investigatorDisplay = originalText;
-    let witnessDisplay = originalText;
-    let originalLanguage = 'auto'; // Let AWS detect the language
+    let participantDisplay = originalText;
+    let originalLanguage = 'auto';
+    let errorMessage: string | undefined;
 
-    if (speaker === "Investigator") {
-      // Investigator speaks, Witness sees translation to witness language
-      // Let AWS detect the source language automatically
-      witnessDisplay = await this.translateText(originalText, 'auto', witnessLanguage);
-      console.log(`   Witness sees (${witnessLanguage}): "${witnessDisplay}"`);
-    } else if (speaker === "Witness") {
-      // Witness speaks, Investigator sees translation to investigator language
-      // Let AWS detect the source language automatically  
-      investigatorDisplay = await this.translateText(originalText, 'auto', investigatorLanguage);
-      console.log(`    👮 Investigator sees (${investigatorLanguage}): "${investigatorDisplay}"`);
+    try {
+      if (speaker === "Investigator") {
+        // Investigator spoke - translate for participant
+        console.log(`👨‍⚖️ Translating for participant...`);
+        participantDisplay = await this.translateText(
+          originalText, 
+          investigatorLanguage, 
+          participantLanguage
+        );
+      } else {
+        // Participant spoke - translate for investigator
+        console.log(`🧑 Translating for investigator...`);
+        investigatorDisplay = await this.translateText(
+          originalText, 
+          participantLanguage, 
+          investigatorLanguage
+        );
+      }
+    } catch (error: any) {
+      console.error(' translateConversation failed:', error);
+      
+      //  Capture error message but continue with original text
+      errorMessage = error instanceof TranslationError 
+        ? error.message 
+        : 'Translation failed. Please try again.';
+      
+      console.warn('⚠️ Displaying original text due to translation error');
     }
 
+    //  Always return result (with original text if translation failed)
     return {
       investigatorDisplay,
-      witnessDisplay,
-      originalLanguage
+      participantDisplay,
+      originalLanguage,
+      error: errorMessage //  Include error if it occurred
     };
   }
 
@@ -104,19 +150,17 @@ class TranslationService {
     return `trans_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
 
-  // NEW: Save translations to S3
   async saveTranslations(data: SaveTranslationRequest): Promise<any> {
     try {
       const endpoint = process.env.REACT_APP_API_ENDPOINT + "/translation/save";
 
-      console.log(' Saving translations to S3...', {
+      console.log('💾 Saving translations to S3...', {
         caseId: data.caseId,
         sessionId: data.sessionId,
         translationCount: data.translations.length,
         metadata: data.metadata
       });
 
-      // Convert Date objects to ISO strings for JSON serialization
       const translationsWithStringDates = data.translations.map(trans => ({
         ...trans,
         timestamp: trans.timestamp.toISOString()
@@ -146,7 +190,7 @@ class TranslationService {
       console.log("Translations saved successfully:", result);
       return result;
     } catch (error) {
-      console.error(" Error saving translations:", error);
+      console.error("Error saving translations:", error);
       throw error;
     }
   }
