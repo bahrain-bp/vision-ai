@@ -34,8 +34,7 @@ class SharedInfrastructureStack(Stack):
                     s3.HttpMethods.DELETE,
                     s3.HttpMethods.HEAD
                 ],
-                allowed_origins=["*"]
-                ,
+                allowed_origins=["*"],
                 allowed_headers=["*"],
                 exposed_headers=["ETag"],
                 max_age=3000

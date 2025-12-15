@@ -349,6 +349,8 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
             "Maximum attempts reached, showing manual override options"
           );
           setShowManualOverride(true);
+          setPreviousDocumentKey(null);
+          setPreviousPersonPhotoKey(null);
           setVerificationState((prev) => ({
             ...prev,
             error: errorMessage,
@@ -696,26 +698,30 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
         />
 
         <div className="space-y-8">
-          <PersonPhotoUpload
-            onFileUpload={handleFileUpload}
-            referencePhoto={identityData.referencePhoto}
-            isVerifying={verificationState.isVerifying}
-            isVerified={identityData.isVerified}
-            fileInputKey={fileInputKey}
-            t={t}
-          />
+          {!showManualOverride && (
+            <>
+              <PersonPhotoUpload
+                onFileUpload={handleFileUpload}
+                referencePhoto={identityData.referencePhoto}
+                isVerifying={verificationState.isVerifying}
+                isVerified={identityData.isVerified}
+                fileInputKey={fileInputKey}
+                t={t}
+              />
 
-          <DocumentUploadSection
-            documentType={documentType}
-            documentDisplayName={documentDisplayName}
-            currentDocument={currentDocument}
-            onDocumentUpload={handleDocumentUpload}
-            onToggleDocumentType={toggleDocumentType}
-            isVerifying={verificationState.isVerifying}
-            isVerified={identityData.isVerified}
-            documentInputKey={documentInputKey}
-            t={t}
-          />
+              <DocumentUploadSection
+                documentType={documentType}
+                documentDisplayName={documentDisplayName}
+                currentDocument={currentDocument}
+                onDocumentUpload={handleDocumentUpload}
+                onToggleDocumentType={toggleDocumentType}
+                isVerifying={verificationState.isVerifying}
+                isVerified={identityData.isVerified}
+                documentInputKey={documentInputKey}
+                t={t}
+              />
+            </>
+          )}
 
           {(verificationState.verificationResult ||
             (showManualOverride &&
