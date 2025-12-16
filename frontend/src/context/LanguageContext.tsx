@@ -56,6 +56,11 @@ const translations = {
     "sessionInfo.translations": "Translations",
     "sessionInfo.avgConfidence": "Avg Confidence",
     "sessionInfo.notVerified": "Not verified yet",
+    "sessionInfo.personType": "Participant Type",
+    "sessionInfo.totalWords": "Total Words",
+    "sessionInfo.investigatorWords": "Total Investigator Words",
+    "sessionInfo.witnessWords": "Total Witness Words",
+    "sessionInfo.currentConfidence": "Current Witness Confidence",
 
     // SessionPage translations
     "session.backToHome": "Back to Home",
@@ -206,15 +211,17 @@ const translations = {
     // RealTimeTranslation translations
     "translation.settingsTitle": "Translation Settings",
     "translation.waiting": "Waiting for transcription...",
-    "translation.waitingForSpeech": "Translation will start automatically when speech is detected",
+    "translation.waitingForSpeech":
+      "Translation will start automatically when speech is detected",
     "translation.demoNote": "Real-time translation from live transcription",
-    "translation.witnessInstruction": "Click 'Witness View' to open translation for witness",
+    "translation.witnessInstruction":
+      "Click 'Witness View' to open translation for witness",
     "translation.pdfTitle": "Investigation Transcript - Translation",
     "translation.exportPDF": "Download PDF",
     "translation.exportWord": "Download Word",
     "translation.exportMarkdown": "Markdown",
     "translation.generating": "Generating...",
-    
+
     "session.witnessView": "Witness View",
     "session.messages": "messages",
     "session.clearAll": "Clear All", 
@@ -249,7 +256,8 @@ const translations = {
     "summarization.generateButton": "Generate Summary",
     "summarization.generating": "Generating Summary...",
     "summarization.generatingMessage": "Generating AI-powered summary...",
-    "summarization.analyzingMessage": "Analyzing session content with Amazon Bedrock Nova Lite",
+    "summarization.analyzingMessage":
+      "Analyzing session content with Amazon Bedrock Nova Lite",
     "summarization.error": "Error",
     "summarization.generatedSummary": "Generated Summary",
     "summarization.summaryMetadata": "Summary Metadata",
@@ -327,6 +335,60 @@ const translations = {
     "evaluation.suggestions": "Suggestions for Improvement:",
     "evaluation.improved": "AI Improved Version:",
     "evaluation.excellentQuestion": "Excellent question! This meets professional investigation standards.",
+
+    //Transcript feature SECTION (Salman Khamis)
+
+    //RealTimeView
+    "session.Transcription_Translation": "Transcription & Translation",
+
+    // TranscriptionSessionSetup translations - ADD THESE
+    "setup.readyToStart": "Ready to Start",
+    "setup.configureSession":
+      "Configure your session settings before starting the recording.",
+    "setup.languageMode": "Language Configuration Mode",
+    "setup.singleLanguage": "Single Language for Entire Session",
+    "setup.singleLanguageDesc":
+      "Everyone speaks the same language. Best for standard investigations.",
+    "setup.separateLanguages": "Separate Languages (Multilingual)",
+    "setup.separateLanguagesDesc":
+      "Investigator and witnesses speak different languages with translation.",
+    "setup.sessionLanguage": "Session Language",
+    "setup.autoDetect": "Auto Detect Multiple Languages",
+    "setup.selectLanguages": "Select Languages to Detect",
+    "setup.chooseLanguages": "Choose languages...",
+    "setup.languagePriority":
+      "Languages are prioritized in order of selection - first selected language gets highest priority",
+    "setup.investigatorLanguage": "Investigator Language",
+    "setup.investigatorLanguageDesc":
+      "Select your language for the investigation",
+    "setup.witnessLanguage": "Witness Language",
+    "setup.witnessLanguageDesc": "Select the witness language",
+    "setup.selectYourLanguage": "Select your language...",
+    "setup.selectWitnessLanguage": "Select witness language...",
+    "setup.speakerMode": "Speaker Detection Mode",
+    "setup.oneOnOne": "One-on-One Interview",
+    "setup.recommended": "Recommended",
+    "setup.oneOnOneDesc":
+      "Standard interview with two speakers (investigator + one participant). Provides the highest accuracy.",
+    "setup.multipleParticipants": "Multiple Participants",
+    "setup.inDevelopment": "In Development",
+    "setup.multipleParticipantsDesc":
+      "For group interviews or when multiple people are present.",
+    "setup.mayProduceInaccurate": "May produce inaccurate results.",
+    "setup.speakerLabelStandard":
+      'Speakers will be labeled as "Investigator" and "Witness" for example.',
+    "setup.speakerLabelMulti":
+      'Speakers will be labeled as "Investigator", "Speaker 0", "Speaker 1", etc. for example.',
+    "setup.startRecording": "Start Recording",
+    "setup.simple": "Simple",
+    "setup.advanced": "Advanced",
+    //LiveTranscription
+    "transcription.title": "Live Transcription",
+    "transcription.initializing": "Initializing recording session...",
+    "transcription.recordingAudioDetected": "Recording Active",
+    "transcription.recordingNoAudio": "Recording / No Audio Input",
+    "transcription.placeholder": "Transcript will appear here...",
+    "transcription.copyAll": "Copy All",
   },
   ar: {
     // HomePage translations
@@ -374,7 +436,8 @@ const translations = {
     "session.language": "لغة",
     "session.pause": "إيقاف مؤقت",
     "session.resume": "استئناف",
-    "session.reset": "إعادة تعيين",
+    "session.reset": "إعادة النص",
+
     "session.endSession": "إنهاء الجلسة",
     "session.realTime": "ترجمة الجلسة المرئية",
     "session.processing": "المعالجة",
@@ -388,14 +451,20 @@ const translations = {
     "sessionInfo.statistics": "الإحصائيات",
     "sessionInfo.words": "الكلمات",
     "sessionInfo.translations": "الترجمات",
-    "sessionInfo.avgConfidence": "متوسط الدقة",
+    "sessionInfo.avgConfidence": "متوسط ثقة",
+
     "sessionInfo.notVerified": "لم يتم التحقق بعد",
+    "sessionInfo.personType": "نوع المشارك",
+    "sessionInfo.totalWords": "إجمالي الكلمات",
+    "sessionInfo.investigatorWords": "إجمالي كلمات المحقق",
+    "sessionInfo.witnessWords": "إجمالي كلمات المشارك",
+    "sessionInfo.currentConfidence": "ثقة المشارك الحالية",
 
     // Identity Verification translations
     "identity.title": "التحقق من الهوية",
     "identity.personType": "نوع الشخص",
-    "identity.witness": "الشاهد",
-    "identity.accused": "المتهم",
+    "identity.witness": "المشارك",
+    "identity.accused": "متهم",
     "identity.nationality": "الجنسية",
     "identity.verificationAttempts": "محاولات التحقق",
     "identity.remainingAttempts": "محاولة متبقية",
@@ -525,7 +594,8 @@ const translations = {
     "translation.waiting": "بانتظار الترجمة...",
     "translation.waitingForSpeech": "ستبدأ الترجمة تلقائيًا عند التحدث",
     "translation.demoNote": "ترجمة فورية من النص المباشر",
-    "translation.witnessInstruction": "انقر على 'شاشة المشارك' لفتح الترجمة للمشارك",
+    "translation.witnessInstruction":
+      "انقر على 'شاشة المشارك' لفتح الترجمة للمشارك",
     "translation.pdfTitle": "نسخة التحقيق - الترجمة",
     "translation.exportPDF": "PDF تحميل",
     "translation.exportWord": "Word تحميل",
@@ -535,7 +605,7 @@ const translations = {
     "session.witnessView": "شاشة المشارك",
     "session.messages": "رسائل",
     "session.clearAll": "مسح الكل",
-    
+
     // PDFExporter translations
     "pdf.downloadPdf": "PDF تحميل",
     "pdf.downloadWord": "Word تحميل",
@@ -553,7 +623,8 @@ const translations = {
     "summarization.customization": "تخصيص الملخص",
     "summarization.usingLiveTranscript": "استخدام النص المباشر",
     "summarization.characters": "حرف",
-    "summarization.noLiveTranscript": "لا يوجد نص مباشر - استخدام البيانات التجريبية",
+    "summarization.noLiveTranscript":
+      "لا يوجد نص مباشر - استخدام البيانات التجريبية",
     "summarization.summaryLanguage": "لغة الملخص",
     "summarization.summaryLength": "طول الملخص",
     "summarization.english": "الإنجليزية",
@@ -565,7 +636,8 @@ const translations = {
     "summarization.generateButton": "إنشاء الملخص",
     "summarization.generating": "جارٍ إنشاء الملخص...",
     "summarization.generatingMessage": "جارٍ إنشاء ملخص بالذكاء الاصطناعي...",
-    "summarization.analyzingMessage": "تحليل محتوى الجلسة باستخدام Amazon Bedrock Nova Lite",
+    "summarization.analyzingMessage":
+      "تحليل محتوى الجلسة باستخدام Amazon Bedrock Nova Lite",
     "summarization.error": "خطأ",
     "summarization.generatedSummary": "الملخص المُنشأ",
     "summarization.summaryMetadata": "بيانات الملخص",
@@ -642,8 +714,62 @@ const translations = {
     "evaluation.suggestions": "اقتراحات للتحسين:",
     "evaluation.improved": "النسخة المحسنة:",
     "evaluation.excellentQuestion": "سؤال ممتاز! يستوفي هذا معايير التحقيق المهنية.",
+
+    //Transcript feature SECTION (Salman Khamis)
+
+    //Real time
+    "session.Transcription_Translation": "التفريغ النص والترجمة",
+
+    // TranscriptionSessionSetup translations - ADD THESE
+    "setup.readyToStart": "جاهز للبدء",
+    "setup.configureSession": "قم بتكوين إعدادات الجلسة قبل بدء التسجيل.",
+    "setup.languageMode": "وضع تكوين اللغة",
+    "setup.singleLanguage": "لغة واحدة للجلسة بأكملها",
+    "setup.singleLanguageDesc":
+      "الجميع يتحدث نفس اللغة. الأفضل للتحقيقات القياسية.",
+    "setup.separateLanguages": "لغات منفصلة (متعدد اللغات)",
+    "setup.separateLanguagesDesc":
+      "المحقق والشهود يتحدثون لغات مختلفة مع الترجمة.",
+    "setup.sessionLanguage": "لغة الجلسة",
+    "setup.autoDetect": "الكشف التلقائي عن اللغات المتعددة",
+    "setup.selectLanguages": "اختر اللغات المراد اكتشافها",
+    "setup.chooseLanguages": "اختر اللغات...",
+    "setup.languagePriority":
+      "يتم ترتيب اللغات حسب أولوية الاختيار - اللغة الأولى المختارة لها الأولوية القصوى",
+    "setup.investigatorLanguage": "لغة المحقق",
+    "setup.investigatorLanguageDesc": "اختر لغتك للتحقيق",
+    "setup.witnessLanguage": "لغة المشارك",
+    "setup.witnessLanguageDesc": "اختر لغة المشارك",
+    "setup.selectYourLanguage": "اختر لغتك...",
+    "setup.selectWitnessLanguage": "اختر لغة المشارك...",
+    "setup.speakerMode": "وضع اكتشاف المتحدث",
+    "setup.oneOnOne": "مقابلة فردية",
+    "setup.recommended": "موصى به بشدة",
+    "setup.oneOnOneDesc":
+      "مقابلة فردية بين شخصين فقط (محقق ومشارك واحد)، وتوفر أعلى دقة في التفريغ النصي.",
+    "setup.multipleParticipants": "مشاركون متعددون",
+    "setup.inDevelopment": "قيد التطوير",
+    "setup.multipleParticipantsDesc":
+      "للمقابلات الجماعية أو عند وجود عدة أشخاص.",
+    "setup.mayProduceInaccurate": "قد ينتج نتائج غير دقيقة.",
+    "setup.speakerLabelStandard":
+      'سيتم تصنيف المتحدثين كـ "محقق" و "المشارك" على سبيل المثال.',
+    "setup.speakerLabelMulti":
+      'سيتم تصنيف المتحدثين كـ "محقق" و "متحدث 0" و "متحدث 1" وما إلى ذلك على سبيل المثال.',
+    "setup.startRecording": "بدء التسجيل",
+    "setup.simple": "بسيط",
+    "setup.advanced": "متقدم",
+
+    //LiveTranscription
+    "transcription.title": "التفريغ النص المباشر",
+    "transcription.initializing": "جارٍ تهيئة جلسة التسجيل...",
+    "transcription.recordingAudioDetected": "جاري التسجيل",
+    "transcription.recordingNoAudio": "جاري التسجيل / لا يوجد إدخال صوتي",
+    "transcription.placeholder": "سيظهر النص هنا...",
+    "transcription.copyAll": "نسخ الكل",
   },
 };
+
 
 const LanguageContext = createContext<LanguageContextType | undefined>(
   undefined

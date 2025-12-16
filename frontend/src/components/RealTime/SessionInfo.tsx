@@ -2,6 +2,7 @@ import React from "react";
 import { FileText } from "lucide-react";
 import { useCaseContext } from "../../hooks/useCaseContext";
 import { useTranscription } from "../../hooks/useTranscription";
+import { useLanguage } from "../../context/LanguageContext";
 interface SessionData {
   sessionId: string;
   participant: string;
@@ -17,6 +18,8 @@ interface SessionInfoProps {
 const SessionInfo: React.FC<SessionInfoProps> = ({ sessionData }) => {
   const { currentPersonName, currentPersonType } = useCaseContext();
   const { transcriptStats } = useTranscription();
+    const { t } = useLanguage();
+  
   const getConfidenceClass = (confidence: number) => {
     if (confidence >= 95) return "confidence-excellent";
     if (confidence >= 85) return "confidence-high";
@@ -35,49 +38,53 @@ const SessionInfo: React.FC<SessionInfoProps> = ({ sessionData }) => {
     <div className="session-info-card">
       <div className="card-header">
         <FileText className="header-icon" />
-        <h3 className="card-title">Session Info</h3>
+        <h3 className="card-title">{t("sessionInfo.title")}</h3>
       </div>
 
       <div className="info-content">
         <div className="info-item">
-          <p className="info-label">Participant Name:</p>
+          <p className="info-label">{t("sessionInfo.participantName")}:</p>
           <p className="info-value">{participantName}</p>
         </div>
 
         <div className="info-item">
-          <p className="info-label">Participant Type:</p>
+          <p className="info-label">{t("sessionInfo.personType")}:</p>
           <p className="info-value">{participantType}</p>
         </div>
 
         <div className="info-item">
-          <p className="info-label">Session ID:</p>
+          <p className="info-label">{t("sessionInfo.sessionId")}:</p>
           <p className="info-value">{sessionData.sessionId}</p>
         </div>
 
         <div className="info-item">
-          <p className="info-label">Duration:</p>
+          <p className="info-label">{t("sessionInfo.duration")}:</p>
           <p className="info-value">{sessionData.duration}</p>
         </div>
 
         <div className="info-divider"></div>
 
         <div className="stats-section">
-          <p className="stats-label">Statistics:</p>
+          <p className="stats-label">{t("sessionInfo.statistics")}:</p>
           <div className="stats-grid">
             <div className="stat-item">
-              <span className="stat-label">Total Words:</span>
+              <span className="stat-label">{t("sessionInfo.totalWords")}:</span>
               <span className="stat-value">
                 {transcriptStats.totalWordCount}
               </span>
             </div>
             <div className="stat-item">
-              <span className="stat-label">Total Investigator Words:</span>
+              <span className="stat-label">
+                {t("sessionInfo.investigatorWords")}:
+              </span>
               <span className="stat-value">
                 {transcriptStats.investigatorWordCount ?? 0}
               </span>
             </div>
             <div className="stat-item">
-              <span className="stat-label">Total Witness Words:</span>
+              <span className="stat-label">
+                {t("sessionInfo.witnessWords")}:
+              </span>
               <span className="stat-value">
                 {transcriptStats.witnessWordCount ?? 0}
               </span>
@@ -89,7 +96,9 @@ const SessionInfo: React.FC<SessionInfoProps> = ({ sessionData }) => {
                 </div>
               */}
             <div className="stat-item">
-              <span className="stat-label">Current Witness Confidence:</span>
+              <span className="stat-label">
+                {t("sessionInfo.currentConfidence")}:
+              </span>
               <span
                 className={`stat-value ${getConfidenceClass(
                   transcriptStats.curWitnessConfidenceLevel * 100
@@ -99,7 +108,9 @@ const SessionInfo: React.FC<SessionInfoProps> = ({ sessionData }) => {
               </span>
             </div>
             <div className="stat-item">
-              <span className="stat-label">Average Witness Confidence:</span>
+              <span className="stat-label">
+                {t("sessionInfo.avgConfidence")}:
+              </span>
               <span
                 className={`stat-value ${getConfidenceClass(
                   transcriptStats.avgWitnessConfidenceLevel * 100

@@ -337,7 +337,7 @@ const SessionPageContent: React.FC<SessionPageProps & {
                     }}
                   >
                     {isPaused ? <Play size={16} /> : <Pause size={16} />}
-                    {isPaused ? "Resume" : "Pause"}
+                    {isPaused ? t("session.resume") : t("session.pause")}
                   </button>
 
                   <button
@@ -360,14 +360,14 @@ const SessionPageContent: React.FC<SessionPageProps & {
                     }}
                   >
                     <RotateCcw size={16} />
-                    Reset
+                    {t("session.reset")}
                   </button>
 
                   <button
                     onClick={handleEndSession}
                     className="end-session-btn"
                   >
-                    End Session
+                    {t("session.endSession")}
                   </button>
                 </>
               )}

@@ -348,7 +348,7 @@ class TranscribeService {
         ShowSpeakerLabel: source === "display" && speakerMode === "multi",
         AudioStream: this.getAudioStream(microphoneStream, sampleRate),
       });
-
+      console.table(command);
     try {
       // Send connection request to AWS Transcribe
       const data: StartStreamTranscriptionCommandOutput =
