@@ -83,8 +83,10 @@ def handle_verification_request(event, context):
         logger.error(f"Maximum verification attempts exceeded: {attempt_number}")
         return error_response(400, 'Maximum verification attempts (3) exceeded. Please use manual override or end session.')
 
+    is_dummy_key = 'manual-override' in document_key or 'manual-override' in person_photo_key
+
     # Prevent using same file for document and person photo
-    if document_key == person_photo_key:
+    if document_key == person_photo_key and not is_dummy_key:
         logger.error("The documentKey and personPhotoKey cannot be the same file.")
         return error_response(400, "The document and person photo must be different files. Please upload distinct images.")
 
@@ -95,29 +97,31 @@ def handle_verification_request(event, context):
             return error_response(400, 'overrideReason must be at least 10 characters when manualOverride is true')
 
     # Verify files exist in S3
-    logger.info("\n--- Verifying S3 objects exist ---")
-    if not verify_s3_object_exists(document_key):
-        return error_response(404, f'Document not found in S3: {document_key}')
-    
-    if not verify_s3_object_exists(person_photo_key):
-        return error_response(404, f'Person photo not found in S3: {person_photo_key}')
-    
-        # Validate file extensions
-    logger.info("\n--- Validating file extensions ---")
-    allowed_extensions = ['.jpg', '.jpeg', '.png']
+    if not (manual_override and is_dummy_key):
+        logger.info("\n--- Verifying S3 objects exist ---")
+        if not verify_s3_object_exists(document_key):
+            return error_response(404, f'Document not found in S3: {document_key}')
+        
+        if not verify_s3_object_exists(person_photo_key):
+            return error_response(404, f'Person photo not found in S3: {person_photo_key}')
+        
+            # Validate file extensions
+        logger.info("\n--- Validating file extensions ---")
+        allowed_extensions = ['.jpg', '.jpeg', '.png']
 
-    document_ext = os.path.splitext(document_key)[1].lower()
-    if document_ext not in allowed_extensions:
-        logger.error(f"Invalid document file extension: {document_ext}")
-        return error_response(400, f'Invalid document file type. Only JPG, JPEG, and PNG files are allowed. Uploaded: {document_ext}')
+        document_ext = os.path.splitext(document_key)[1].lower()
+        if document_ext not in allowed_extensions:
+            logger.error(f"Invalid document file extension: {document_ext}")
+            return error_response(400, f'Invalid document file type. Only JPG, JPEG, and PNG files are allowed. Uploaded: {document_ext}')
 
-    person_photo_ext = os.path.splitext(person_photo_key)[1].lower()
-    if person_photo_ext not in allowed_extensions:
-        logger.error(f"Invalid person photo file extension: {person_photo_ext}")
-        return error_response(400, f'Invalid person photo file type. Only JPG, JPEG, and PNG files are allowed. Uploaded: {person_photo_ext}')
+        person_photo_ext = os.path.splitext(person_photo_key)[1].lower()
+        if person_photo_ext not in allowed_extensions:
+            logger.error(f"Invalid person photo file extension: {person_photo_ext}")
+            return error_response(400, f'Invalid person photo file type. Only JPG, JPEG, and PNG files are allowed. Uploaded: {person_photo_ext}')
 
-    logger.info(f"✓ File extensions validated - Document: {document_ext}, Photo: {person_photo_ext}")
-    
+        logger.info(f"✓ File extensions validated - Document: {document_ext}, Photo: {person_photo_ext}")
+    else:
+        logger.info("\n--- Skipping file validation (manual override with dummy keys) ---")
     # STEP 1: Extract CPR and Name OR Use Manual Data
     logger.info("\n" + "=" * 60)
     logger.info("STEP 1: Processing document data")

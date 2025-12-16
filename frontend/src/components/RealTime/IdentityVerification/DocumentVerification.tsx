@@ -290,8 +290,8 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
           currentAttempt
         );
 
-      setPreviousDocumentKey(result.verificationSummaryKey);
-      setPreviousPersonPhotoKey(result.verificationSummaryKey);
+      setPreviousDocumentKey(null);
+      setPreviousPersonPhotoKey(null);
 
       const photoReader = new FileReader();
       photoReader.onloadend = () => {
@@ -349,6 +349,8 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
             "Maximum attempts reached, showing manual override options"
           );
           setShowManualOverride(true);
+          setPreviousDocumentKey(null);
+          setPreviousPersonPhotoKey(null);
           setVerificationState((prev) => ({
             ...prev,
             error: errorMessage,
@@ -422,14 +424,14 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
       return;
     }
 
-    if (!identityData.referencePhoto || !currentDocument) {
-      setVerificationState((prev) => ({
-        ...prev,
-        error:
-          "Please upload both a person photo and document to proceed with manual override.",
-      }));
-      return;
-    }
+    // if (!identityData.referencePhoto || !currentDocument) {
+    //   setVerificationState((prev) => ({
+    //     ...prev,
+    //     error:
+    //       "Please upload both a person photo and document to proceed with manual override.",
+    //   }));
+    //   return;
+    // }
 
     setVerificationState((prev) => ({
       ...prev,
@@ -453,43 +455,21 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
 
       if (!documentKey || !personPhotoKey) {
         console.log(
-          "No previous upload keys found, uploading files for manual override..."
+          "No previous upload keys found, using dummy keys for manual override..."
         );
 
-        try {
-          documentKey = await IdentityVerificationService.uploadDocument(
-            caseId,
-            sessionId,
-            currentDocument
-          );
-          console.log("Document uploaded for manual override:", documentKey);
-        } catch (uploadError) {
-          console.warn(
-            "Document upload failed for manual override:",
-            uploadError
-          );
-          documentKey = `manual-override-document-${Date.now()}`;
-        }
+        // For manual override, use dummy keys instead of trying to upload
+        documentKey = `document-manual-override-${Date.now()}.json`;
+        personPhotoKey = `person-manual-override-${Date.now()}.json`;
 
-        try {
-          personPhotoKey = await IdentityVerificationService.uploadPersonPhoto(
-            caseId,
-            sessionId,
-            identityData.referencePhoto,
-            personType
-          );
-          console.log(
-            "Person photo uploaded for manual override:",
-            personPhotoKey
-          );
-        } catch (uploadError) {
-          console.warn(
-            "Person photo upload failed for manual override:",
-            uploadError
-          );
-          personPhotoKey = `manual-override-photo-${Date.now()}`;
-        }
+        console.log("Using dummy keys:", { documentKey, personPhotoKey });
       }
+
+      console.log("DEBUG - Keys before API call:", {
+        documentKey,
+        personPhotoKey,
+        areEqual: documentKey === personPhotoKey,
+      });
 
       const result = await IdentityVerificationService.verifyIdentity({
         caseId,
@@ -696,26 +676,30 @@ const DocumentVerification: React.FC<DocumentVerificationProps> = ({
         />
 
         <div className="space-y-8">
-          <PersonPhotoUpload
-            onFileUpload={handleFileUpload}
-            referencePhoto={identityData.referencePhoto}
-            isVerifying={verificationState.isVerifying}
-            isVerified={identityData.isVerified}
-            fileInputKey={fileInputKey}
-            t={t}
-          />
+          {!showManualOverride && (
+            <>
+              <PersonPhotoUpload
+                onFileUpload={handleFileUpload}
+                referencePhoto={identityData.referencePhoto}
+                isVerifying={verificationState.isVerifying}
+                isVerified={identityData.isVerified}
+                fileInputKey={fileInputKey}
+                t={t}
+              />
 
-          <DocumentUploadSection
-            documentType={documentType}
-            documentDisplayName={documentDisplayName}
-            currentDocument={currentDocument}
-            onDocumentUpload={handleDocumentUpload}
-            onToggleDocumentType={toggleDocumentType}
-            isVerifying={verificationState.isVerifying}
-            isVerified={identityData.isVerified}
-            documentInputKey={documentInputKey}
-            t={t}
-          />
+              <DocumentUploadSection
+                documentType={documentType}
+                documentDisplayName={documentDisplayName}
+                currentDocument={currentDocument}
+                onDocumentUpload={handleDocumentUpload}
+                onToggleDocumentType={toggleDocumentType}
+                isVerifying={verificationState.isVerifying}
+                isVerified={identityData.isVerified}
+                documentInputKey={documentInputKey}
+                t={t}
+              />
+            </>
+          )}
 
           {(verificationState.verificationResult ||
             (showManualOverride &&
