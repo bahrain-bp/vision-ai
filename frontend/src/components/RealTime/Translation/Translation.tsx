@@ -3,7 +3,7 @@ import { useRealTimeTranslation } from '../../../hooks/useRealTimeTranslation';
 import { Globe, Eye } from 'lucide-react'; 
 import TranslationSettings from './TranslationSettings';
 import PDFExporter from './TranslationPDFExporter';
-import TranslationErrorDisplay from './TranslationErrorDisplay'; // 👈 ADDED
+import TranslationErrorDisplay from './TranslationErrorDisplay'; 
 import { useLanguage } from '../../../context/LanguageContext';
 
 interface TranslationSettings {
@@ -16,7 +16,7 @@ const Translation: React.FC = () => {
     translations,
     isTranslating, 
     error,
-    clearError, // 👈 ADDED
+    clearError, 
     investigatorLanguage,
     participantLanguage,
     setInvestigatorLanguage,
@@ -60,10 +60,10 @@ const Translation: React.FC = () => {
     }
   };
 
-  // 👇 ADDED: Handle retry
+  //  Handle retry
   const handleRetry = () => {
     clearError();
-    // Optional: You could trigger a re-translation of the last failed segment here
+    // You could trigger a re-translation of the last failed segment here
     console.log('🔄 Retrying translation...');
   };
 
@@ -76,7 +76,7 @@ const Translation: React.FC = () => {
         </div>
       </div>
 
-      {/* 👇 ADDED: Error display BEFORE TranslationSettings */}
+      {/*  Error display BEFORE TranslationSettings */}
       <TranslationErrorDisplay 
         error={error}
         onDismiss={clearError}
