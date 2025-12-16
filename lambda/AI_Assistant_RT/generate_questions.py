@@ -92,7 +92,6 @@ def lambda_handler(event, context):
         print(f"ERROR: Question generation failed: {str(e)}")
         return error_response(500, f"Question generation failed: {str(e)}")
 
-
 def build_bedrock_prompt(case_summary, victim_testimony, current_transcript, 
                          person_type, language, question_count, previous_questions):
     """
@@ -281,6 +280,8 @@ All questions, explanations, and categories MUST be in English only."""
         "- motivation: Understanding reasons or intent",
         "- contradiction: Identifying inconsistencies between testimonies or within same testimony",  
         "",
+        "⚠️ CRITICAL: You MUST use ONLY these 5 category names. Do NOT create new categories.",
+        "",
         "=== CONFIDENCE SCORING (AI System Certainty) ===",
         "",
         "Rate how confident the AI system is that this question is well-formed and relevant:",
@@ -334,7 +335,6 @@ All questions, explanations, and categories MUST be in English only."""
     ])
     
     return "\n".join(prompt_parts)
-
 
 def generate_unique_questions(case_summary, victim_testimony, current_transcript,
                               person_type, language, required_count, previous_questions, temperature):
@@ -430,10 +430,9 @@ def generate_unique_questions(case_summary, victim_testimony, current_transcript
     
     return final_questions
 
-
 def invoke_bedrock(prompt, temperature=DEFAULT_TEMPERATURE):
     """
-    Call Amazon Bedrock Nova Lite model with custom temperature.
+    Call Amazon Bedrock Nova Lite model with custom temperature and category validation.
     """
     
     request_body = {
@@ -466,13 +465,95 @@ def invoke_bedrock(prompt, temperature=DEFAULT_TEMPERATURE):
         content = response_body.get('output', {}).get('message', {}).get('content', [])
         
         if content and len(content) > 0:
-            return content[0].get('text', '')
+            raw_text = content[0].get('text', '')
+            
+            # ✅ VALIDATE AND FIX CATEGORIES BEFORE RETURNING
+            validated_text = validate_and_fix_categories(raw_text)
+            
+            return validated_text
         
         raise Exception("No content in Bedrock response")
         
     except Exception as e:
         print(f"ERROR: Bedrock invocation failed: {str(e)}")
         raise
+
+
+def validate_and_fix_categories(bedrock_text):
+    """
+    Validate that all question categories are in the allowed list.
+    If not, map invalid categories to valid ones.
+    
+    Allowed categories: clarification, verification, timeline, motivation, contradiction
+    
+    Args:
+        bedrock_text: Raw JSON text from Bedrock
+        
+    Returns:
+        Corrected JSON text with valid categories
+    """
+    
+    VALID_CATEGORIES = ['clarification', 'verification', 'timeline', 'motivation', 'contradiction']
+    
+    # Category mapping for common invalid categories
+    CATEGORY_MAPPING = {
+        'credibility': 'verification',
+        'evidence': 'verification',
+        'behavioral': 'clarification',
+        'detail': 'clarification',
+        'factual': 'verification',
+        'consistency': 'contradiction',
+        'corroboration': 'verification',
+        'observation': 'verification',
+        'background': 'clarification',
+        'context': 'clarification'
+    }
+    
+    try:
+        # Clean markdown if present
+        cleaned_text = bedrock_text.strip()
+        if cleaned_text.startswith('```json'):
+            cleaned_text = cleaned_text[7:]
+        if cleaned_text.startswith('```'):
+            cleaned_text = cleaned_text[3:]
+        if cleaned_text.endswith('```'):
+            cleaned_text = cleaned_text[:-3]
+        cleaned_text = cleaned_text.strip()
+        
+        # Parse JSON
+        questions_data = json.loads(cleaned_text)
+        
+        # Validate and fix categories
+        fixed_count = 0
+        for question in questions_data:
+            original_category = question.get('category', '').lower()
+            
+            # Check if category is valid
+            if original_category not in VALID_CATEGORIES:
+                # Try to map to valid category
+                mapped_category = CATEGORY_MAPPING.get(original_category, 'clarification')
+                
+                if LOG_LEVEL == 'INFO':
+                    print(f"⚠️ CATEGORY FIX: '{original_category}' → '{mapped_category}'")
+                    print(f"   Question: {question.get('text', '')[:80]}...")
+                
+                question['category'] = mapped_category
+                fixed_count += 1
+        
+        if fixed_count > 0 and LOG_LEVEL == 'INFO':
+            print(f"✅ Fixed {fixed_count} invalid categor{'y' if fixed_count == 1 else 'ies'}")
+        
+        # Return corrected JSON as string
+        return json.dumps(questions_data)
+        
+    except json.JSONDecodeError:
+        # If JSON parsing fails, return original text (parse_bedrock_response will handle error)
+        if LOG_LEVEL == 'INFO':
+            print("WARN: Could not parse JSON for category validation, returning original")
+        return bedrock_text
+    except Exception as e:
+        print(f"ERROR: Category validation failed: {str(e)}")
+        return bedrock_text
 
 
 def calculate_similarity(q1: str, q2: str) -> float:
@@ -497,7 +578,6 @@ def calculate_similarity(q1: str, q2: str) -> float:
     union = len(q1_words.union(q2_words))
     
     return intersection / union if union > 0 else 0.0
-
 
 def remove_duplicate_questions(new_questions: list, previous_questions: list, similarity_threshold: float = 0.55) -> list:
     """
@@ -551,7 +631,6 @@ def remove_duplicate_questions(new_questions: list, previous_questions: list, si
                 print(f"❌ Filtered duplicate: {new_text[:100]}")
     
     return filtered
-
 
 def parse_bedrock_response(bedrock_text, expected_count, previous_questions=None):
     """
@@ -620,7 +699,6 @@ def parse_bedrock_response(bedrock_text, expected_count, previous_questions=None
         print(f"Raw response: {bedrock_text}")
         raise Exception("Failed to parse AI response")
 
-
 def error_response(status_code, message):
     """Return error response"""
     return {
@@ -631,7 +709,6 @@ def error_response(status_code, message):
             'error': message
         })
     }
-
 
 def get_cors_headers():
     """Return CORS headers for API Gateway"""
