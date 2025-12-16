@@ -1,7 +1,7 @@
 import React from 'react';
 import { CheckCircle } from 'lucide-react';
 import { useLanguage } from '../../../context/LanguageContext';
-import TranslationPDFExporter from '../TranslationPDFExporter';
+import TranslationPDFExporter from '../Translation/TranslationPDFExporter';
 
 /*
  * SummaryDisplay

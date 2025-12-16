@@ -50,31 +50,49 @@ interface SessionPageProps {
 
 type MainTab = "real-time" | "processing";
 
-// OUTER COMPONENT - Only provides the context
+// OUTER COMPONENT - Manages translation languages and provides context
 const SessionPage: React.FC<SessionPageProps> = ({
   user,
   onSignOut,
   sessionData,
   onEndSession,
 }) => {
+  // State for translation languages - starts with defaults but can be updated
+  const [investigatorLang, setInvestigatorLang] = useState<string>(
+    sessionData?.translationSettings?.targetLanguage || "en-US"
+  );
+  const [participantLang, setParticipantLang] = useState<string>(
+    sessionData?.translationSettings?.sourceLanguage || "ar-SA"
+  );
+
   return (
-    <TranslationProvider investigatorLanguage="en" witnessLanguage="ar">
+    <TranslationProvider 
+      investigatorLanguage={investigatorLang} 
+      witnessLanguage={participantLang}
+    >
       <SessionPageContent
         user={user}
         onSignOut={onSignOut}
         sessionData={sessionData}
         onEndSession={onEndSession}
+        onLanguageChange={(inv, part) => {
+          setInvestigatorLang(inv);
+          setParticipantLang(part);
+        }}
       />
     </TranslationProvider>
   );
 };
 
 // INNER COMPONENT - Has all the logic and uses the hook
-const SessionPageContent: React.FC<SessionPageProps> = ({
+const SessionPageContent: React.FC<SessionPageProps & {
+  onLanguageChange: (investigator: string, participant: string) => void;
+}> = ({
   user,
   onSignOut,
   sessionData,
   onEndSession,
+  onLanguageChange,
 }) => {
   const { t } = useLanguage();
   const {
@@ -93,7 +111,7 @@ const SessionPageContent: React.FC<SessionPageProps> = ({
   const { stopRecording, toggleRecordingPause, toggleReset } =
     useTranscription();
   
-  const { saveTranslationsToS3 } = useRealTimeTranslation();
+  const { saveTranslationsToS3, clearConversation } = useRealTimeTranslation();
   const { language: contextLanguage } = useLanguage();
 
   const [language, setLanguage] = useState<"en" | "ar">(contextLanguage);
@@ -107,8 +125,8 @@ const SessionPageContent: React.FC<SessionPageProps> = ({
 
   const [setupData, setSetupData] = useState<SetupData>({
     translationSettings: {
-      sourceLanguage: sessionData?.translationSettings?.sourceLanguage || "ar",
-      targetLanguage: sessionData?.translationSettings?.targetLanguage || "en",
+      sourceLanguage: sessionData?.translationSettings?.sourceLanguage || "ar-SA",
+      targetLanguage: sessionData?.translationSettings?.targetLanguage || "en-US",
     },
   });
 
@@ -155,11 +173,17 @@ const SessionPageContent: React.FC<SessionPageProps> = ({
   const handleEndSession = async () => {
     stopRecording(setSessionState);
 
-    await saveTranslationsToS3();
+    try {
+        await saveTranslationsToS3();
+    } catch (error) {
+        console.error('Failed to save translations to S3:', error);
+    }
+
+
+    clearConversation();
 
     if (currentSession && currentCase) {
       try {
-        
         await updateSessionStatus(
           currentCase.caseId,
           currentSession.sessionId,
@@ -169,7 +193,7 @@ const SessionPageContent: React.FC<SessionPageProps> = ({
         console.error("Failed to update session status:", error);
       }
     }
-
+    
     // Trigger switch to summarization tab
     setTriggerSummarization(true);
   };
@@ -191,13 +215,23 @@ const SessionPageContent: React.FC<SessionPageProps> = ({
     field: keyof TranslationSettings,
     value: string
   ) => {
-    setSetupData((prev) => ({
-      ...prev,
-      translationSettings: {
-        ...prev.translationSettings,
-        [field]: value,
-      },
-    }));
+    setSetupData((prev) => {
+      const updated = {
+        ...prev,
+        translationSettings: {
+          ...prev.translationSettings,
+          [field]: value,
+        },
+      };
+      
+      // Update the parent component's language state
+      onLanguageChange(
+        field === 'targetLanguage' ? value : updated.translationSettings.targetLanguage,
+        field === 'sourceLanguage' ? value : updated.translationSettings.sourceLanguage
+      );
+      
+      return updated;
+    });
   };
 
   const sessionCreationAttempted = React.useRef(false);

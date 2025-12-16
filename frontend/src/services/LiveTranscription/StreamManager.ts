@@ -69,6 +69,7 @@ class StreamManager {
     return this.sampleRate;
   }
 
+  // Validates microphone audio stream status before transcription
   getAudioStreamStatus(): {
     isActive: boolean;
     hasAudioTracks: boolean;
@@ -85,9 +86,12 @@ class StreamManager {
     const audioTracks = this.audioStream.getAudioTracks();
     const isActive = this.audioStream.active;
     const hasAudioTracks = audioTracks.length > 0;
+
+    // Verify all tracks are enabled and live
     const allTracksEnabled = audioTracks.every(
       (track) => track.enabled && track.readyState === "live"
     );
+
     return {
       isActive,
       hasAudioTracks,
@@ -102,6 +106,7 @@ class StreamManager {
     };
   }
 
+  // Validates screen capture stream status including optional audio
   getDisplayStreamStatus(): {
     isActive: boolean;
     hasVideoTracks: boolean;
@@ -122,6 +127,8 @@ class StreamManager {
     const isActive = this.displayStream.active;
     const hasVideoTracks = videoTracks.length > 0;
     const hasAudioTracks = audioTracks.length > 0;
+
+    // Check if video tracks are enabled and live
     const allTracksLive = videoTracks.every(
       (track) => track.enabled && track.readyState === "live"
     );

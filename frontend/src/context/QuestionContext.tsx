@@ -1,30 +1,45 @@
 // React Context for managing AI Question Generation state and logic
-
-import React, { createContext, useState, useCallback, ReactNode } from 'react';
+import React, { createContext, useState, useCallback, useMemo, useContext, ReactNode } from 'react';
+import { TranscriptionContext } from './TranscriptionContext';
+import { CaseContext } from './CaseContext';
 import {
-  Question,
   QuestionAttempt,
   QuestionMetrics,
   QuestionGenerationContext,
+  SaveQuestionsRequest,
 } from '../types';
+import questionService from '../services/AIAssistant/questionServiceRT';
 
 // ============================================
 // CONTEXT TYPE DEFINITION
 // ============================================
-
-export interface QuestionContextType {        // This basically shows what this context will provide
+export interface QuestionContextType {
   // ========== STATE ==========
-  attempts: QuestionAttempt[];              // All generation attempts in this session
-  currentAttemptIndex: number;              // Index of currently displayed attempt
-  currentAttempt: QuestionAttempt | null;   // Currently displayed attempt (computed)
-  selectedQuestionIds: string[];            // IDs of selected questions in current attempt
-  metrics: QuestionMetrics;                 // Session-wide metrics
-  isLoading: boolean;                       // Is API call in progress?
-  error: string | null;                     // Error message if generation failed
+  attempts: QuestionAttempt[];
+  currentAttemptIndex: number;
+  currentAttempt: QuestionAttempt | null;
+  selectedQuestionIds: string[];
+  metrics: QuestionMetrics;
+  isLoading: boolean;
+  error: string | null;
+  canGenerate: boolean;
+
+  // ✨ NEW
+  generateFinalHTMLReport: (
+    caseId: string,
+    sessionId: string,
+    metadata: {
+      investigator: string;
+      personType: string;
+      personName: string;
+      sessionDate: string;
+    }
+  ) => Promise<{ success: boolean; data?: any; error?: any }>;
+
 
   // ========== ACTIONS ==========
   generateQuestions: (context: QuestionGenerationContext) => Promise<void>;
-  confirmAttempt: () => void;
+  confirmAttempt: () => Promise<void>;
   retryWithSelection: (context: QuestionGenerationContext) => Promise<void>;
   navigateToAttempt: (index: number) => void;
   selectQuestion: (questionId: string) => void;
@@ -35,15 +50,34 @@ export interface QuestionContextType {        // This basically shows what this 
 // ============================================
 // CREATE CONTEXT
 // ============================================
-
 const QuestionContext = createContext<QuestionContextType | undefined>(undefined);
 
 // ============================================
 // PROVIDER COMPONENT
 // ============================================
-
 export const QuestionProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  // ========== TRANSCRIPTION CONTEXT ==========
+  const transcriptionContext = useContext(TranscriptionContext);
   
+  if (!transcriptionContext) {
+    throw new Error('QuestionProvider must be used within TranscriptionProvider');
+  }
+  
+  const { recordingStatus, getFullTranscript } = transcriptionContext;
+
+  // ========== CASE CONTEXT ==========
+  const caseContext = useContext(CaseContext);
+
+  if (!caseContext) {
+    throw new Error('QuestionProvider must be used within CaseProvider');
+  }
+
+  const { 
+    currentSession, 
+    currentPersonType, 
+    currentPersonName 
+  } = caseContext;
+
   // ========== STATE ==========
   const [attempts, setAttempts] = useState<QuestionAttempt[]>([]);
   const [currentAttemptIndex, setCurrentAttemptIndex] = useState<number>(-1);
@@ -59,8 +93,27 @@ export const QuestionProvider: React.FC<{ children: ReactNode }> = ({ children }
   // ========== COMPUTED VALUES ==========
   const currentAttempt = currentAttemptIndex >= 0 ? attempts[currentAttemptIndex] : null;
 
-  // ========== HELPER FUNCTIONS ==========
+  /**
+   * Prerequisites check for question generation
+   */
+  const canGenerate = useMemo((): boolean => {
+    const hasTranscript = !!(getFullTranscript && getFullTranscript.trim().length > 0);
+    const isRecordingActiveOrPaused = recordingStatus !== 'off';
+    const result = hasTranscript && isRecordingActiveOrPaused;
+    
+    console.log('🔍 Prerequisites check:', {
+      hasTranscript,
+      transcriptLength: getFullTranscript?.length || 0,
+      recordingStatus,
+      isRecordingActiveOrPaused,
+      canGenerate: result,
+    });
+    
+    return Boolean(result);
+  }, [getFullTranscript, recordingStatus]);
 
+  // ========== HELPER FUNCTIONS ==========
+  
   /**
    * Generate unique attempt ID
    */
@@ -69,70 +122,116 @@ export const QuestionProvider: React.FC<{ children: ReactNode }> = ({ children }
   };
 
   /**
-   * Generate unique question ID
+   * Deduplicate questions array
    */
-  const generateQuestionId = useCallback((): string => {
-  return `question-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-}, []);
+  const deduplicateQuestions = (questions: string[]): string[] => {
+    const seen = new Set<string>();
+    const unique: string[] = [];
+    
+    for (const question of questions) {
+      const normalized = question.trim().toLowerCase();
+      if (!seen.has(normalized)) {
+        seen.add(normalized);
+        unique.push(question);
+      }
+    }
+    
+    return unique;
+  };
+
+  /**
+   * Sort questions by priority and confidence
+   * High priority/confidence questions appear first
+   */
+  const sortQuestionsByPriority = (questions: any[]) => {
+    return questions.sort((a, b) => {
+      // Sort by priority first (high before medium)
+      if (a.priority === 'high' && b.priority !== 'high') return -1;
+      if (a.priority !== 'high' && b.priority === 'high') return 1;
+      
+      // Then by confidence (high before medium)
+      if (a.confidence === 'high' && b.confidence !== 'high') return -1;
+      if (a.confidence !== 'high' && b.confidence === 'high') return 1;
+      
+      return 0; // Keep original order if same priority and confidence
+    });
+  };
 
   // ========== MAIN ACTIONS ==========
-  /**
-   * 1. generateQuestions()      // Generate new questions via API
-     2. confirmAttempt()         // Save selected questions
-     3. retryWithSelection()     // Regenerate with selective keep
-     4. navigateToAttempt()      // Switch between attempts
-     5. selectQuestion()         // Toggle question selection
-     6. clearError()             // Dismiss error message
-     7. resetSession()           // Clear everything
-   */
 
   /**
    * Generate new questions using API
-   * TODO: Replace mock data with actual API call in Phase 3
    */
   const generateQuestions = useCallback(
     async (context: QuestionGenerationContext) => {
+      if (!canGenerate) {
+        const errorMsg = recordingStatus === 'off' 
+          ? 'Cannot generate questions: Recording not started'
+          : 'Cannot generate questions: No transcript available';
+        setError(errorMsg);
+        console.error('❌ Generation blocked:', errorMsg);
+        return;
+      }
+
       setIsLoading(true);
       setError(null);
 
       try {
-        // TODO: Phase 3 - Replace with actual API call
-        // const response = await questionService.generateQuestions(context);
+        // Step 1: Fetch case summary (required)
+        console.log('📥 Step 1/3: Fetching case summary...');
+        const caseSummary = await questionService.getCaseSummary(context.caseId);
+        
+        // Step 2: Fetch victim testimony (optional - may return null)
+        console.log('📥 Step 2/3: Fetching victim testimony...');
+        const victimTestimony = await questionService.getVictimTestimony(
+          context.caseId, 
+          context.sessionId
+        );
+        
+        // Step 3: Generate questions with complete context
+        console.log('🤖 Step 3/3: Generating questions with AI...');
+        const completeContext: QuestionGenerationContext = {
+          ...context,
+          caseSummary,
+          victimTestimony: victimTestimony || undefined,
+        };
 
-        // MOCK DATA for now (Phase 1-2 testing)
-        await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate API delay
+        console.log('🔍 [QuestionContext] Complete context being sent to service:', {
+          caseId: completeContext.caseId,
+          sessionId: completeContext.sessionId,
+          personType: completeContext.personType,
+          language: completeContext.language,
+          questionCount: completeContext.questionCount,
+          hasCaseSummary: !!completeContext.caseSummary,
+          hasVictimTestimony: !!completeContext.victimTestimony,
+          transcriptLength: completeContext.currentTranscript.length,
+        });
 
-        const mockQuestions: Question[] = Array.from({ length: context.questionCount }, (_, i) => ({
-          id: generateQuestionId(),
-          text: `${context.language === 'ar' ? 'سؤال تجريبي' : 'Mock question'} ${i + 1}`,
-          category: (['clarification', 'verification', 'timeline', 'motivation'] as const)[i % 4],
-          status: 'pending',
-          reasoning: `Generated based on testimony context (mock)`,
-          sourceContext: 'Mock source context from transcript',
-          generatedAt: new Date().toISOString(),
-        }));
+        const generatedQuestions = await questionService.generateQuestions(completeContext);
 
+        // Create new attempt with sorted questions
         const newAttempt: QuestionAttempt = {
           attemptId: generateAttemptId(),
-          questions: mockQuestions,
+          questions: sortQuestionsByPriority(generatedQuestions),
           language: context.language,
           timestamp: new Date().toISOString(),
           isConfirmed: false,
           transcriptSnapshot: context.currentTranscript,
           rejectedQuestions: [],
+          retryCount: 0,
         };
 
-        // Add new attempt to history
         setAttempts(prev => [...prev, newAttempt]);
-        setCurrentAttemptIndex(attempts.length); // Point to new attempt
-        setSelectedQuestionIds([]); // Clear selections
+        setCurrentAttemptIndex(attempts.length);
+        setSelectedQuestionIds([]);
 
         console.log('✅ Generated questions successfully', {
           attemptId: newAttempt.attemptId,
-          questionCount: mockQuestions.length,
+          questionCount: generatedQuestions.length,
           language: context.language,
-          transcriptLength: context.currentTranscript.length, // ← Log transcript length for debugging
-
+          hasCaseSummary: !!caseSummary,
+          hasVictimTestimony: !!victimTestimony,
+          transcriptLength: context.currentTranscript.length,
         });
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to generate questions';
@@ -142,74 +241,96 @@ export const QuestionProvider: React.FC<{ children: ReactNode }> = ({ children }
         setIsLoading(false);
       }
     },
-    [attempts.length]
+    [attempts.length, canGenerate, recordingStatus]
   );
 
   /**
-   * Confirm current attempt and save selected questions
+   * Confirm current attempt and save to S3
    */
-  const confirmAttempt = useCallback(() => {
-  if (!currentAttempt) {
-    console.warn('⚠️ No current attempt to confirm');
-    return;
-  }
+  const confirmAttempt = useCallback(async () => {
+    if (!currentAttempt) {
+      console.warn('⚠️ No current attempt to confirm');
+      return;
+    }
 
-  // SMART LOGIC: If nothing selected, treat as "all confirmed"
-  const effectiveSelections = selectedQuestionIds.length === 0 
-    ? currentAttempt.questions.map(q => q.id)  // Select all if none selected
-    : selectedQuestionIds;
+    if (selectedQuestionIds.length > 0) {
+      console.error('❌ DESIGN VIOLATION: Cannot confirm with active selections');
+      setError('Cannot confirm with selections. Please use "Retry Selected" instead.');
+      return;
+    }
 
-  // 1. Mark selected questions as confirmed, unselected as rejected
-  const updatedQuestions = currentAttempt.questions.map(q => ({
-    ...q,
-    status: (effectiveSelections.includes(q.id) ? 'confirmed' : 'rejected') as 'confirmed' | 'rejected',
-  }));
+    // Mark all questions as confirmed
+    const updatedQuestions = currentAttempt.questions.map(q => ({
+      ...q,
+      status: 'confirmed' as const,
+    }));
 
-  // 2. Create finalized attempt
-  const confirmedAttempt: QuestionAttempt = {
-    ...currentAttempt,
-    questions: updatedQuestions,
-    isConfirmed: true, // Lock this attempt
-  };
+    const confirmedAttempt: QuestionAttempt = {
+      ...currentAttempt,
+      questions: updatedQuestions,
+      isConfirmed: true,
+    };
 
-  // 3. Update attempts array
-  setAttempts(prev => prev.map(a => 
-    a.attemptId === currentAttempt.attemptId ? confirmedAttempt : a
-  ));
+    // Update local state immediately
+    setAttempts(prev => prev.map(a => 
+      a.attemptId === currentAttempt.attemptId ? confirmedAttempt : a
+    ));
 
-  // 4. Calculate metrics for this confirmation
-  const confirmedCount = effectiveSelections.length;
-  const rejectedCount = updatedQuestions.length - confirmedCount;
+    const confirmedCount = updatedQuestions.filter(q => q.status === 'confirmed').length;
+    setMetrics(prev => ({
+      confirmedCount: prev.confirmedCount + confirmedCount,
+      rejectedCount: prev.rejectedCount,
+      retryCount: prev.retryCount,
+    }));
 
-  // 5. Update session-wide metrics
-  setMetrics(prev => ({
-    confirmedCount: prev.confirmedCount + confirmedCount,
-    rejectedCount: prev.rejectedCount + rejectedCount,
-    retryCount: prev.retryCount,
-  }));
+    setSelectedQuestionIds([]);
 
-  // 6. Clear selections (ready for next attempt)
-  setSelectedQuestionIds([]);
+    console.log('✅ Attempt confirmed locally', {
+      attemptId: confirmedAttempt.attemptId,
+      confirmedQuestions: confirmedCount,
+      totalSessionConfirmed: metrics.confirmedCount + confirmedCount,
+    });
 
-  // 7. TODO: Phase 3 - Save to S3
-  // const saveRequest: SaveQuestionsRequest = {
-  //   caseId: confirmedAttempt.caseId,
-  //   sessionId: confirmedAttempt.sessionId,
-  //   attempts: [confirmedAttempt],
-  //   metadata: { /* ... */ }
-  // };
-  // await questionService.saveToS3(saveRequest);
+    // Save to S3 (non-blocking)
+    if (!currentSession) {
+      console.warn('⚠️ No current session available for saving');
+      return;
+    }
 
-  console.log('✅ Attempt confirmed and ready for S3 save', {
-    attemptId: confirmedAttempt.attemptId,
-    confirmedQuestions: confirmedCount,
-    rejectedQuestions: rejectedCount,
-    smartLogicApplied: selectedQuestionIds.length === 0 ? 'Yes (all confirmed)' : 'No',
-    totalSessionConfirmed: metrics.confirmedCount + confirmedCount,
-    totalSessionRejected: metrics.rejectedCount + rejectedCount,
-  });
-}, [currentAttempt, selectedQuestionIds, metrics]);
+    try {
+      console.log('💾 Saving confirmed attempt to S3...');
+      
+      const saveRequest: SaveQuestionsRequest = {
+        caseId: currentSession.caseId,
+        sessionId: currentSession.sessionId,
+        attempts: [confirmedAttempt],
+        metadata: {
+          investigator: currentSession.investigator || 'Unknown',
+          personType: currentPersonType as "witness" | "accused" | "victim",
+          personName: currentPersonName || 'Unknown',
+          sessionDate: new Date().toISOString(),
+          savedAt: new Date().toISOString(),
+        }
+      };
 
+      const result = await questionService.saveQuestions(saveRequest);
+
+      if (result.success) {
+        console.log('✅ Questions saved to S3 successfully:', {
+          s3Path: result.s3Path,
+          savedAttempts: result.savedAttempts,
+        });
+      } else {
+        console.error('❌ Failed to save questions to S3:', result.error);
+      }
+    } catch (err) {
+      console.error('❌ Error saving to S3:', err);
+    }
+}, [currentAttempt, selectedQuestionIds, metrics, currentSession, currentPersonName, currentPersonType]);
+
+  /**
+   * Retry with selection - WITH PROGRESSIVE TEMPERATURE
+   */
   const retryWithSelection = useCallback(
   async (context: QuestionGenerationContext) => {
     if (!currentAttempt) {
@@ -217,101 +338,158 @@ export const QuestionProvider: React.FC<{ children: ReactNode }> = ({ children }
       return;
     }
 
+    if (!canGenerate) {
+      const errorMsg = recordingStatus === 'off' 
+        ? 'Cannot retry: Recording not started'
+        : 'Cannot retry: No transcript available';
+      setError(errorMsg);
+      console.error('❌ Retry blocked:', errorMsg);
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
 
     try {
-      // 1. Handle two scenarios: "Retry All" vs "Retry Selected"
-const nothingSelected = selectedQuestionIds.length === 0;
+      const nothingSelected = selectedQuestionIds.length === 0;
 
-// 2. Determine which questions to reject and which to keep
-const rejectedQuestions = nothingSelected
-  ? currentAttempt.questions.map(q => ({ ...q, status: 'rejected' as const }))  // Retry All: reject all
-  : currentAttempt.questions
-      .filter(q => selectedQuestionIds.includes(q.id))  // Retry Selected: reject only selected
-      .map(q => ({ ...q, status: 'rejected' as const }));
+      const rejectedQuestions = nothingSelected
+        ? currentAttempt.questions.map(q => ({ ...q, status: 'rejected' as const }))
+        : currentAttempt.questions
+            .filter(q => selectedQuestionIds.includes(q.id))
+            .map(q => ({ ...q, status: 'rejected' as const }));
 
-const keptQuestions = nothingSelected
-  ? []  // Retry All: keep nothing
-  : currentAttempt.questions.filter(q => !selectedQuestionIds.includes(q.id));  // Retry Selected: keep unselected
+      const keptQuestions = nothingSelected
+        ? []
+        : currentAttempt.questions.filter(q => !selectedQuestionIds.includes(q.id));
 
-// 3. Calculate how many new questions to generate
-const questionsToGenerate = rejectedQuestions.length;
+      const questionsToGenerate = rejectedQuestions.length;
 
-console.log('↻ Retry Details:', {
-  mode: nothingSelected ? 'Retry All' : `Retry Selected (${selectedQuestionIds.length})`,
-  keptCount: keptQuestions.length,
-  rejectedCount: rejectedQuestions.length,
-  willGenerate: questionsToGenerate,
-});
+      // Progressive temperature calculation
+      const currentRetryCount = currentAttempt.retryCount || 0;
+      const newRetryCount = currentRetryCount + 1;
+      
+      const baseTemperature = 0.7;
+      const temperatureIncrement = 0.05;
+      const maxTemperature = 0.95;
+      
+      const calculatedTemperature = Math.min(
+        baseTemperature + (temperatureIncrement * newRetryCount),
+        maxTemperature
+      );
 
-// 4. Update rejected metrics immediately
-setMetrics(prev => ({
-  ...prev,
-  rejectedCount: prev.rejectedCount + rejectedQuestions.length,
-  retryCount: prev.retryCount + 1,
-}));
+      console.log('🌡️ Temperature calculation:', {
+        retryNumber: newRetryCount,
+        temperature: calculatedTemperature,
+        formula: `${baseTemperature} + (${temperatureIncrement} × ${newRetryCount}) = ${calculatedTemperature}`,
+        cappedAt: calculatedTemperature >= maxTemperature ? 'MAX (0.95)' : 'No',
+      });
 
-      // 5. Build context for regeneration (CRITICAL: Use saved transcript snapshot!)
-      const retryContext: QuestionGenerationContext = {
-        ...context,
-        currentTranscript: currentAttempt.transcriptSnapshot, // ← Use SAVED transcript, not current!
-        questionCount: questionsToGenerate, // Only generate replacements
-        previousQuestions: [
-          ...keptQuestions, // Don't duplicate kept questions
-          ...rejectedQuestions, // Don't duplicate rejected questions
-          ...(context.previousQuestions || []), // Don't duplicate from other attempts
-        ],
-      };
+      console.log('↻ Retry Details:', {
+        mode: nothingSelected ? 'Retry All' : `Retry Selected (${selectedQuestionIds.length})`,
+        keptCount: keptQuestions.length,
+        rejectedCount: rejectedQuestions.length,
+        willGenerate: questionsToGenerate,
+        retryAttempt: newRetryCount,
+        temperature: calculatedTemperature,
+      });
 
-     // TODO: Phase 3 - Use retryContext for actual API call:
-// const response = await questionService.generateQuestions(retryContext);
-console.log('📋 Retry context prepared (will be used in Phase 3):', {
-  questionCount: retryContext.questionCount,
-  transcriptLength: retryContext.currentTranscript.length,
-});
-
-      // 6. Generate replacement questions (mock for now)
-      // TODO: Phase 3 - Replace with actual API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
-
-      const newQuestions: Question[] = Array.from({ length: questionsToGenerate }, (_, i) => ({
-        id: generateQuestionId(),
-        text: `${context.language === 'ar' ? 'سؤال بديل' : 'Replacement question'} ${i + 1}`,
-        category: (['clarification', 'verification', 'timeline', 'motivation'] as const)[i % 4],
-        status: 'pending',
-        reasoning: `Generated as replacement (mock)`,
-        sourceContext: 'Mock replacement context',
-        generatedAt: new Date().toISOString(),
+      setMetrics(prev => ({
+        ...prev,
+        rejectedCount: prev.rejectedCount + rejectedQuestions.length,
+        retryCount: prev.retryCount + 1,
       }));
 
-      // 7. Merge kept questions + new replacements
-      const mergedQuestions = [...keptQuestions, ...newQuestions];
+      console.log('📥 Fetching context for retry...');
+      const caseSummary = await questionService.getCaseSummary(context.caseId);
+      
+      const victimTestimony = await questionService.getVictimTestimony(
+        context.caseId, 
+        context.sessionId
+      );
 
-      // 8. Update current attempt and accumulate rejected questions
-const updatedAttempt: QuestionAttempt = {
-  ...currentAttempt,
-  questions: mergedQuestions,
-  rejectedQuestions: [
-    ...(currentAttempt.rejectedQuestions || []),  // Keep previous rejected
-    ...rejectedQuestions,                          // Add new rejected
-  ],
-  // Keep same transcriptSnapshot, language, timestamp
-};
+      // Deduplicate previous questions
+      const allPreviousQuestions = [
+        ...keptQuestions.map(q => q.text),
+        ...rejectedQuestions.map(q => q.text),
+        ...(context.previousQuestions || []),
+      ];
 
-      // 9. Update attempts array
+      const uniquePreviousQuestions = deduplicateQuestions(allPreviousQuestions);
+
+      console.log('🔍 Previous questions for retry:', {
+        total: allPreviousQuestions.length,
+        unique: uniquePreviousQuestions.length,
+        duplicatesRemoved: allPreviousQuestions.length - uniquePreviousQuestions.length,
+      });
+
+      const retryContext: QuestionGenerationContext = {
+        caseId: context.caseId,
+        sessionId: context.sessionId,
+        personType: context.personType,
+        caseSummary,
+        victimTestimony: victimTestimony || undefined,
+        currentTranscript: currentAttempt.transcriptSnapshot,
+        language: context.language,
+        questionCount: questionsToGenerate,
+        previousQuestions: uniquePreviousQuestions,
+        temperature: calculatedTemperature,
+      };
+
+      console.log('🔄 Retry context prepared:', {
+        questionCount: retryContext.questionCount,
+        transcriptLength: retryContext.currentTranscript.length,
+        previousQuestionsCount: retryContext.previousQuestions?.length || 0,
+        temperature: retryContext.temperature,
+        retryAttempt: newRetryCount,
+      });
+
+      const newQuestions = await questionService.generateQuestions(retryContext);
+      
+      // ✅ FIX: Filter out duplicates before merging
+      const uniqueNewQuestions = newQuestions.filter(newQ => {
+        // Check if this question text already exists in keptQuestions
+        return !keptQuestions.some(keptQ => keptQ.text.trim() === newQ.text.trim());
+      });
+
+      if (uniqueNewQuestions.length < newQuestions.length) {
+        const filteredCount = newQuestions.length - uniqueNewQuestions.length;
+        console.warn(`⚠️ Filtered ${filteredCount} duplicate(s) from API response in retry`);
+        console.warn('Duplicates found:', 
+          newQuestions
+            .filter(newQ => keptQuestions.some(keptQ => keptQ.text.trim() === newQ.text.trim()))
+            .map(q => q.text)
+        );
+      }
+
+      // ✅ Merge and SORT only unique questions
+      const mergedQuestions = sortQuestionsByPriority([...keptQuestions, ...uniqueNewQuestions]);
+
+      const updatedAttempt: QuestionAttempt = {
+        ...currentAttempt,
+        questions: mergedQuestions,
+        rejectedQuestions: [
+          ...(currentAttempt.rejectedQuestions || []),
+          ...rejectedQuestions,
+        ],
+        retryCount: newRetryCount,
+      };
+
       setAttempts(prev => prev.map(a => 
         a.attemptId === currentAttempt.attemptId ? updatedAttempt : a
       ));
 
-      // 10. Clear selections (user needs to review new questions)
       setSelectedQuestionIds([]);
 
       console.log('✅ Retry completed successfully', {
         attemptId: updatedAttempt.attemptId,
         keptQuestions: keptQuestions.length,
         newQuestions: newQuestions.length,
+        uniqueNewQuestions: uniqueNewQuestions.length,
+        duplicatesFiltered: newQuestions.length - uniqueNewQuestions.length,
         totalQuestions: mergedQuestions.length,
+        usedTemperature: calculatedTemperature,
+        totalRetriesForThisAttempt: newRetryCount,
       });
 
     } catch (err) {
@@ -322,33 +500,51 @@ const updatedAttempt: QuestionAttempt = {
       setIsLoading(false);
     }
   },
-  [currentAttempt, selectedQuestionIds, generateQuestionId]
+  [currentAttempt, selectedQuestionIds, canGenerate, recordingStatus]
 );
 
   /**
    * Navigate to specific attempt
    */
   const navigateToAttempt = useCallback(
-    (index: number) => {
-      if (index >= 0 && index < attempts.length) {
+  (index: number) => {
+    if (index >= 0 && index < attempts.length) {
+      console.log('🔄 Clearing state before navigation...');
+      
+      // Clear state first
+      setCurrentAttemptIndex(-1);
+      setSelectedQuestionIds([]);
+      
+      // Navigate in next tick to ensure clean state
+      setTimeout(() => {
         setCurrentAttemptIndex(index);
         
-        // Load selections from that attempt
         const attempt = attempts[index];
-        const selectedIds = attempt.questions
-          .filter(q => q.status === 'confirmed')
-          .map(q => q.id);
-        setSelectedQuestionIds(selectedIds);
-
-        console.log('Navigated to attempt', {
+        
+        console.log('📍 Navigated to attempt:', {
           index: index + 1,
           total: attempts.length,
           attemptId: attempt.attemptId,
+          questionCount: attempt.questions.length,
+          language: attempt.language,
+          isConfirmed: attempt.isConfirmed,
         });
-      }
-    },
-    [attempts]
-  );
+        
+        // Only set selections for non-confirmed attempts
+        if (!attempt.isConfirmed) {
+          const selectedIds = attempt.questions
+            .filter(q => q.status === 'confirmed')
+            .map(q => q.id);
+          
+          if (selectedIds.length > 0) {
+            setSelectedQuestionIds(selectedIds);
+          }
+        }
+      }, 0);
+    }
+  },
+  [attempts]
+);
 
   /**
    * Toggle question selection
@@ -360,7 +556,7 @@ const updatedAttempt: QuestionAttempt = {
         ? prev.filter(id => id !== questionId)
         : [...prev, questionId];
       
-      console.log(isSelected ? ' Deselected question' : ' Selected question', {
+      console.log(isSelected ? '❌ Deselected question' : '✅ Selected question', {
         questionId,
         totalSelected: newSelection.length,
       });
@@ -369,16 +565,10 @@ const updatedAttempt: QuestionAttempt = {
     });
   }, []);
 
-  /**
-   * Clear error message
-   */
   const clearError = useCallback(() => {
     setError(null);
   }, []);
 
-  /**
-   * Reset entire session (clear all attempts and metrics)
-   */
   const resetSession = useCallback(() => {
     setAttempts([]);
     setCurrentAttemptIndex(-1);
@@ -389,12 +579,55 @@ const updatedAttempt: QuestionAttempt = {
       retryCount: 0,
     });
     setError(null);
-    console.log('Session reset');
+    console.log('🔄 Session reset');
   }, []);
+
+  // ========== ✨ NEW: HTML GENERATION FUNCTION ==========
+  
+  const generateFinalHTMLReport = async (
+    caseId: string,
+    sessionId: string,
+    metadata: {
+      investigator: string;
+      personType: string;
+      personName: string;
+      sessionDate: string;
+    }
+  ) => {
+    try {
+      console.log('🎨 [QuestionContext] Generating final HTML report...');
+
+      // Use the questionService to call the correct API
+      const response = await questionService.saveQuestions({
+        caseId,
+        sessionId,
+        attempts: [], // Empty - all attempts already saved
+        isFinalSave: true, // ← Triggers HTML generation
+        metadata: {
+          investigator: metadata.investigator,
+          personType: metadata.personType as "witness" | "accused" | "victim",
+          personName: metadata.personName,
+          sessionDate: metadata.sessionDate,
+          savedAt: new Date().toISOString(),
+        }
+      });
+
+      if (response.success) {
+        console.log('✅ HTML report generated successfully:', response);
+        return { success: true, data: response };
+      } else {
+        console.warn('⚠️ HTML generation failed:', response.error);
+        return { success: false, error: response.error || 'Failed to generate report' };
+      }
+      
+    } catch (error) {
+      console.warn('⚠️ HTML generation error:', error);
+      return { success: false, error };
+    }
+  };
 
   // ========== CONTEXT VALUE ==========
   const value: QuestionContextType = {
-    // State
     attempts,
     currentAttemptIndex,
     currentAttempt,
@@ -402,8 +635,7 @@ const updatedAttempt: QuestionAttempt = {
     metrics,
     isLoading,
     error,
-
-    // Actions
+    canGenerate,
     generateQuestions,
     confirmAttempt,
     retryWithSelection,
@@ -411,6 +643,7 @@ const updatedAttempt: QuestionAttempt = {
     selectQuestion,
     clearError,
     resetSession,
+    generateFinalHTMLReport,
   };
 
   return (
@@ -419,4 +652,5 @@ const updatedAttempt: QuestionAttempt = {
     </QuestionContext.Provider>
   );
 };
+
 export { QuestionContext };

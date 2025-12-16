@@ -7,7 +7,7 @@ import {
   SessionType,
   LanguagePreferences,
 } from "../../types/";
-import PDFExporter from "../RealTime/TranslationPDFExporter";
+import PDFExporter from "../RealTime/Translation/TranslationPDFExporter"; 
 import ErrorDisplay from "./ErrorDisplay";
 import { useState } from "react";
 import { useCaseContext } from "../../hooks/useCaseContext";

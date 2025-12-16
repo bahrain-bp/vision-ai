@@ -5,6 +5,8 @@
     "tailwindcss": "^4.1.16"
   },
   "dependencies": {
+    "@types/axios": "^0.9.36",
+    "axios": "^1.13.2",
     "@aws-sdk/client-translate": "^3.940.0",
     "aws-amplify": "^6.15.7",
     "docx": "^9.5.1",

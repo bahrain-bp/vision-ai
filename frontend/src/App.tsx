@@ -10,8 +10,7 @@ import { TranscriptionProvider } from "./context/TranscriptionContext";
 import { CaseProvider } from "./context/CaseContext"; // ADD THIS IMPORT
 import { QuestionProvider } from "./context/QuestionContext";
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import WitnessPage from "./components/RealTime/WitnessPage"; 
-
+import ParticipantPage from "./components/RealTime/Translation/ParticipantPage";
 
 Amplify.configure(awsConfig);
 
@@ -171,10 +170,10 @@ const App: React.FC = () => {
         } 
       />
       
-      {/* Witness view route */}
+      {/* Participant view route */}
       <Route 
-        path="/witness" 
-        element={<WitnessPage />} 
+        path="/participant" 
+        element={<ParticipantPage />} 
       />
     </Routes>
   </Router>
