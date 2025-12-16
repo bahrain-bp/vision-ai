@@ -10,7 +10,7 @@ import MetricsWidget from './MetricsWidget';
 import AttemptNavigation from './AttemptNavigation';
 import QuestionList from './QuestionList';
 import { useLanguage } from '../../../context/LanguageContext';
-import TranslationPDFExporter from '../TranslationPDFExporter';
+import TranslationPDFExporter from '../Translation/TranslationPDFExporter';
 
 /**
  * QuestionGenerator Component
