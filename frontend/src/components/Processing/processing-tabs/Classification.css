@@ -22,7 +22,7 @@
   text-align: center;
 }
 
-.classification-page.rtl .results-textarea,
+.classification-page.rtl .classification-results-textarea,
 .classification-page.rtl .category-textarea {
   direction: rtl;
   text-align: right;
@@ -198,7 +198,7 @@
 }
 
 /* text area */
-.results-textarea {
+.classification-results-textarea {
   width: 100%;
   min-height: 200px;
   padding: 10px 12px;
@@ -397,7 +397,7 @@
     padding: 18px 16px;
   }
 
-  .results-textarea {
+  .classification-results-textarea {
     min-height: 170px;
   }
 }
