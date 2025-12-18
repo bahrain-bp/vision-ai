@@ -23,7 +23,6 @@ interface ClassificationProps {
 
 type LoadingState = "idle" | "upload" | "extract" | "classify" | "save";
 
-const MAX_FILE_SIZE_MB = 4;
 const ALLOWED_TYPES = [
   "application/pdf",
   "application/msword",
@@ -104,13 +103,6 @@ const Classification: React.FC<ClassificationProps> = ({
   };
 
   const validateFile = (f: File): string | null => {
-    const sizeMb = f.size / 1024 / 1024;
-    if (sizeMb > MAX_FILE_SIZE_MB) {
-      return t(
-        `Max allowed size is ${MAX_FILE_SIZE_MB}MB`,
-        `الحد الأقصى للحجم هو ${MAX_FILE_SIZE_MB} ميجابايت`
-      );
-    }
     if (!ALLOWED_TYPES.includes(f.type)) {
       return t("Invalid file type. Use PDF, Word, or TXT.", "نوع الملف غير مسموح. استخدم PDF أو Word أو TXT.");
     }
@@ -332,8 +324,8 @@ const Classification: React.FC<ClassificationProps> = ({
           </p>
           <p className="upload-sub">
             {t(
-              `PDF, Word, or TXT — up to ${MAX_FILE_SIZE_MB} MB`,
-              `ملف PDF او Word او TXT - أقصى حجم ${MAX_FILE_SIZE_MB}MB`,
+              `PDF, Word, or TXT`,
+              `ملف PDF او Word او TXT`,
 
             )}
           </p>
@@ -384,7 +376,7 @@ const Classification: React.FC<ClassificationProps> = ({
         </div>
 
         <textarea
-          className="results-textarea"
+          className="classification-results-textarea"
           placeholder={t("Extracted text will appear here after processing...", "سيظهر النص المستخرج هنا بعد المعالجة...")}
           value={text}
           readOnly
