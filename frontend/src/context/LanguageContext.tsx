@@ -54,7 +54,7 @@ const translations = {
     "sessionInfo.statistics": "Statistics",
     "sessionInfo.words": "Words",
     "sessionInfo.translations": "Translations",
-    "sessionInfo.avgConfidence": "Avg Confidence",
+    "sessionInfo.avgConfidence": "Average Witness Confidence",
     "sessionInfo.notVerified": "Not verified yet",
     "sessionInfo.personType": "Participant Type",
     "sessionInfo.totalWords": "Total Words",
@@ -161,7 +161,7 @@ const translations = {
     "popup.cancel": "Cancel",
 
     //Translation Language Names
-     "lang.af-ZA": "Afrikaans",
+    "lang.af-ZA": "Afrikaans",
     "lang.ar-AE": "Arabic (Gulf)",
     "lang.ar-SA": "Arabic (Modern Standard)",
     "lang.ca-ES": "Catalan",
@@ -184,7 +184,7 @@ const translations = {
     "lang.fr-FR": "French",
     "lang.he-IL": "Hebrew",
     "lang.hi-IN": "Hindi",
-     "lang.hr-HR": "Croatian",
+    "lang.hr-HR": "Croatian",
     "lang.id-ID": "Indonesian",
     "lang.it-IT": "Italian",
     "lang.ja-JP": "Japanese",
@@ -224,9 +224,8 @@ const translations = {
 
     "session.witnessView": "Witness View",
     "session.messages": "messages",
-    "session.clearAll": "Clear All", 
+    "session.clearAll": "Clear All",
 
-    
     // PDFExporter translations
     "pdf.downloadPdf": "Download PDF",
     "pdf.downloadWord": "Download Word",
@@ -265,22 +264,24 @@ const translations = {
     "summarization.caseId": "Case ID",
     "summarization.language": "Language",
 
-
     // ==================== AI ASSISTANT ====================
     // Main Generator
     "aiAssistant.title": "AI Assistant",
     "aiAssistant.startRecording": "Start recording to generate questions",
-    "aiAssistant.questionsBasedOnTestimony": "Questions will be generated based on live testimony",
+    "aiAssistant.questionsBasedOnTestimony":
+      "Questions will be generated based on live testimony",
     "aiAssistant.noQuestionsYet": "No questions generated yet",
-    "aiAssistant.clickGenerate": "Click \"Generate Questions\" above to start",
+    "aiAssistant.clickGenerate": 'Click "Generate Questions" above to start',
     "aiAssistant.cannotGenerate": "Cannot Generate Questions",
     "aiAssistant.tip": "Tip",
-    "aiAssistant.tipStartRecording": "Start the recording to begin collecting testimony.",
-    "aiAssistant.tipWaitForSpeech": "Wait for the witness to speak so the system can generate relevant questions.",
+    "aiAssistant.tipStartRecording":
+      "Start the recording to begin collecting testimony.",
+    "aiAssistant.tipWaitForSpeech":
+      "Wait for the witness to speak so the system can generate relevant questions.",
     "aiAssistant.rejectedQuestions": "Rejected Questions",
     "aiAssistant.clickToExpand": "Click to expand",
 
-     // Generator Controls
+    // Generator Controls
     "aiAssistant.questions": "Questions",
     "aiAssistant.generateButton": "Generate Questions",
     "aiAssistant.generating": "Generating...",
@@ -291,7 +292,7 @@ const translations = {
     "aiAssistant.rejected": "Rejected",
     "aiAssistant.retries": "Retries",
 
-     // Question Card
+    // Question Card
     "aiAssistant.highPriority": "High Priority",
     "aiAssistant.highConfidence": "High Confidence",
     "aiAssistant.showReasoning": "Show Reasoning",
@@ -300,18 +301,18 @@ const translations = {
     "aiAssistant.source": "Source",
     "aiAssistant.showQuestion": "Show Question",
 
-     // Question Categories
+    // Question Categories
     "aiAssistant.category.clarification": "Clarification",
     "aiAssistant.category.verification": "Verification",
     "aiAssistant.category.contradiction": "Contradiction",
     "aiAssistant.category.timeline": "Timeline",
     "aiAssistant.category.motivation": "Motivation",
-    
+
     // Question List
     "aiAssistant.confirmAll": "Confirm All",
     "aiAssistant.retryAll": "Retry All",
     "aiAssistant.retrySelected": "Retry Selected",
-    
+
     // Attempt Navigation
     "aiAssistant.attempt": "Attempt",
     "aiAssistant.of": "of",
@@ -321,8 +322,10 @@ const translations = {
     // Question Evaluation Tool
     "evaluation.title": "Question Evaluation Tool",
     "evaluation.subtitle": "Training & Quality Check",
-    "evaluation.instructions": "Type your own question below and get instant AI feedback on clarity, relevance, and appropriateness. This helps improve your questioning skills without affecting the current session.",
-    "evaluation.placeholder": "Example: Can you describe what happened at approximately 3:00 PM when you saw the accused?",
+    "evaluation.instructions":
+      "Type your own question below and get instant AI feedback on clarity, relevance, and appropriateness. This helps improve your questioning skills without affecting the current session.",
+    "evaluation.placeholder":
+      "Example: Can you describe what happened at approximately 3:00 PM when you saw the accused?",
     "evaluation.evaluateButton": "Evaluate Question",
     "evaluation.evaluating": "Evaluating...",
     "evaluation.clear": "Clear",
@@ -334,7 +337,8 @@ const translations = {
     "evaluation.issuesFound": "Issues Found:",
     "evaluation.suggestions": "Suggestions for Improvement:",
     "evaluation.improved": "AI Improved Version:",
-    "evaluation.excellentQuestion": "Excellent question! This meets professional investigation standards.",
+    "evaluation.excellentQuestion":
+      "Excellent question! This meets professional investigation standards.",
 
     //Transcript feature SECTION (Salman Khamis)
 
@@ -583,7 +587,7 @@ const translations = {
     "lang.sv-SE": "السويدية",
     "lang.th-TH": "التايلاندية",
     "lang.tl-PH": "التاغالوغية/الفلبينية",
-     "lang.uk-UA": "الأوكرانية",
+    "lang.uk-UA": "الأوكرانية",
     "lang.vi-VN": "الفيتنامية",
     "lang.zh-CN": "الصينية (المبسطة)",
     "lang.zh-HK": "الصينية (الكانتونية)",
@@ -645,31 +649,33 @@ const translations = {
     "summarization.caseId": "رقم القضية",
     "summarization.language": "اللغة",
 
-     // ==================== AI ASSISTANT ====================
-     // Main Generator
+    // ==================== AI ASSISTANT ====================
+    // Main Generator
     "aiAssistant.title": "المساعد الذكي",
     "aiAssistant.startRecording": "ابدأ التسجيل لتوليد الأسئلة",
-    "aiAssistant.questionsBasedOnTestimony": "سيتم توليد الأسئلة بناءً على الشهادة المباشرة",
+    "aiAssistant.questionsBasedOnTestimony":
+      "سيتم توليد الأسئلة بناءً على الشهادة المباشرة",
     "aiAssistant.noQuestionsYet": "لم يتم توليد أسئلة بعد",
-    "aiAssistant.clickGenerate": "انقر على \"توليد الأسئلة\" أعلاه للبدء",
+    "aiAssistant.clickGenerate": 'انقر على "توليد الأسئلة" أعلاه للبدء',
     "aiAssistant.cannotGenerate": "لا يمكن توليد الأسئلة",
     "aiAssistant.tip": "نصيحة",
     "aiAssistant.tipStartRecording": "ابدأ التسجيل لبدء جمع الشهادة.",
-    "aiAssistant.tipWaitForSpeech": "انتظر حتى يتحدث الشاهد حتى يتمكن النظام من توليد أسئلة ذات صلة.",
+    "aiAssistant.tipWaitForSpeech":
+      "انتظر حتى يتحدث الشاهد حتى يتمكن النظام من توليد أسئلة ذات صلة.",
     "aiAssistant.rejectedQuestions": "الأسئلة المرفوضة",
     "aiAssistant.clickToExpand": "انقر للتوسيع",
-    
+
     // Generator Controls
     "aiAssistant.questions": "أسئلة",
     "aiAssistant.generateButton": "توليد الأسئلة",
     "aiAssistant.generating": "جارٍ التوليد...",
     "aiAssistant.waitingForTranscript": "في انتظار النص...",
-    
+
     // Metrics
     "aiAssistant.confirmed": "مؤكد",
     "aiAssistant.rejected": "مرفوض",
     "aiAssistant.retries": "إعادة المحاولة",
-    
+
     // Question Card
     "aiAssistant.highPriority": "أولوية عالية",
     "aiAssistant.highConfidence": "ثقة عالية",
@@ -678,30 +684,32 @@ const translations = {
     "aiAssistant.aiReasoning": "تفسير الذكاء الاصطناعي",
     "aiAssistant.source": "المصدر",
     "aiAssistant.showQuestion": "إظهار السؤال",
-    
+
     // Question Categories
     "aiAssistant.category.clarification": "توضيح",
     "aiAssistant.category.verification": "تحقق",
     "aiAssistant.category.contradiction": "تناقض",
     "aiAssistant.category.timeline": "الخط الزمني",
     "aiAssistant.category.motivation": "الدافع",
-    
+
     // Question List
     "aiAssistant.confirmAll": "تأكيد الكل",
     "aiAssistant.retryAll": "إعادة محاولة الكل",
     "aiAssistant.retrySelected": "إعادة محاولة المحدد",
 
-     // Attempt Navigation
+    // Attempt Navigation
     "aiAssistant.attempt": "محاولة",
     "aiAssistant.of": "من",
     "aiAssistant.previousAttempt": "المحاولة السابقة",
     "aiAssistant.nextAttempt": "المحاولة التالية",
-    
+
     // Question Evaluation Tool
     "evaluation.title": "أداة تقييم الأسئلة",
     "evaluation.subtitle": "التدريب وفحص الجودة",
-    "evaluation.instructions": "اكتب سؤالك أدناه واحصل على تقييم فوري من الذكاء الاصطناعي حول الوضوح والصلة والملاءمة. يساعد هذا على تحسين مهارات طرح الأسئلة دون التأثير على الجلسة الحالية.",
-    "evaluation.placeholder": "مثال: هل يمكنك وصف ما حدث في حوالي الساعة 3:00 مساءً عندما رأيت المتهم؟",
+    "evaluation.instructions":
+      "اكتب سؤالك أدناه واحصل على تقييم فوري من الذكاء الاصطناعي حول الوضوح والصلة والملاءمة. يساعد هذا على تحسين مهارات طرح الأسئلة دون التأثير على الجلسة الحالية.",
+    "evaluation.placeholder":
+      "مثال: هل يمكنك وصف ما حدث في حوالي الساعة 3:00 مساءً عندما رأيت المتهم؟",
     "evaluation.evaluateButton": "تقييم السؤال",
     "evaluation.evaluating": "جارٍ التقييم...",
     "evaluation.clear": "مسح",
@@ -713,12 +721,13 @@ const translations = {
     "evaluation.issuesFound": "المشاكل المكتشفة:",
     "evaluation.suggestions": "اقتراحات للتحسين:",
     "evaluation.improved": "النسخة المحسنة:",
-    "evaluation.excellentQuestion": "سؤال ممتاز! يستوفي هذا معايير التحقيق المهنية.",
+    "evaluation.excellentQuestion":
+      "سؤال ممتاز! يستوفي هذا معايير التحقيق المهنية.",
 
     //Transcript feature SECTION (Salman Khamis)
 
     //Real time
-    "session.Transcription_Translation": "التفريغ النص والترجمة",
+    "session.Transcription_Translation": "تفريغ النص والترجمة",
 
     // TranscriptionSessionSetup translations - ADD THESE
     "setup.readyToStart": "جاهز للبدء",

@@ -32,9 +32,9 @@ class TranscribeService {
 
   private mediaManager = StreamManager;
 
-  private readonly microphoneAttempts: number = 5;
+  private readonly microphoneAttempts: number = 8;
 
-  private readonly displayAttempts: number = 5;
+  private readonly displayAttempts: number = 8;
 
   private transcribeClient: TranscribeStreamingClient | null = null;
 
@@ -348,7 +348,6 @@ class TranscribeService {
         ShowSpeakerLabel: source === "display" && speakerMode === "multi",
         AudioStream: this.getAudioStream(microphoneStream, sampleRate),
       });
-      console.table(command);
     try {
       // Send connection request to AWS Transcribe
       const data: StartStreamTranscriptionCommandOutput =
@@ -426,7 +425,7 @@ class TranscribeService {
               // Multi-participant mode: use AWS speaker labels
               const awsSpeakerLabel = transcriptWords[0]?.speaker || "0";
               speaker = `${
-                this.participantType ?? "Speaker"
+                 "Speaker"
               } ${awsSpeakerLabel}`;
             }
           }
@@ -492,7 +491,7 @@ class TranscribeService {
       }
 
       const result = await response.json();
-      console.log("Transcription saved:", result);
+      //console.log("Transcription saved:", result);
       return result;
     } catch (error) {
       console.error("Error saving transcription:", error);
