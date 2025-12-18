@@ -147,6 +147,14 @@ const SessionPageContent: React.FC<SessionPageProps & {
     return () => clearInterval(intervalId);
   }, [sessionState, isPaused]);
 
+
+  useEffect(()=>{
+    if (sessionState === "on"){
+      setTimerString("00:00:00");
+      setTimerMs(0);
+    }
+  },[sessionState])
+
   useEffect(() => {
     const formatted = getTimeString(timerMs);
     setTimerString(formatted);
