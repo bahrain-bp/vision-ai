@@ -425,7 +425,7 @@ class TranscribeService {
               // Multi-participant mode: use AWS speaker labels
               const awsSpeakerLabel = transcriptWords[0]?.speaker || "0";
               speaker = `${
-                 "Speaker"
+                this.participantType ?? "Speaker"
               } ${awsSpeakerLabel}`;
             }
           }
