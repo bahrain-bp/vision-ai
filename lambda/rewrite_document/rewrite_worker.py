@@ -23,7 +23,7 @@ s3_client = boto3.client("s3")
 
 # Configuration
 BUCKET_NAME = os.environ.get("BUCKET_NAME", "vision-investigation-system-052904446370")
-MODEL_ID = "amazon.nova-lite-v1:0"
+MODEL_ID = os.environ.get("INFERENCE_PROFILE_ARN", "amazon.nova-lite-v1:0")
 
 # ===== Size & performance limits =====
 MAX_TOTAL_CHARS = 60000  # Max chars for entire document

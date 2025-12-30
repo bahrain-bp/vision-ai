@@ -76,8 +76,11 @@ def generate_summary(text, length, language):
     """
     prompt = f"Summarize this investigation transcript in {length} length in {language}:\n\n{text}"
     
+    # Use cross-region inference profile if available
+    model_id = os.environ.get('INFERENCE_PROFILE_ARN', 'amazon.nova-lite-v1:0')
+    
     response = bedrock.invoke_model(
-        modelId='amazon.nova-lite-v1:0',
+        modelId=model_id,
         body=json.dumps({
             "messages": [{"role": "user", "content": [{"text": prompt}]}],
             "inferenceConfig": {"maxTokens": 1000, "temperature": 0.3}

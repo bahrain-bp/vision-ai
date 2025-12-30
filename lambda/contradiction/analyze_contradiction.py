@@ -7,7 +7,7 @@ s3 = boto3.client("s3")
 bedrock = boto3.client("bedrock-runtime")
 
 BUCKET = os.environ["BUCKET_NAME"]
-MODEL_ID = os.environ.get("BEDROCK_MODEL_ID", "amazon.nova-lite-v1:0")
+MODEL_ID = os.environ.get("INFERENCE_PROFILE_ARN", "amazon.nova-lite-v1:0")
 
 def handler(event, context):
     try:

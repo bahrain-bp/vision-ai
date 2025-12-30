@@ -32,7 +32,8 @@ class RewriteStack(Stack):
             timeout=Duration.seconds(300),
             memory_size=512,
             environment={
-                'BUCKET_NAME': investigation_bucket.bucket_name
+                'BUCKET_NAME': investigation_bucket.bucket_name,
+                'INFERENCE_PROFILE_ARN': 'us.amazon.nova-lite-v1:0'
             }
         )
         

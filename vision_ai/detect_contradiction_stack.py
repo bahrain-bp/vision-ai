@@ -51,7 +51,7 @@ class ContradictionStack(Stack):
             memory_size=1024,
             environment={
                 "BUCKET_NAME": investigation_bucket.bucket_name,
-                "BEDROCK_MODEL_ID": "amazon.nova-lite-v1:0",
+                "INFERENCE_PROFILE_ARN": "us.amazon.nova-lite-v1:0",
             },
         )
 

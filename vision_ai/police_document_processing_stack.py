@@ -55,7 +55,7 @@ class PoliceDocumentProcessingStack(Stack):
             
             environment={
                 "BUCKET_NAME": investigation_bucket.bucket_name,
-                "BEDROCK_MODEL_ID": "amazon.nova-lite-v1:0",  # ✅ Nova Lite
+                "INFERENCE_PROFILE_ARN": "us.amazon.nova-lite-v1:0",
             },
             description="Processes police PDFs and generates AI summaries via Bedrock Nova Lite"
         )

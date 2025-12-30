@@ -15,7 +15,7 @@ bedrock_client = boto3.client('bedrock-runtime')
 
 # Environment variables
 BUCKET_NAME = os.environ['BUCKET_NAME']
-BEDROCK_MODEL_ID = os.environ['BEDROCK_MODEL_ID']
+BEDROCK_MODEL_ID = os.environ.get('INFERENCE_PROFILE_ARN', 'amazon.nova-lite-v1:0')
 
 
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:

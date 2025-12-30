@@ -86,7 +86,8 @@ class SummarizationStack(Stack):
             memory_size=512,
             environment={
                 "BUCKET_NAME": investigation_bucket.bucket_name,
-                "LOG_LEVEL": "INFO"
+                "LOG_LEVEL": "INFO",
+                "INFERENCE_PROFILE_ARN": "us.amazon.nova-lite-v1:0"
             },
             description="Generate AI summaries using Amazon Bedrock Nova Lite"
         )
