@@ -8,7 +8,7 @@ s3_client = boto3.client('s3')
 
 # Environment variables
 BUCKET_NAME = os.environ.get('BUCKET_NAME')
-BEDROCK_MODEL_ID = os.environ.get('BEDROCK_MODEL_ID', 'amazon.nova-lite-v1:0')
+INFERENCE_PROFILE_ARN = os.environ.get('INFERENCE_PROFILE_ARN', 'us.amazon.nova-lite-v1:0')
 LOG_LEVEL = os.environ.get('LOG_LEVEL', 'INFO')
 
 def lambda_handler(event, context):
@@ -210,7 +210,7 @@ def invoke_bedrock(prompt):
     
     try:
         response = bedrock_runtime.invoke_model(
-            modelId=BEDROCK_MODEL_ID,
+            modelId=INFERENCE_PROFILE_ARN,
             body=json.dumps(request_body)
         )
         

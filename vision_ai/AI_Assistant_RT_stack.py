@@ -95,7 +95,7 @@ class AIAssistantRTStack(Stack):
             effect=iam.Effect.ALLOW,
             actions=["bedrock:InvokeModel"],
             resources=[
-                f"arn:aws:bedrock:{Stack.of(self).region}::foundation-model/amazon.nova-lite-v1:0"
+                f"arn:aws:bedrock:*::foundation-model/amazon.nova-lite-v1:0" 
             ]
         ))
         
@@ -189,7 +189,7 @@ class AIAssistantRTStack(Stack):
             memory_size=512,
             environment={
                 "BUCKET_NAME": investigation_bucket.bucket_name,
-                "BEDROCK_MODEL_ID": "amazon.nova-lite-v1:0",
+                "INFERENCE_PROFILE_ARN": "us.amazon.nova-lite-v1:0", 
                 "LOG_LEVEL": "INFO"
             },
             description="Evaluates manually entered questions using Bedrock AI"
