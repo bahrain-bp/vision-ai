@@ -3,12 +3,12 @@ import boto3
 import os
 
 # Initialize clients
-bedrock_runtime = boto3.client('bedrock-runtime', region_name='us-east-1')
+bedrock_runtime = boto3.client('bedrock-runtime', region_name='us-west-2')
 s3_client = boto3.client('s3')
 
 # Environment variables
 BUCKET_NAME = os.environ.get('BUCKET_NAME')
-INFERENCE_PROFILE_ARN = os.environ.get('INFERENCE_PROFILE_ARN', 'us.amazon.nova-lite-v1:0')
+MODEL_ID = os.environ.get('MODEL_ID', 'us.amazon.nova-pro-v1:0')
 LOG_LEVEL = os.environ.get('LOG_LEVEL', 'INFO')
 
 def lambda_handler(event, context):
@@ -210,7 +210,7 @@ def invoke_bedrock(prompt):
     
     try:
         response = bedrock_runtime.invoke_model(
-            modelId=INFERENCE_PROFILE_ARN,
+             modelId='us.amazon.nova-pro-v1:0', 
             body=json.dumps(request_body)
         )
         
