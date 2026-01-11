@@ -328,6 +328,7 @@
   color: var(--text-dark);
   font-size: 15px;
   border-left: 4px solid var(--primary-color);
+  white-space: pre-line;
 }
 
 .summary-text-container.rtl {
