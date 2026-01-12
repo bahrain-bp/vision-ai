@@ -32,9 +32,9 @@ class TranscribeService {
 
   private mediaManager = StreamManager;
 
-  private readonly microphoneAttempts: number = 8;
+  private readonly microphoneAttempts: number = 12;
 
-  private readonly displayAttempts: number = 8;
+  private readonly displayAttempts: number = 12;
 
   private transcribeClient: TranscribeStreamingClient | null = null;
 
@@ -425,7 +425,7 @@ class TranscribeService {
               // Multi-participant mode: use AWS speaker labels
               const awsSpeakerLabel = transcriptWords[0]?.speaker || "0";
               speaker = `${
-                this.participantType ?? "Speaker"
+                 "Speaker"
               } ${awsSpeakerLabel}`;
             }
           }

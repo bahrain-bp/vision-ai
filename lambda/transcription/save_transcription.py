@@ -4,29 +4,34 @@ import os
 from datetime import datetime
 from botocore.exceptions import ClientError
 
+# Initialize S3 client
 s3_client = boto3.client('s3')
 bucket_name = os.environ['BUCKET_NAME']
 
 def handler(event, context):
+    """Lambda handler for saving investigation transcripts to S3"""
     try:        
+        # Parse request body
         body = json.loads(event.get('body', '{}'))
         case_id = body.get('caseId')
         session_id = body.get('sessionId')
         transcription = body.get('transcription')
         metadata = body.get('metadata', {})
         
+        # Validate required fields
         if not all([case_id, session_id, transcription]):
             return build_response(400, {
                 'error': 'Missing required fields: caseId, sessionId, transcription'
             })
         
+        # Generate timestamp for file versioning
         timestamp = datetime.utcnow().strftime('%Y%m%d-%H%M%S')
         
-        # This path auto-creates the "transcribe" folder
+        # Construct S3 paths with case/session hierarchy
         transcription_key = f"cases/{case_id}/sessions/{session_id}/transcribe/transcript-{timestamp}.txt"
         metadata_key = f"cases/{case_id}/sessions/{session_id}/transcribe/metadata-{timestamp}.json"
         
-        # Save transcription text
+        # Save transcript text
         s3_client.put_object(
             Bucket=bucket_name,
             Key=transcription_key,
@@ -34,7 +39,7 @@ def handler(event, context):
             ContentType='text/plain'
         )
         
-        # Save metadata
+        # Build and save metadata
         metadata_with_info = {
             'caseId': case_id,
             'sessionId': session_id,
@@ -43,6 +48,7 @@ def handler(event, context):
             **metadata
         }
         
+        #Append bucket to add new object
         s3_client.put_object(
             Bucket=bucket_name,
             Key=metadata_key,
