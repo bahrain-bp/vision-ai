@@ -39,16 +39,20 @@ const Classification: React.FC<ClassificationProps> = ({
 }) => {
   const [file, setFile] = useState<File | null>(null);
   const [text, setText] = useState<string>(() => persistedData?.text || "");
-  const [category, setCategory] = useState<string>(() => persistedData?.category || "");
+  const [category, setCategory] = useState<string>(
+    () => persistedData?.category || ""
+  );
   const [confidence, setConfidence] = useState<number | null>(() =>
-    typeof persistedData?.confidence === "number" ? persistedData.confidence : null
+    typeof persistedData?.confidence === "number"
+      ? persistedData.confidence
+      : null
   );
   const [loading, setLoading] = useState<LoadingState>("idle");
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
-  const [classificationReason, setClassificationReason] = useState<string | null>(
-    persistedData?.classificationReason || null
-  );
+  const [classificationReason, setClassificationReason] = useState<
+    string | null
+  >(persistedData?.classificationReason || null);
 
   const isArabic = language === "ar";
   const t = (en: string, ar: string) => (isArabic ? ar : en);
@@ -64,10 +68,13 @@ const Classification: React.FC<ClassificationProps> = ({
   useEffect(() => {
     if (!hydrateFromPersisted) return;
     if (persistedData?.text !== undefined) setText(persistedData.text || "");
-    if (persistedData?.category !== undefined) setCategory(persistedData.category || "");
+    if (persistedData?.category !== undefined)
+      setCategory(persistedData.category || "");
     if (persistedData?.confidence !== undefined) {
       setConfidence(
-        typeof persistedData.confidence === "number" ? persistedData.confidence : null
+        typeof persistedData.confidence === "number"
+          ? persistedData.confidence
+          : null
       );
     }
     if (persistedData?.classificationReason !== undefined) {
@@ -90,12 +97,9 @@ const Classification: React.FC<ClassificationProps> = ({
   const apiBase = process.env.REACT_APP_API_ENDPOINT || "";
   const uploadUrl = `${apiBase}/classification/upload`;
   const extractUrl = `${apiBase}/classification/extract`;
+  const extractStatusUrl = `${apiBase}/classification/extract/status`;
   const storeUrl = `${apiBase}/classification/store`;
   const classifyUrl = `${apiBase}/classification/categorize`;
-  const extractFnUrl =
-    process.env.REACT_APP_EXTRACT_FN_URL && process.env.REACT_APP_EXTRACT_FN_URL !== ""
-      ? process.env.REACT_APP_EXTRACT_FN_URL
-      : "https://s2dntz6phbvnsmferrtuirulfe0ziteu.lambda-url.us-east-1.on.aws/";
 
   const clearMessages = () => {
     setError(null);
@@ -104,7 +108,10 @@ const Classification: React.FC<ClassificationProps> = ({
 
   const validateFile = (f: File): string | null => {
     if (!ALLOWED_TYPES.includes(f.type)) {
-      return t("Invalid file type. Use PDF, Word, or TXT.", "نوع الملف غير مسموح. استخدم PDF أو Word أو TXT.");
+      return t(
+        "Invalid file type. Use PDF, Word, or TXT.",
+        "نوع الملف غير مسموح. استخدم PDF أو Word أو TXT."
+      );
     }
     return null;
   };
@@ -135,7 +142,9 @@ const Classification: React.FC<ClassificationProps> = ({
 
   const getUploadUrl = async (selectedFile: File) => {
     if (!sessionData.sessionId) {
-      throw new Error(t("Missing session id.", "لم يتم العثور على رقم الجلسة."));
+      throw new Error(
+        t("Missing session id.", "لم يتم العثور على رقم الجلسة.")
+      );
     }
 
     const res = await fetch(uploadUrl, {
@@ -148,7 +157,8 @@ const Classification: React.FC<ClassificationProps> = ({
       }),
     });
 
-    if (!res.ok) throw new Error(t("Could not get upload URL.", "تعذر إنشاء رابط الرفع."));
+    if (!res.ok)
+      throw new Error(t("Could not get upload URL.", "تعذر إنشاء رابط الرفع."));
     return res.json() as Promise<{ uploadUrl: string; key: string }>;
   };
 
@@ -164,23 +174,52 @@ const Classification: React.FC<ClassificationProps> = ({
 
   const extractText = async (key: string) => {
     if (!sessionData.sessionId) {
-      throw new Error(t("Missing session id.", "لم يتم العثور على رقم الجلسة."));
+      throw new Error(
+        t("Missing session id.", "لم يتم العثور على رقم الجلسة.")
+      );
     }
 
-    const targetUrl = extractFnUrl || extractUrl;
-    const res = await fetch(targetUrl, {
+    // Start extraction job
+    const startRes = await fetch(extractUrl, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        key,
-        sessionId: sessionData.sessionId,
-      }),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key, sessionId: sessionData.sessionId }),
     });
 
-    if (!res.ok) throw new Error(t("Extraction failed.", "فشل الاستخراج."));
-    return res.json() as Promise<{ extracted_text: string; category?: string }>;
+    if (!startRes.ok)
+      throw new Error(t("Extraction failed to start.", "فشل بدء الاستخراج."));
+
+    const { jobId } = (await startRes.json()) as { jobId: string };
+
+    // Poll for results
+    const maxAttempts = 180; // 15 minutes max (5s interval)
+    for (let i = 0; i < maxAttempts; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 5000)); // Wait 5s
+
+      const statusRes = await fetch(`${extractStatusUrl}?jobId=${jobId}`);
+      if (!statusRes.ok)
+        throw new Error(t("Failed to check status.", "فشل التحقق من الحالة."));
+
+      const status = (await statusRes.json()) as {
+        status: string;
+        extractedText?: string;
+        error?: string;
+      };
+
+      if (status.status === "COMPLETED") {
+        return { extracted_text: status.extractedText || "" };
+      }
+
+      if (status.status === "FAILED") {
+        throw new Error(
+          status.error || t("Extraction failed.", "فشل الاستخراج.")
+        );
+      }
+
+      // Still PROCESSING, continue polling
+    }
+
+    throw new Error(t("Extraction timeout.", "انتهت مهلة الاستخراج."));
   };
 
   const storeExtractedText = async (textToStore: string) => {
@@ -232,7 +271,9 @@ const Classification: React.FC<ClassificationProps> = ({
 
       setLoading("classify");
 
-      const classification = await classifyExtractedText(result.extracted_text || "");
+      const classification = await classifyExtractedText(
+        result.extracted_text || ""
+      );
       setCategory(classification.category || "");
       setConfidence(
         typeof classification.confidence === "number"
@@ -282,7 +323,11 @@ const Classification: React.FC<ClassificationProps> = ({
     });
 
     if (!res.ok) throw new Error(t("Classification failed.", "فشل التصنيف."));
-    return res.json() as Promise<{ category: string; confidence?: number; reason?: string }>;
+    return res.json() as Promise<{
+      category: string;
+      confidence?: number;
+      reason?: string;
+    }>;
   };
 
   const isBusy = loading !== "idle";
@@ -320,14 +365,12 @@ const Classification: React.FC<ClassificationProps> = ({
           </div>
 
           <p className="upload-title">
-            {file ? t("Change document", "تغيير الملف") : t("Upload document", "رفع ملف")}
+            {file
+              ? t("Change document", "تغيير الملف")
+              : t("Upload document", "رفع ملف")}
           </p>
           <p className="upload-sub">
-            {t(
-              `PDF, Word, or TXT`,
-              `ملف PDF او Word او TXT`,
-
-            )}
+            {t(`PDF, Word, or TXT`, `ملف PDF او Word او TXT`)}
           </p>
 
           <button
@@ -338,7 +381,9 @@ const Classification: React.FC<ClassificationProps> = ({
             }}
             disabled={isBusy}
           >
-            {file ? t("Choose another file", "اختر ملفاً آخر") : t("Click to browse", "اضغط للاختيار")}
+            {file
+              ? t("Choose another file", "اختر ملفاً آخر")
+              : t("Click to browse", "اضغط للاختيار")}
           </button>
 
           <input
@@ -377,18 +422,24 @@ const Classification: React.FC<ClassificationProps> = ({
 
         <textarea
           className="classification-results-textarea"
-          placeholder={t("Extracted text will appear here after processing...", "سيظهر النص المستخرج هنا بعد المعالجة...")}
+          placeholder={t(
+            "Extracted text will appear here after processing...",
+            "سيظهر النص المستخرج هنا بعد المعالجة..."
+          )}
           value={text}
           readOnly
         />
 
         <div className="category-block">
           <div className="category-header">
-            <p className="category-label">{t("Detected Category", "الفئة المكتشفة")}</p>
+            <p className="category-label">
+              {t("Detected Category", "الفئة المكتشفة")}
+            </p>
           </div>
           <div className="category-display">
             <p className="category-main">
-              {category || t("Category will appear here.", "سيظهر التصنيف هنا.")}
+              {category ||
+                t("Category will appear here.", "سيظهر التصنيف هنا.")}
             </p>
             {(classificationReason || confidence !== null) && (
               <div className="category-meta">

@@ -54,12 +54,15 @@ class classificationStack(Stack):
 
         lambda_role.add_to_policy(iam.PolicyStatement(
             effect=iam.Effect.ALLOW,
-            actions=[
-            "bedrock:Converse",
-        ],
-        resources=["*"],  
-    )
-        )
+            actions=["bedrock:Converse"],
+            resources=["*"],  
+        ))
+
+        lambda_role.add_to_policy(iam.PolicyStatement(
+            effect=iam.Effect.ALLOW,
+            actions=["lambda:InvokeFunction"],
+            resources=["*"]
+        ))
 
         docx_layer = _lambda.LayerVersion(
             self,
@@ -115,16 +118,17 @@ class classificationStack(Stack):
             description="Classify extracted text into violation, misdemeanor, or felony",
         )
 
-        #Lambda #2: extract text using Bedrock Nova Lite
-        extract_text_lambda = _lambda.Function(
+        # Lambda Worker: extract text using Bedrock Nova Lite (invoked asynchronously)
+        extract_text_worker = _lambda.Function(
             self,
-            "ExtractTextLambda",
+            "ExtractTextWorker",
             runtime=_lambda.Runtime.PYTHON_3_12,
-            handler="extract_text.handler",       
+            handler="extract_text_worker.handler",       
             code=_lambda.Code.from_asset("lambda/classification"),
             role=lambda_role,
             memory_size=512,
-            timeout = Duration.seconds(900),  
+            timeout=Duration.seconds(900),
+            reserved_concurrent_executions=10,
             layers=[
                 tesseract_layer,
                 _lambda.LayerVersion.from_layer_version_arn(
@@ -144,21 +148,47 @@ class classificationStack(Stack):
             },
         )
 
-        # Allow lambda to read uploaded files from S3
-        investigation_bucket.grant_read(extract_text_lambda)
+        # Lambda Initiator: starts extraction job and returns jobId
+        extract_text_initiator = _lambda.Function(
+            self,
+            "ExtractTextInitiator",
+            runtime=_lambda.Runtime.PYTHON_3_12,
+            handler="extract_text_initiator.handler",
+            code=_lambda.Code.from_asset("lambda/classification"),
+            role=lambda_role,
+            timeout=Duration.seconds(30),
+            environment={
+                "WORKER_FUNCTION_NAME": extract_text_worker.function_name,
+                "BUCKET_NAME": investigation_bucket.bucket_name,
+            },
+        )
 
-        # Allow lambda to call Bedrock Nova Lite
-        extract_text_lambda.add_to_role_policy(
+        # Lambda Status: checks job status from S3
+        extract_text_status = _lambda.Function(
+            self,
+            "ExtractTextStatus",
+            runtime=_lambda.Runtime.PYTHON_3_12,
+            handler="extract_text_status.handler",
+            code=_lambda.Code.from_asset("lambda/classification"),
+            role=lambda_role,
+            timeout=Duration.seconds(10),
+            environment={
+                "BUCKET_NAME": investigation_bucket.bucket_name,
+            },
+        )
+
+        # Allow worker lambda to read/write S3
+        investigation_bucket.grant_read_write(extract_text_worker)
+
+        # Allow worker lambda to call Bedrock
+        extract_text_worker.add_to_role_policy(
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
                 actions=[
                     "bedrock:InvokeModel",
                     "bedrock:InvokeModelWithResponseStream", 
                 ],
-                resources=[
-                    "*"
-            
-                ],
+                resources=["*"],
             )
         )
 
@@ -201,8 +231,8 @@ class classificationStack(Stack):
             authorization_type=apigateway.AuthorizationType.NONE,
         )
 
-        #2- for text extraction /classification/exreact
-        extract_resource= classification_resource.add_resource("extract")
+        # /classification/extract - Start extraction job
+        extract_resource = classification_resource.add_resource("extract")
         extract_resource.add_cors_preflight(
             allow_origins=apigateway.Cors.ALL_ORIGINS,
             allow_methods=["OPTIONS", "POST"],
@@ -215,21 +245,26 @@ class classificationStack(Stack):
 
         extract_resource.add_method(
             "POST",
-            apigateway.LambdaIntegration(extract_text_lambda),
+            apigateway.LambdaIntegration(extract_text_initiator),
             authorization_type=apigateway.AuthorizationType.NONE,
         )
 
-        extract_fn_url = extract_text_lambda.add_function_url(
-            auth_type=_lambda.FunctionUrlAuthType.NONE,
-            cors=_lambda.FunctionUrlCorsOptions(
-                allowed_origins=["*"],
-                allowed_methods=[_lambda.HttpMethod.POST],    
-                allowed_headers=[
-                    "content-type",
-                    "x-amz-date",
-                    "x-requested-with"
-                ]
-            )
+        # /classification/extract/status - Check job status
+        extract_status_resource = extract_resource.add_resource("status")
+        extract_status_resource.add_cors_preflight(
+            allow_origins=apigateway.Cors.ALL_ORIGINS,
+            allow_methods=["OPTIONS", "GET"],
+            allow_headers=[
+                "Content-Type",
+                "X-Amz-Date",
+                "X-Requested-With"
+            ]
+        )
+
+        extract_status_resource.add_method(
+            "GET",
+            apigateway.LambdaIntegration(extract_text_status),
+            authorization_type=apigateway.AuthorizationType.NONE,
         )
 
         store_resource = classification_resource.add_resource("store")
@@ -278,14 +313,14 @@ class classificationStack(Stack):
             self,
             "TextExtractEndpoint",
             value=f"https://{shared_api.rest_api_id}.execute-api.{env.region}.amazonaws.com/prod/classification/extract",
-            description="POST endpoint for text extraction",
+            description="POST endpoint to start text extraction job (returns jobId)",
         )
 
         CfnOutput(
             self,
-            "ExtractTextFunctionURL",
-            value=extract_fn_url.url,
-            description="Direct Lambda URL for text extraction",
+            "TextExtractStatusEndpoint",
+            value=f"https://{shared_api.rest_api_id}.execute-api.{env.region}.amazonaws.com/prod/classification/extract/status",
+            description="GET endpoint to check extraction job status (query param: jobId)",
         )
 
         CfnOutput(

@@ -20,18 +20,12 @@ class S3EventWiringStack(Stack):
         self,
         scope: Construct,
         construct_id: str,
-        investigation_bucket_name: str,  
+        investigation_bucket: s3.IBucket,  
         police_doc_lambda_name: str,     
         env,
         **kwargs
     ) -> None:
         super().__init__(scope, construct_id, env=env, **kwargs)
-        
-        # Import S3 bucket by name
-        investigation_bucket = s3.Bucket.from_bucket_name(
-            self, "InvestigationBucket",
-            investigation_bucket_name
-        )
         
         # Import Lambda by function name
         police_doc_lambda = _lambda.Function.from_function_name(

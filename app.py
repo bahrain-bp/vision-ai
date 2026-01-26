@@ -183,7 +183,7 @@ police_doc_stack.add_dependency(shared_stack)
 s3_wiring_stack = S3EventWiringStack(
     app, f"{app_name}-s3-event-wiring-stack",
     env=env,
-    investigation_bucket_name="vision-rt-investigation-system",  
+    investigation_bucket=shared_stack.investigation_bucket,  
     police_doc_lambda_name="vision-ai-process-police-document", 
     description="S3 event notifications: Triggers Lambda on PDF uploads"
 )
