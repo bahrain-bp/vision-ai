@@ -21,7 +21,6 @@ from docx.text.paragraph import Paragraph
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-# Ensure the Lambda runtime can locate the Tesseract binaries and data files from the layer.
 os.environ.setdefault("PATH", "")
 os.environ["PATH"] = "/opt/bin:" + os.environ["PATH"]
 os.environ.setdefault("LD_LIBRARY_PATH", "")
@@ -56,10 +55,10 @@ NORMALIZATION_SYSTEM_PROMPT = """
 - لا تضف أي معلومات غير موجودة في الصفحة الأصلية.
 - لا تضف عناوين، أو تذييلات، أو ملاحظات من عندك.
 - حافظ على جميع التفاصيل كما هي، بما في ذلك الأرقام، التواريخ، العناوين، التسميات، وأسماء الحقول كما ظهرت في الصفحة.
-- طَبِّع/نظِّم المخرجات كنص نظيف ومتصل وسهل القراءة والمعالجة لاحقًا.
+- طَبِّع/نظِّم المخرجات كنص نظيف ومتصل وسهل القراءة والمعالجة لاحقًا.
 - حافظ على هيكل وترتيب النص كما هو في الصفحة الأصلية (العناوين، الفقرات، البنود، التسلسل).
 - يجب أن يحتوي الإخراج على **النص الموجود في الصفحة فقط**. لا تضف أي مقدمات، أو تعليقات، أو اعتذارات، أو شروح.
-- ابدأ إجابتك بأول سطر نص موجود في الصفحة مباشرة، ولا تبدأ بعبارات مثل: "إليك النص" أو "ها هو…".
+- ابدأ إجابتك بأول سطر نص موجود في الصفحة مباشرة، ولا تبدأ بعبارات مثل: \"إليك النص\" أو \"ها هو…\".
 - أنهِ إجابتك بآخر سطر نص في الصفحة، ولا تضف أي نص بعده.
 
 """.strip()
@@ -69,7 +68,7 @@ VISION_USER_PROMPT = """
 
 سأرسل لك في كل مرة:
 1. صورة لصفحة من مستند (صورة ممسوحة من PDF أو ورقة تصوير).
-2. نصًّا خاماً مستخرجاً من نفس الصفحة بواسطة أداة أخرى (قد يحتوي على أخطاء وتشويش).
+2. نصًّا خاماً مستخرجاً من نفس الصفحة بواسطة أداة أخرى (قد يحتوي على أخطاء وتشويش).
 
 مهمتك:
 
@@ -79,9 +78,9 @@ VISION_USER_PROMPT = """
    - العناوين، الجمل، الفقرات، العناصر المرقمة، والجداول إن وُجدت.
    - النص العربي والإنجليزي والأرقام والرموز المفهومة.
 4. **نظّم الناتج ليكون قابلاً للقراءة**:
-   - لا تترك حروفاً متقطعة (مثلاً: "ال س ل ا م" ← "السلام").
+   - لا تترك حروفاً متقطعة (مثلاً: \"ال س ل ا م\" ← \"السلام\").
    - صحّح ترتيب الحروف واتجاهها إن كان مقلوباً أو معكوساً.
-   - تخلّص من الرموز والقطع المشوّهة مثل: ï»؛, �, ☐, أو أي نص واضح أنه غير مفهوم أو ناتج عن خطأ مسح.
+   - تخلّص من الرموز والقطع المشوّهة مثل: ï»؛, , ☐, أو أي نص واضح أنه غير مفهوم أو ناتج عن خطأ مسح.
 5. **فصل الفقرات**:
    - اجعل كل فقرة في سطر مستقل.
    - ضع سطرًا فارغًا واحدًا بين الفقرة والتي تليها.
@@ -93,7 +92,7 @@ VISION_USER_PROMPT = """
    - أعِد كتابة النص كما هو قدر الإمكان، مع تحسين التنسيق فقط وتصحيح الأخطاء البصرية.
 9. الناتج النهائي يجب أن يكون:
    - نصًا خامًا فقط (plain text)، بدون أي شرح أو تعليقات من عندك.
-   - بدون عناوين مثل "الناتج هو:" أو "النص بعد التصحيح:"، فقط ابدأ مباشرة بالنص.
+   - بدون عناوين مثل \"الناتج هو:\" أو \"النص بعد التصحيح:\"، فقط ابدأ مباشرة بالنص.
    -بدون تعليقات مضافة او ملاحظات او قواعد استخدمت لاستخراج النص.
 10. اذا كان النص المرسل فارغا ولم تستطع استخراج نص من الصورة ارجع النص فارغا
 
@@ -102,76 +101,73 @@ VISION_USER_PROMPT = """
 - أولاً: النص الخام المستخرج بين ثلاث علامات اقتباس ثلاثية 
 - وثانياً: صورة الصفحة،
 
-ابدأ في استخراج النص المنظَّم مباشرة.
+ابدأ في استخراج النص المنظَّم مباشرة.
 
-\"\"\"
+\\\"\\\"\\\"
 {RAW_TEXT}
-\"\"\"
+\\\"\\\"\\\"
 """.strip()
-
-
-def error_response(message, status=500):
-    return {
-        "statusCode": status,
-        "headers": {"Content-Type": "application/json"},
-        "body": json.dumps({"error": message}),
-    }
-
-
-def api_response(text, status=200):
-    return {
-        "statusCode": status,
-        "headers": {"Content-Type": "application/json; charset=utf-8"},
-        "body": json.dumps({"extracted_text": text}, ensure_ascii=False),
-    }
 
 
 def handler(event, context):
     """
-    Input (API Gateway):
-      { "key": "classification/upload/...", "sessionId": "..." }
-
-    Output:
-      { "extracted_text": "..." }
+    Worker lambda invoked asynchronously.
+    Input: { "jobId": "...", "key": "...", "sessionId": "..." }
+    Updates S3 status file with result or error.
     """
-    try:
-        body = json.loads(event.get("body", "{}"))
-        s3_key = unquote_plus(body["key"])
-        session_id = body.get("sessionId")
-        if not session_id or not s3_key:
-            return error_response("sessionId and s3 key are required", status=400)
+    job_id = event.get("jobId")
+    s3_key = unquote_plus(event.get("key", ""))
+    session_id = event.get("sessionId")
 
+    status_key = f"classification/jobs/{job_id}/status.json"
+
+    try:
         safe_session = str(session_id).replace("/", "_")
         if ".." in s3_key.split("/"):
-            return error_response("Invalid s3 key", status=400)
+            raise ValueError("Invalid s3 key")
 
         if not s3_key.startswith("classification/upload/"):
-            return error_response("Invalid key prefix", status=400)
+            raise ValueError("Invalid key prefix")
         if f"/{safe_session}/" not in s3_key:
-            return error_response("Key does not belong to the provided session", status=400)
+            raise ValueError("Key does not belong to the provided session")
 
         logger.info("Extracting from s3://%s/%s (session=%s)", BUCKET_NAME, s3_key, safe_session)
 
         filename = s3_key.split("/")[-1].lower()
 
         if filename.endswith(".pdf"):
-            return extract_pdf(s3_key)
-
-        if filename.endswith(".docx"):
-            return extract_docx(s3_key)
-
-        if filename.endswith(".txt"):
+            extracted_text = extract_pdf(s3_key)
+        elif filename.endswith(".docx"):
+            extracted_text = extract_docx(s3_key)
+        elif filename.endswith(".txt"):
             obj = s3.get_object(Bucket=BUCKET_NAME, Key=s3_key)
-            text = obj["Body"].read().decode("utf-8", errors="ignore")
-            return api_response(text)
+            extracted_text = obj["Body"].read().decode("utf-8", errors="ignore")
+        else:
+            raise ValueError("Unsupported file type. Allowed: .pdf, .docx, .txt")
 
-        msg = "Unsupported file type. Allowed: .pdf, .docx, .txt"
-        logger.warning(msg)
-        return error_response(msg, status=400)
+        # Update status to COMPLETED
+        s3.put_object(
+            Bucket=BUCKET_NAME,
+            Key=status_key,
+            Body=json.dumps({
+                "status": "COMPLETED",
+                "extractedText": extracted_text
+            }, ensure_ascii=False),
+            ContentType="application/json"
+        )
 
     except Exception as e:
         logger.exception("Extraction error")
-        return error_response(str(e), status=500)
+        # Update status to FAILED
+        s3.put_object(
+            Bucket=BUCKET_NAME,
+            Key=status_key,
+            Body=json.dumps({
+                "status": "FAILED",
+                "error": str(e)
+            }),
+            ContentType="application/json"
+        )
 
 
 def extract_pdf(s3_key):
@@ -196,10 +192,10 @@ def extract_pdf(s3_key):
                 page_index, page_output = future.result()
                 pages_text[page_index - 1] = page_output
 
-    full_text = "\n\n".join([p for p in pages_text if p]).strip()
+    full_text = "\\n\\n".join([p for p in pages_text if p]).strip()
     if not full_text:
-        return error_response("failed to extract the text", status=500)
-    return api_response(full_text)
+        raise ValueError("failed to extract the text")
+    return full_text
 
 
 def extract_pdf_raw_text(page):
@@ -211,7 +207,7 @@ def extract_pdf_raw_text(page):
             continue
         text = (block[4] or "").strip()
         if text:
-            text_blocks.append((block[0], block[1], text))  # x0, y0, text
+            text_blocks.append((block[0], block[1], text))
 
     if not text_blocks:
         fallback_text = (page.get_text("text") or "").strip()
@@ -219,7 +215,7 @@ def extract_pdf_raw_text(page):
 
     sorted_blocks = sorted(text_blocks, key=lambda b: (b[1], b[0]))
     raw_lines = [b[2] for b in sorted_blocks]
-    return merge_lines("\n".join(raw_lines))
+    return merge_lines("\\n".join(raw_lines))
 
 
 def render_pdf_page_image(page):
@@ -259,9 +255,9 @@ def extract_docx(s3_key):
 
     raw_text = extract_docx_raw_text(data)
     if not raw_text:
-        return error_response("failed to extract the text", status=500)
+        raise ValueError("failed to extract the text")
 
-    return api_response(format_page_output(1, raw_text))
+    return format_page_output(1, raw_text)
 
 
 def extract_docx_raw_text(docx_bytes):
@@ -280,29 +276,26 @@ def extract_docx_raw_text(docx_bytes):
             text = normalize_docx_line(block.text)
             if text:
                 lines.append(text)
-                lines.append(DOCX_PARA_BREAK)  # mark paragraph boundary
+                lines.append(DOCX_PARA_BREAK)
         elif isinstance(block, Table):
             lines.extend(table_to_row_style(block))
-            lines.append(DOCX_PARA_BREAK)  # mark table boundary
+            lines.append(DOCX_PARA_BREAK)
     collapsed = collapse_docx_paragraphs(lines)
-    return "\n".join(collapsed).strip()
+    return "\\n".join(collapsed).strip()
 
 
 def table_to_row_style(table):
-    """Return table rows as plain lines (header then each row)."""
     if not table.rows:
         return []
 
     headers = [normalize_docx_line(cell.text) for cell in table.rows[0].cells]
     lines = []
-    # Include header row if it contains any text
     if any(headers):
         lines.append(" | ".join(headers))
 
     for row in table.rows[1:]:
         cells = []
         for col_index, cell in enumerate(row.cells):
-            # Skip duplicate cells caused by merged cells sharing the same _tc
             if col_index > 0 and row.cells[col_index - 1]._tc is cell._tc:
                 continue
             cells.append(normalize_docx_line(cell.text))
@@ -313,26 +306,18 @@ def table_to_row_style(table):
 def merge_lines(text):
     if not text:
         return ""
-    merged = re.sub(r"([^\n])\n(?=[^\n])", r"\1 ", text.strip())
-    # Normalize presentation forms (common in Arabic PDFs) back to base codepoints.
+    merged = re.sub(r"([^\\n])\\n(?=[^\\n])", r"\\1 ", text.strip())
     return unicodedata.normalize("NFKC", merged)
 
 
 def normalize_docx_line(text: str) -> str:
-    """Normalize DOCX line: strip, replace NBSP, and normalize presentation forms."""
     if text is None:
         return ""
-    cleaned = text.replace("\u00a0", " ").strip()
+    cleaned = text.replace("\\u00a0", " ").strip()
     return unicodedata.normalize("NFKC", cleaned)
 
 
 def collapse_docx_paragraphs(lines):
-    """
-    Merge consecutive DOCX paragraph lines into flowing paragraphs.
-    - Table rows (containing ' | ') are kept as-is.
-    - Blank lines or explicit paragraph breaks flush the current paragraph.
-    - Short/fragmented lines get concatenated until punctuation ends the sentence.
-    """
     out = []
     buffer = ""
 
@@ -370,13 +355,13 @@ def collapse_docx_paragraphs(lines):
 
 
 def format_page_output(page_index, body):
-    return f"=== Page {page_index} ===\n{body.strip()}"
+    return f"=== Page {page_index} ===\\n{body.strip()}"
 
 
 def is_sparse_pdf_text(text: str) -> bool:
     if text is None:
         return True
-    compact = re.sub(r"\s+", "", text)
+    compact = re.sub(r"\\s+", "", text)
     return len(compact) < PDF_MIN_TEXT_CHARS
 
 
